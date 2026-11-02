@@ -22558,6 +22558,7 @@ dependencies = [
  "clock",
  "collections",
  "command_palette",
+ "command_palette_hooks",
  "dap_adapters",
  "db",
  "debug_adapter_extension",

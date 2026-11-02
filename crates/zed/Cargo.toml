@@ -69,6 +69,7 @@ client.workspace = true
 clock = { workspace = true, optional = true }
 collections.workspace = true
 command_palette.workspace = true
+command_palette_hooks.workspace = true
 dap_adapters.workspace = true
 db.workspace = true
 debug_adapter_extension.workspace = true

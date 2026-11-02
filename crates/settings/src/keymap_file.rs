@@ -59,15 +59,17 @@ pub(crate) static KEY_BINDING_VALIDATORS: LazyLock<BTreeMap<TypeId, Box<dyn KeyB
 #[serde(transparent)]
 pub struct KeymapFile(Vec<KeymapSection>);
 
-/// Action namespaces of features that are not part of this application.
-/// Bindings to them are skipped instead of being reported as errors.
-const UNAVAILABLE_ACTION_NAMESPACES: &[&str] = &[
+/// Actions, or action namespaces ending in `::`, of features that are not part of
+/// this application. Bindings to them are skipped instead of being reported as errors.
+const UNAVAILABLE_ACTIONS: &[&str] = &[
     "agent::",
     "agents_sidebar::",
     "channel_modal::",
     "collab_panel::",
     "inline_assistant::",
     "repl::",
+    "projects::OpenDevContainer",
+    "projects::OpenRemote",
 ];
 
 fn is_unavailable_action(action: &Value) -> bool {
@@ -79,9 +81,13 @@ fn is_unavailable_action(action: &Value) -> bool {
         },
         _ => return false,
     };
-    UNAVAILABLE_ACTION_NAMESPACES
-        .iter()
-        .any(|namespace| name.starts_with(namespace))
+    UNAVAILABLE_ACTIONS.iter().any(|unavailable| {
+        if unavailable.ends_with("::") {
+            name.starts_with(unavailable)
+        } else {
+            name == unavailable
+        }
+    })
 }
 
 /// Keymap section which binds keystrokes to actions.
