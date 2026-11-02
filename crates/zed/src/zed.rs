@@ -425,11 +425,37 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     })
     .detach();
 
-    // Remote development is not available.
+    // AI, multi-workspace and remote development are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
+        for namespace in [
+            "agent",
+            "agents_sidebar",
+            "assistant",
+            "context_server",
+            "copilot",
+            "copilot_edit_predictions",
+            "edit_prediction",
+            "multi_workspace",
+            "skill_creator",
+            "zed_predict_onboarding",
+        ] {
+            filter.hide_namespace(namespace);
+        }
         filter.hide_action_types(&[
-            TypeId::of::<zed_actions::OpenRemote>(),
+            TypeId::of::<editor::actions::AcceptEditPrediction>(),
+            TypeId::of::<editor::actions::AcceptNextLineEditPrediction>(),
+            TypeId::of::<editor::actions::AcceptNextWordEditPrediction>(),
+            TypeId::of::<editor::actions::NextEditPrediction>(),
+            TypeId::of::<editor::actions::PreviousEditPrediction>(),
+            TypeId::of::<editor::actions::ShowEditPrediction>(),
+            TypeId::of::<editor::actions::ToggleEditPrediction>(),
+            TypeId::of::<git::GenerateCommitMessage>(),
+            TypeId::of::<zed_actions::OpenZedPredictOnboarding>(),
+            TypeId::of::<zed_actions::assistant::CreateSkillFromUrl>(),
+            TypeId::of::<zed_actions::assistant::ManageSkills>(),
+            TypeId::of::<zed_actions::assistant::OpenSkillCreator>(),
             TypeId::of::<zed_actions::OpenDevContainer>(),
+            TypeId::of::<zed_actions::OpenRemote>(),
         ]);
     });
 

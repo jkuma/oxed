@@ -908,8 +908,11 @@ mod linux {
 
                 // libexec is the standard, lib/oxed is for Arch (and other non-libexec distros),
                 // ./oxed is for the target directory in development builds.
-                let possible_locations =
-                    ["../libexec/oxed-editor", "../lib/oxed/oxed-editor", "./oxed"];
+                let possible_locations = [
+                    "../libexec/oxed-editor",
+                    "../lib/oxed/oxed-editor",
+                    "./oxed",
+                ];
                 possible_locations
                     .iter()
                     .find_map(|p| dir.join(p).canonicalize().ok().filter(|path| path != &cli))
