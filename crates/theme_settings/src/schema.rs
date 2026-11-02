@@ -803,80 +803,6 @@ pub fn theme_colors_refinement(
             .as_ref()
             .or(this.version_control_conflict_theirs_background.as_ref())
             .and_then(|color| try_parse_color(color).ok()),
-        vim_normal_background: this
-            .vim_normal_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_insert_background: this
-            .vim_insert_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_replace_background: this
-            .vim_replace_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_background: this
-            .vim_visual_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_line_background: this
-            .vim_visual_line_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_block_background: this
-            .vim_visual_block_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_yank_background: this
-            .vim_yank_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok())
-            .or(editor_document_highlight_read_background),
-        vim_helix_jump_label_foreground: this
-            .vim_helix_jump_label_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok())
-            .or(status_colors.error),
-        vim_helix_normal_background: this
-            .vim_helix_normal_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_helix_select_background: this
-            .vim_helix_select_background
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_normal_foreground: this
-            .vim_normal_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_insert_foreground: this
-            .vim_insert_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_replace_foreground: this
-            .vim_replace_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_foreground: this
-            .vim_visual_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_line_foreground: this
-            .vim_visual_line_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_visual_block_foreground: this
-            .vim_visual_block_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_helix_normal_foreground: this
-            .vim_helix_normal_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
-        vim_helix_select_foreground: this
-            .vim_helix_select_foreground
-            .as_ref()
-            .and_then(|color| try_parse_color(color).ok()),
     }
 }
 
@@ -913,8 +839,6 @@ fn try_parse_color(color: &str) -> anyhow::Result<Hsla> {
 
 #[cfg(test)]
 mod tests {
-    use theme::StatusColorsRefinement;
-
     use super::{
         StatusColorsContent, ThemeColorsContent, status_colors_refinement, theme_colors_refinement,
         try_parse_color,
@@ -1071,40 +995,5 @@ mod tests {
             Ok(color) => color,
             Err(error) => panic!("failed to parse color {color}: {error}"),
         }
-    }
-
-    #[test]
-    fn helix_jump_label_color_uses_theme_color_or_status_error() {
-        let status_error = try_parse_color("#e63333").expect("valid color");
-        let override_color = try_parse_color("#00ff00").expect("valid color");
-        let status_colors = StatusColorsRefinement {
-            error: Some(status_error),
-            ..Default::default()
-        };
-
-        let fallback_refinement = theme_colors_refinement(
-            &ThemeColorsContent::default(),
-            &status_colors,
-            Default::default(),
-        );
-
-        assert_eq!(
-            fallback_refinement.vim_helix_jump_label_foreground,
-            Some(status_error)
-        );
-
-        let override_refinement = theme_colors_refinement(
-            &ThemeColorsContent {
-                vim_helix_jump_label_foreground: Some("#00ff00".into()),
-                ..Default::default()
-            },
-            &status_colors,
-            Default::default(),
-        );
-
-        assert_eq!(
-            override_refinement.vim_helix_jump_label_foreground,
-            Some(override_color)
-        );
     }
 }

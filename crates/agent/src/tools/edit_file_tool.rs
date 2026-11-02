@@ -1488,15 +1488,15 @@ mod tests {
     async fn test_streaming_authorize(cx: &mut TestAppContext) {
         let (edit_tool, _project, _action_log, _fs, _thread) = setup_test(cx, json!({})).await;
 
-        // Test 1: Path with .zed component should require confirmation
+        // Test 1: Path with .oxed component should require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx
-            .update(|cx| edit_tool.authorize(&PathBuf::from(".zed/settings.json"), &stream_tx, cx));
+            .update(|cx| edit_tool.authorize(&PathBuf::from(".oxed/settings.json"), &stream_tx, cx));
 
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.title,
-            MaybeUndefined::Value("Edit `.zed/settings.json` (local settings)".into())
+            MaybeUndefined::Value("Edit `.oxed/settings.json` (local settings)".into())
         );
 
         // Test 2: Path outside project should require confirmation
@@ -1510,22 +1510,22 @@ mod tests {
             MaybeUndefined::Value("Edit `/etc/hosts`".into())
         );
 
-        // Test 3: Relative path without .zed should not require confirmation
+        // Test 3: Relative path without .oxed should not require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         cx.update(|cx| edit_tool.authorize(&PathBuf::from("root/src/main.rs"), &stream_tx, cx))
             .await
             .unwrap();
         assert!(stream_rx.try_recv().is_err());
 
-        // Test 4: Path with .zed in the middle should require confirmation
+        // Test 4: Path with .oxed in the middle should require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from("root/.zed/tasks.json"), &stream_tx, cx)
+            edit_tool.authorize(&PathBuf::from("root/.oxed/tasks.json"), &stream_tx, cx)
         });
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.title,
-            MaybeUndefined::Value("Edit `root/.zed/tasks.json` (local settings)".into())
+            MaybeUndefined::Value("Edit `root/.oxed/tasks.json` (local settings)".into())
         );
 
         // Test 5: When global default is allow, sensitive and outside-project
@@ -1536,14 +1536,14 @@ mod tests {
             agent_settings::AgentSettings::override_global(settings, cx);
         });
 
-        // 5.1: .zed/settings.json is a sensitive path — still prompts
+        // 5.1: .oxed/settings.json is a sensitive path — still prompts
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx
-            .update(|cx| edit_tool.authorize(&PathBuf::from(".zed/settings.json"), &stream_tx, cx));
+            .update(|cx| edit_tool.authorize(&PathBuf::from(".oxed/settings.json"), &stream_tx, cx));
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.title,
-            MaybeUndefined::Value("Edit `.zed/settings.json` (local settings)".into())
+            MaybeUndefined::Value("Edit `.oxed/settings.json` (local settings)".into())
         );
 
         // 5.2: /etc/hosts is outside the project, but Allow auto-approves
@@ -1669,9 +1669,9 @@ mod tests {
         );
     }
 
-    /// `.zed/foo/../../safe.json` similarly sidesteps the consecutive-
-    /// component scan for `.zed/`, so the canonical-path recheck has to
-    /// catch it. (We escape *out* of `.zed/` here and back in via `..`,
+    /// `.oxed/foo/../../safe.json` similarly sidesteps the consecutive-
+    /// component scan for `.oxed/`, so the canonical-path recheck has to
+    /// catch it. (We escape *out* of `.oxed/` here and back in via `..`,
     /// just to confirm the recheck doesn't naively trust the raw scan.)
     #[gpui::test]
     async fn test_streaming_authorize_blocks_dotdot_settings_bypass(cx: &mut TestAppContext) {
@@ -1680,7 +1680,7 @@ mod tests {
         fs.insert_tree(
             path!("/root"),
             json!({
-                ".zed": { "foo": {}, "settings.json": "{}" },
+                ".oxed": { "foo": {}, "settings.json": "{}" },
             }),
         )
         .await;
@@ -1690,7 +1690,7 @@ mod tests {
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
             edit_tool.authorize(
-                &PathBuf::from(path!("/root/.zed/foo/../settings.json")),
+                &PathBuf::from(path!("/root/.oxed/foo/../settings.json")),
                 &stream_tx,
                 cx,
             )
@@ -1702,13 +1702,13 @@ mod tests {
                 .title
                 .value()
                 .is_some_and(|title| title.ends_with("(local settings)")),
-            "`..` traversal into .zed must still prompt: {:?}",
+            "`..` traversal into .oxed must still prompt: {:?}",
             event.tool_call.title,
         );
     }
 
-    /// An intra-project symlink like `safe -> .zed` keeps a path's
-    /// raw components clean of `.zed`, and `resolve_project_path`
+    /// An intra-project symlink like `safe -> .oxed` keeps a path's
+    /// raw components clean of `.oxed`, and `resolve_project_path`
     /// (correctly) doesn't flag the symlink as an escape because the
     /// target stays inside the worktree. The canonical-path recheck is
     /// the only thing standing between the agent and a silent settings
@@ -1720,11 +1720,11 @@ mod tests {
         fs.insert_tree(
             path!("/root"),
             json!({
-                ".zed": { "settings.json": "{}" },
+                ".oxed": { "settings.json": "{}" },
             }),
         )
         .await;
-        fs.insert_symlink(path!("/root/safe"), PathBuf::from(".zed"))
+        fs.insert_symlink(path!("/root/safe"), PathBuf::from(".oxed"))
             .await;
         let (edit_tool, _project, _action_log, _fs, _thread) =
             setup_test_with_fs(cx, fs, &[path!("/root").as_ref()]).await;
@@ -1744,7 +1744,7 @@ mod tests {
                 .title
                 .value()
                 .is_some_and(|title| title.ends_with("(local settings)")),
-            "Intra-project symlink to .zed must still prompt: {:?}",
+            "Intra-project symlink to .oxed must still prompt: {:?}",
             event.tool_call.title,
         );
     }
@@ -2057,7 +2057,7 @@ mod tests {
         fs.insert_tree(
             "/workspace/shared",
             json!({
-                ".zed": {
+                ".oxed": {
                     "settings.json": "{}"
                 }
             }),
@@ -2078,9 +2078,9 @@ mod tests {
             ("frontend/src/main.js", false, "File in first worktree"),
             ("backend/src/main.rs", false, "File in second worktree"),
             (
-                "shared/.zed/settings.json",
+                "shared/.oxed/settings.json",
                 true,
-                ".zed file in third worktree",
+                ".oxed file in third worktree",
             ),
             ("/etc/hosts", true, "Absolute path outside all worktrees"),
             (
@@ -2115,11 +2115,11 @@ mod tests {
         fs.insert_tree(
             "/project",
             json!({
-                ".zed": {
+                ".oxed": {
                     "settings.json": "{}"
                 },
                 "src": {
-                    ".zed": {
+                    ".oxed": {
                         "local.json": "{}"
                     }
                 }
@@ -2176,7 +2176,7 @@ mod tests {
             "/project",
             json!({
                 "existing.txt": "content",
-                ".zed": {
+                ".oxed": {
                     "settings.json": "{}"
                 }
             }),
@@ -2188,10 +2188,10 @@ mod tests {
         let modes = vec![EditSessionMode::Edit, EditSessionMode::Write];
 
         for _mode in modes {
-            // Test .zed path with different modes
+            // Test .oxed path with different modes
             let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
             let _auth = cx.update(|cx| {
-                edit_tool.authorize(&PathBuf::from("project/.zed/settings.json"), &stream_tx, cx)
+                edit_tool.authorize(&PathBuf::from("project/.oxed/settings.json"), &stream_tx, cx)
             });
 
             stream_rx.expect_authorization().await;

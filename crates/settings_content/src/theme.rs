@@ -1110,61 +1110,6 @@ pub struct ThemeColorsContent {
     /// Deprecated in favor of `version_control_conflict_marker_theirs`.
     #[deprecated]
     pub version_control_conflict_theirs_background: Option<ThemeColor>,
-
-    /// Background color for Vim Normal mode indicator.
-    #[serde(rename = "vim.normal.background")]
-    pub vim_normal_background: Option<ThemeColor>,
-    /// Background color for Vim Insert mode indicator.
-    #[serde(rename = "vim.insert.background")]
-    pub vim_insert_background: Option<ThemeColor>,
-    /// Background color for Vim Replace mode indicator.
-    #[serde(rename = "vim.replace.background")]
-    pub vim_replace_background: Option<ThemeColor>,
-    /// Background color for Vim Visual mode indicator.
-    #[serde(rename = "vim.visual.background")]
-    pub vim_visual_background: Option<ThemeColor>,
-    /// Background color for Vim Visual Line mode indicator.
-    #[serde(rename = "vim.visual_line.background")]
-    pub vim_visual_line_background: Option<ThemeColor>,
-    /// Background color for Vim Visual Block mode indicator.
-    #[serde(rename = "vim.visual_block.background")]
-    pub vim_visual_block_background: Option<ThemeColor>,
-    /// Background color for Vim yank highlight.
-    #[serde(rename = "vim.yank.background")]
-    pub vim_yank_background: Option<ThemeColor>,
-    /// Foreground color for Helix jump labels.
-    #[serde(rename = "vim.helix_jump_label.foreground")]
-    pub vim_helix_jump_label_foreground: Option<ThemeColor>,
-    /// Background color for Vim Helix Normal mode indicator.
-    #[serde(rename = "vim.helix_normal.background")]
-    pub vim_helix_normal_background: Option<ThemeColor>,
-    /// Background color for Vim Helix Select mode indicator.
-    #[serde(rename = "vim.helix_select.background")]
-    pub vim_helix_select_background: Option<ThemeColor>,
-    /// Background color for Vim Normal mode indicator.
-    #[serde(rename = "vim.normal.foreground")]
-    pub vim_normal_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Insert mode indicator.
-    #[serde(rename = "vim.insert.foreground")]
-    pub vim_insert_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Replace mode indicator.
-    #[serde(rename = "vim.replace.foreground")]
-    pub vim_replace_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Visual mode indicator.
-    #[serde(rename = "vim.visual.foreground")]
-    pub vim_visual_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Visual Line mode indicator.
-    #[serde(rename = "vim.visual_line.foreground")]
-    pub vim_visual_line_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Visual Block mode indicator.
-    #[serde(rename = "vim.visual_block.foreground")]
-    pub vim_visual_block_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Helix Normal mode indicator.
-    #[serde(rename = "vim.helix_normal.foreground")]
-    pub vim_helix_normal_foreground: Option<ThemeColor>,
-    /// Foreground color for Vim Helix Select mode indicator.
-    #[serde(rename = "vim.helix_select.foreground")]
-    pub vim_helix_select_foreground: Option<ThemeColor>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]

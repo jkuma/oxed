@@ -144,8 +144,8 @@ impl PendingBindings {
         }
     }
 
-    fn keybinding(keystrokes: Rc<[KeybindingKeystroke]>, cx: &App) -> KeyBinding {
-        KeyBinding::from_keystrokes(keystrokes, KeyBinding::is_vim_mode(cx)).color(Color::Accent)
+    fn keybinding(keystrokes: Rc<[KeybindingKeystroke]>) -> KeyBinding {
+        KeyBinding::from_keystrokes(keystrokes).color(Color::Accent)
     }
 
     fn keybinding_width(
@@ -153,7 +153,7 @@ impl PendingBindings {
         window: &mut Window,
         cx: &mut App,
     ) -> Pixels {
-        Self::keybinding(keystrokes, cx)
+        Self::keybinding(keystrokes)
             .into_any_element()
             .layout_as_root(
                 size(AvailableSpace::MaxContent, AvailableSpace::MaxContent),
@@ -182,7 +182,7 @@ impl PendingBindings {
         key_column_width: Pixels,
         cx: &App,
     ) -> AnyElement {
-        let keybinding = Self::keybinding(keystrokes, cx);
+        let keybinding = Self::keybinding(keystrokes);
         if keybinding_width <= key_column_width {
             return keybinding.into_any_element();
         }
@@ -360,31 +360,6 @@ mod tests {
     }
 
     #[gpui::test]
-    fn test_pending_keybinding_uses_active_vim_style(cx: &mut TestAppContext) {
-        let cx = cx.add_empty_window();
-        cx.update(|window, cx| {
-            // Toggle Vim notation on and back off to catch stale formatting after a mode change.
-            for vim_mode in [false, true, false] {
-                ui::KeyBinding::set_vim_mode(cx, vim_mode);
-                for sequence in ["g", "h", "ctrl-w", "shift-h"] {
-                    let keystrokes: Rc<[KeybindingKeystroke]> =
-                        binding(sequence, "Action").remaining_keystrokes.into();
-                    let expected = text_for_keybinding_keystrokes(&keystrokes, cx);
-                    let keybinding = PendingBindings::keybinding(keystrokes, cx);
-                    assert_eq!(
-                        keybinding
-                            .keyboard_shortcut_text(window, cx)
-                            .expect("keybinding label")
-                            .as_ref(),
-                        expected,
-                        "sequence {sequence}, Vim mode {vim_mode}",
-                    );
-                }
-            }
-        });
-    }
-
-    #[gpui::test]
     fn test_prepare_pending_bindings_preserves_keybinding_keystrokes(cx: &mut App) {
         #[cfg(target_os = "windows")]
         let keystroke = KeybindingKeystroke::new(
@@ -547,7 +522,6 @@ mod tests {
 
     #[gpui::test]
     fn test_prepare_pending_bindings_sorts_by_key_label_length(cx: &mut App) {
-        ui::KeyBinding::set_vim_mode(cx, false);
         // These default macOS chords both follow cmd-k. Key-label length takes
         // precedence over alphabetical key order: "Z" comes before "Command-Left".
         let rows = prepare_pending_bindings(
@@ -568,7 +542,6 @@ mod tests {
 
     #[gpui::test]
     fn test_prepare_pending_bindings_sorts_equal_length_key_labels(cx: &mut App) {
-        ui::KeyBinding::set_vim_mode(cx, false);
         // After cmd-k, language selection (m) precedes encoding selection (n),
         // even though their action names sort in the opposite order.
         let rows = prepare_pending_bindings(
@@ -589,7 +562,6 @@ mod tests {
     fn test_prepare_pending_bindings_preserves_distinct_actions_with_identical_key_labels(
         cx: &mut App,
     ) {
-        ui::KeyBinding::set_vim_mode(cx, false);
         for reverse in [false, true] {
             // Custom bindings are needed to exercise a display collision: é and É
             // are distinct keys, but non-Vim formatting capitalizes both to "É".
@@ -623,7 +595,6 @@ mod tests {
     fn test_prepare_pending_bindings_preserves_distinct_keys_with_identical_display_rows(
         cx: &mut App,
     ) {
-        ui::KeyBinding::set_vim_mode(cx, false);
         let rows = prepare_pending_bindings(
             vec![
                 binding_after_first_keystroke("cmd-k é", "zed::OpenSettings"),
@@ -644,7 +615,6 @@ mod tests {
 
     #[gpui::test]
     fn test_group_bindings_always_shows_completing_bindings(cx: &mut App) {
-        ui::KeyBinding::set_vim_mode(cx, false);
         // A user keymap can extend the default cmd-k cmd-s binding with longer chords.
         let rows = prepare_pending_bindings(
             vec![
