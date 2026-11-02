@@ -312,7 +312,7 @@ fn main() {
     let app_db = db::AppDatabase::new();
     let session_id = Uuid::new_v4().to_string();
     let session = app.background_executor().spawn(Session::new(
-        session_id.clone(),
+        session_id,
         KeyValueStore::from_app_db(&app_db),
     ));
     let (open_listener, mut open_rx) = OpenListener::new();

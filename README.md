@@ -5,9 +5,9 @@ Oxed is a minimal, LSP-first code editor written in Rust. It is a fork of [Zed](
 - language support through Tree-sitter and language servers (LSP),
 - appearance customization (themes, fonts, settings),
 - git integration,
-- extensions, debugger (DAP), terminal and tasks.
+- extensions.
 
-Oxed ships **without** AI features, account sign-in or collaboration, telemetry, crash reporting, auto-update, or remote development.
+Oxed ships **without** AI features, account sign-in or collaboration, an integrated terminal, tasks, a debugger, telemetry, crash reporting, auto-update, or remote development.
 
 ## Building
 
@@ -37,7 +37,14 @@ git merge v1.27.0          # next stable tag
 cargo check -p zed         # also refreshes Cargo.lock
 ```
 
-Removed features are cut at the `crates/zed` level and in a few kept crates (`title_bar`, `git_ui`, `settings_ui`, `onboarding`); the corresponding crates stay in the tree, untouched, to keep merges small. Oxed's own release tags use the `oxed-v*` prefix.
+To keep merges small, removed features are cut where they are wired up rather than deleted from the tree:
+
+- `crates/zed` no longer depends on or initializes their UI crates, which stay in the tree untouched;
+- a few kept crates (`title_bar`, `onboarding`, `recent_projects`, `settings_ui`) hide their entry points;
+- core crates that the editor is built on (`client`, `rpc`, `remote`, `terminal`, `dap`, `language_model`, ...) are still compiled but never connected or started: AI stays disabled, and keymap bindings and command palette entries of removed features are skipped;
+- tests that exercise removed features are marked `#[ignore]` with the reason.
+
+Oxed's own release tags use the `oxed-v*` prefix.
 
 ## License
 
