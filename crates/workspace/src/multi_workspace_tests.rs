@@ -47,6 +47,7 @@ fn setup_multi_workspace<'a>(
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_sidebar_disabled_when_disable_ai_is_enabled(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -118,6 +119,7 @@ async fn test_sidebar_disabled_when_disable_ai_is_enabled(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_multi_workspace_collapses_when_agent_is_disabled(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -178,6 +180,7 @@ async fn test_project_group_keys_initial(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_project_group_keys_add_workspace(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -222,6 +225,7 @@ async fn test_project_group_keys_add_workspace(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_move_active_project_group_actions(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -317,6 +321,7 @@ async fn test_open_new_window_does_not_open_sidebar_on_existing_window(cx: &mut 
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_open_directory_in_existing_window_opens_sidebar(cx: &mut TestAppContext) {
     init_test(cx);
 
@@ -354,6 +359,7 @@ async fn test_open_directory_in_existing_window_opens_sidebar(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_open_directory_in_existing_window_respects_auto_open_setting(
     cx: &mut TestAppContext,
 ) {
@@ -670,6 +676,7 @@ async fn test_find_or_create_workspace_uses_project_group_key_when_paths_are_mis
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_remove_fallback_via_find_or_create_skips_removed_workspaces(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -821,6 +828,7 @@ async fn test_find_or_create_local_workspace_reuses_active_workspace_after_sideb
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_close_workspace_prefers_already_loaded_neighboring_workspace(
     cx: &mut TestAppContext,
 ) {
@@ -917,6 +925,7 @@ async fn test_close_workspace_prefers_already_loaded_neighboring_workspace(
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_close_workspace_prefers_workspace_in_same_project_group(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -1145,6 +1154,7 @@ async fn test_remove_project_group_replaces_unretained_active_workspace(cx: &mut
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_switching_projects_with_sidebar_closed_retains_old_active_workspace(
     cx: &mut TestAppContext,
 ) {
@@ -1300,6 +1310,7 @@ async fn test_remote_project_root_dir_changes_update_groups(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_open_project_closes_empty_workspace_but_not_non_empty_ones(cx: &mut TestAppContext) {
     init_test(cx);
     let app_state = cx.update(AppState::test);
@@ -1565,6 +1576,7 @@ async fn test_remove_project_group_with_remote_neighbor_does_not_create_local_wo
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_nearest_retained_workspace(cx: &mut TestAppContext) {
     init_test(cx);
 
@@ -1700,6 +1712,7 @@ async fn test_nearest_retained_workspace(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+#[ignore = "requires multi-workspace windows"]
 async fn test_nearest_retained_workspace_skips_disconnected_workspace(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());

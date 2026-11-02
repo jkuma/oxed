@@ -11,7 +11,7 @@ use gpui::{Context, DismissEvent, Entity, Focusable as _, Pixels, Point, Subscri
 use project::DisableAiSettings;
 use std::ops::Range;
 use text::PointUtf16;
-use workspace::OpenInTerminal;
+use workspace::{OpenInTerminal, OpenTerminal};
 use zed_actions::agent::AddSelectionToThread;
 use zed_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
@@ -219,6 +219,7 @@ pub fn deploy_context_menu(
 
         let evaluate_selection = window.is_action_available(&EvaluateSelectedText, cx);
         let run_to_cursor = window.is_action_available(&RunToCursor, cx);
+        let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
         let format_selections = window.is_action_available(&FormatSelections, cx);
         let disable_ai = DisableAiSettings::is_ai_disabled_for_buffer(
             editor.buffer.read(cx).as_singleton().as_ref(),
@@ -311,11 +312,13 @@ pub fn deploy_context_menu(
                 .when(is_svg, |builder| {
                     builder.action("Open SVG Preview", Box::new(OpenSvgPreview))
                 })
-                .action_disabled_when(
-                    !has_reveal_target,
-                    "Open in Terminal",
-                    Box::new(OpenInTerminal),
-                )
+                .when(open_in_terminal, |builder| {
+                    builder.action_disabled_when(
+                        !has_reveal_target,
+                        "Open in Terminal",
+                        Box::new(OpenInTerminal),
+                    )
+                })
                 .action_disabled_when(
                     !has_git_repo,
                     "Copy Permalink to Line",

@@ -81,8 +81,8 @@ pub(crate) fn settings_data(cx: &App) -> Vec<SettingsPage> {
         developer_page(cx),
     ]
     .into_iter()
-    // AI and collaboration features are not available.
-    .filter(|page| !matches!(page.title, "AI" | "Collaboration"))
+    // AI, collaboration, debugger and terminal features are not available.
+    .filter(|page| !matches!(page.title, "AI" | "Collaboration" | "Debugger" | "Terminal"))
     .collect()
 }
 

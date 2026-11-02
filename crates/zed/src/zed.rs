@@ -20,7 +20,6 @@ use breadcrumbs::Breadcrumbs;
 use client::zed_urls;
 use collections::VecDeque;
 use command_palette_hooks::CommandPaletteFilter;
-use debugger_ui::debugger_panel::DebugPanel;
 use editor::{Editor, MultiBuffer};
 use extension_host::ExtensionStore;
 use feature_flags::{FeatureFlagAppExt as _, PanicFeatureFlag};
@@ -82,7 +81,6 @@ use std::{
     sync::Arc,
     sync::atomic::{self, AtomicBool},
 };
-use terminal_view::terminal_panel::{self, TerminalPanel};
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry};
 use theme_settings::{ThemeSettings, load_user_theme};
 use ui::{Navigable, NavigableEntry, PopoverMenuHandle, TintColor, prelude::*};
@@ -425,7 +423,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     })
     .detach();
 
-    // AI, multi-workspace and remote development are not available.
+    // AI, multi-workspace, remote development, terminal, tasks and debugger are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
         for namespace in [
             "agent",
@@ -434,9 +432,14 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             "context_server",
             "copilot",
             "copilot_edit_predictions",
+            "debug_panel",
+            "debugger",
             "edit_prediction",
             "multi_workspace",
             "skill_creator",
+            "task",
+            "terminal",
+            "terminal_panel",
             "zed_predict_onboarding",
         ] {
             filter.hide_namespace(namespace);
@@ -456,6 +459,20 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             TypeId::of::<zed_actions::assistant::OpenSkillCreator>(),
             TypeId::of::<zed_actions::OpenDevContainer>(),
             TypeId::of::<zed_actions::OpenRemote>(),
+            TypeId::of::<editor::actions::DisableBreakpoint>(),
+            TypeId::of::<editor::actions::EditLogBreakpoint>(),
+            TypeId::of::<editor::actions::EnableBreakpoint>(),
+            TypeId::of::<editor::actions::SpawnNearestTask>(),
+            TypeId::of::<editor::actions::ToggleBreakpoint>(),
+            TypeId::of::<workspace::NewCenterTerminal>(),
+            TypeId::of::<workspace::NewTerminal>(),
+            TypeId::of::<workspace::OpenInTerminal>(),
+            TypeId::of::<workspace::OpenTerminal>(),
+            TypeId::of::<workspace::ShutdownDebugAdapters>(),
+            TypeId::of::<zed_actions::OpenProjectTasks>(),
+            TypeId::of::<zed_actions::OpenWorktreeSetupTasks>(),
+            TypeId::of::<OpenTasks>(),
+            TypeId::of::<OpenDebugTasks>(),
         ]);
     });
 
@@ -719,9 +736,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
     cx.spawn_in(window, async move |workspace_handle, cx| {
         let project_panel = ProjectPanel::load(workspace_handle.clone(), cx.clone());
         let outline_panel = OutlinePanel::load(workspace_handle.clone(), cx.clone());
-        let terminal_panel = TerminalPanel::load(workspace_handle.clone(), cx.clone());
         let git_panel = GitPanel::load(workspace_handle.clone(), cx.clone());
-        let debug_panel = DebugPanel::load(workspace_handle.clone(), cx);
 
         async fn add_panel_when_ready(
             panel_task: impl Future<Output = anyhow::Result<Entity<impl workspace::Panel>>> + 'static,
@@ -741,9 +756,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
         futures::join!(
             add_panel_when_ready(project_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(outline_panel, workspace_handle.clone(), cx.clone()),
-            add_panel_when_ready(terminal_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
-            add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
         );
 
         workspace_handle.update(cx, |workspace, cx| {
@@ -1138,7 +1151,6 @@ fn register_actions(
         })
         .register_action(open_project_settings_file)
         .register_action(open_project_tasks_file)
-        .register_action(open_worktree_setup_tasks_file)
         .register_action(open_project_debug_tasks_file)
         .register_action(
             |workspace: &mut Workspace,
@@ -1154,14 +1166,6 @@ fn register_actions(
              window: &mut Window,
              cx: &mut Context<Workspace>| {
                 workspace.toggle_panel_focus::<OutlinePanel>(window, cx);
-            },
-        )
-        .register_action(
-            |workspace: &mut Workspace,
-             _: &terminal_panel::ToggleFocus,
-             window: &mut Window,
-             cx: &mut Context<Workspace>| {
-                workspace.toggle_panel_focus::<TerminalPanel>(window, cx);
             },
         )
         .register_action({
@@ -1319,8 +1323,6 @@ fn initialize_pane(
             toolbar.add_item(project_search_bar, window, cx);
             let lsp_log_item = cx.new(|_| LspLogToolbarItemView::new());
             toolbar.add_item(lsp_log_item, window, cx);
-            let dap_log_item = cx.new(|_| debugger_tools::DapLogToolbarItemView::new());
-            toolbar.add_item(dap_log_item, window, cx);
             let syntax_tree_item = cx.new(|_| language_tools::SyntaxTreeToolbarItemView::new());
             toolbar.add_item(syntax_tree_item, window, cx);
             let migration_banner =
@@ -2298,55 +2300,6 @@ fn open_project_tasks_file(
     ) {
         task.detach_and_log_err(cx);
     }
-}
-
-fn open_worktree_setup_tasks_file(
-    workspace: &mut Workspace,
-    _: &zed_actions::OpenWorktreeSetupTasks,
-    window: &mut Window,
-    cx: &mut Context<Workspace>,
-) {
-    // Kept harmless on purpose: tasks with the `create_worktree` hook run automatically
-    // when a worktree is created, so the example must be safe to save unedited.
-    const WORKTREE_SETUP_TASK_EXAMPLE: &str = r#"  {
-    // Runs automatically after Zed creates a new git worktree.
-    // $ZED_WORKTREE_ROOT is the new worktree's root directory, and
-    // $ZED_MAIN_GIT_WORKTREE is the original repository's working directory.
-    "label": "Set up new worktree",
-    "command": "echo \"Setting up $ZED_WORKTREE_ROOT — edit this command\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "hooks": ["create_worktree"]
-  }"#;
-
-    let Some(open_task) = open_local_file(
-        workspace,
-        local_tasks_file_relative_path(),
-        settings::initial_worktree_setup_tasks_content(),
-        window,
-        cx,
-    ) else {
-        return;
-    };
-
-    cx.spawn_in(window, async move |_, cx| {
-        let editor = open_task.await?;
-        editor.update_in(cx, |editor, window, cx| {
-            // Skip insertion if the file already mentions the hook (even in a comment,
-            // like the seeded template's example — uncommenting it beats duplicating it).
-            // `create_git_worktree` is a serde alias for the same hook.
-            let text = editor.text(cx);
-            if text.contains("create_worktree") || text.contains("create_git_worktree") {
-                return anyhow::Ok(());
-            }
-            tasks_ui::insert_task_json_into_editor(
-                editor,
-                WORKTREE_SETUP_TASK_EXAMPLE.to_string(),
-                window,
-                cx,
-            )
-        })?
-    })
-    .detach_and_log_err(cx);
 }
 
 fn open_project_debug_tasks_file(
@@ -5303,7 +5256,7 @@ mod tests {
         // From the JetBrains keymap
         use workspace::ActivatePreviousItem;
         // From the VSCode keymap
-        use debugger_ui::Start;
+        use workspace::ToggleLeftDock;
 
         app_state
             .fs
@@ -5413,7 +5366,7 @@ mod tests {
         window
             .update(cx, |_, _, cx| {
                 workspace.update(cx, |workspace, cx| {
-                    workspace.register_action(|_, _: &Start, _window, _cx| {});
+                    workspace.register_action(|_, _: &ToggleLeftDock, _window, _cx| {});
                     cx.notify();
                 });
             })
@@ -5423,7 +5376,7 @@ mod tests {
         assert_key_bindings_for(
             window.into(),
             cx,
-            vec![("backspace", &ActionB), ("f5", &Start)],
+            vec![("backspace", &ActionB), ("b", &ToggleLeftDock)],
             line!(),
         );
     }
@@ -5595,7 +5548,6 @@ mod tests {
                 "client",
                 "collab",
                 "command_palette",
-                "console",
                 "context_server",
                 "copilot",
                 "copilot_edit_predictions",
@@ -5627,7 +5579,6 @@ mod tests {
                 "markdown",
                 "menu",
                 "multi_workspace",
-                "new_process_modal",
                 "notebook",
                 "onboarding",
                 "outline",
@@ -5652,13 +5603,11 @@ mod tests {
                 "tabular_data",
                 "task",
                 "terminal",
-                "terminal_panel",
                 "text_finder",
                 "theme",
                 "theme_selector",
                 "toast",
                 "toolchain",
-                "variable_list",
                 "vim",
                 "which_key",
                 "window",
@@ -5855,15 +5804,12 @@ mod tests {
             git_ui::init(cx);
             project_panel::init(cx);
             outline_panel::init(cx);
-            terminal_view::init(cx);
             image_viewer::init(cx);
             language_model::init(cx);
-            tasks_ui::init(cx);
             project::debugger::breakpoint_store::BreakpointStore::init(
                 &app_state.client.clone().into(),
             );
             project::debugger::dap_store::DapStore::init(&app_state.client.clone().into(), cx);
-            debugger_ui::init(cx);
             initialize_workspace(app_state.clone(), cx);
             search::init(cx);
             lsp_locations::init(cx);

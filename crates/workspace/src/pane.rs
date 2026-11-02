@@ -3107,6 +3107,7 @@ impl Pane {
                 let pane = pane.clone();
                 let menu_context = menu_context.clone();
                 let extra_actions = item_handle.tab_extra_context_menu_actions(window, cx);
+                let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
                 ContextMenu::build(window, cx, move |mut menu, window, cx| {
                     let close_active_item_action = CloseActiveItem {
                         save_intent: None,
@@ -3289,6 +3290,7 @@ impl Pane {
                             let reveal_path = entry_abs_path.clone();
                             let parent_abs_path = entry_abs_path
                                 .as_deref()
+                                .filter(|_| open_in_terminal)
                                 .and_then(|abs_path| Some(abs_path.parent()?.to_path_buf()));
                             let has_git_repo = project_path.as_ref().is_some_and(|project_path| {
                                 pane.read(cx).project.upgrade().is_some_and(|project| {

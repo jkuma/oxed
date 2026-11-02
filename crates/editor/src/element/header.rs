@@ -1005,6 +1005,7 @@ pub(crate) fn render_buffer_header(
             let editor = editor.clone();
             let file = file.clone();
             let buffer_snapshot = buffer_snapshot.clone();
+            let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
             ContextMenu::build(window, cx, move |mut menu, window, cx| {
                 if let Some(file) = file
                     && let Some(project) = editor.read(cx).project()
@@ -1024,6 +1025,7 @@ pub(crate) fn render_buffer_header(
 
                     let parent_abs_path = abs_path
                         .as_ref()
+                        .filter(|_| open_in_terminal)
                         .and_then(|abs_path| Some(abs_path.parent()?.to_path_buf()));
                     let relative_path = has_relative_path
                         .then_some(relative_path)

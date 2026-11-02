@@ -751,11 +751,11 @@
     // Whether to show line numbers in the gutter.
     "line_numbers": true,
     // Whether to show runnables buttons in the gutter.
-    "runnables": true,
+    "runnables": false,
     // Whether to show bookmarks in the gutter.
     "bookmarks": true,
     // Whether to show breakpoints in the gutter.
-    "breakpoints": true,
+    "breakpoints": false,
     // Whether to show fold buttons in the gutter.
     "folds": true,
     // Minimum number of characters to reserve space for in the gutter.
@@ -2298,7 +2298,7 @@
   // Settings related to running tasks.
   "tasks": {
     "variables": {},
-    "enabled": true,
+    "enabled": false,
     // Use LSP tasks over Zed language extension ones.
     // If no LSP tasks are returned due to error/timeout or regular execution,
     // Zed language extension tasks will be used instead.
