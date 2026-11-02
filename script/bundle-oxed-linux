@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Builds a release Oxed bundle (oxed.app + tar.gz) for the host Linux system.
+# Runtime libraries are not bundled: the archive targets the build machine's distro.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+channel=$(<crates/zed/RELEASE_CHANNEL)
+version="$(script/get-crate-version zed)"
+target_dir="${CARGO_TARGET_DIR:-target}"
+
+case "$channel" in
+    stable) suffix=""; app_name="Oxed"; app_id="dev.jkuma.Oxed" ;;
+    preview) suffix="-preview"; app_name="Oxed Preview"; app_id="dev.jkuma.Oxed-Preview" ;;
+    nightly) suffix="-nightly"; app_name="Oxed Nightly"; app_id="dev.jkuma.Oxed-Nightly" ;;
+    dev) suffix="-dev"; app_name="Oxed Dev"; app_id="dev.jkuma.Oxed-Dev" ;;
+    *) echo "unknown release channel: $channel" >&2; exit 1 ;;
+esac
+
+echo "Bundling Oxed $version ($channel)"
+
+cargo --config .cargo/bundle-config.toml build --release --package zed --bin oxed
+cargo --config .cargo/bundle-config.toml build --release --package cli
+
+temp_dir=$(mktemp -d)
+trap 'rm -rf "$temp_dir"' EXIT
+app_dir="${temp_dir}/oxed${suffix}.app"
+
+mkdir -p "${app_dir}/bin" "${app_dir}/libexec"
+strip --strip-unneeded -o "${app_dir}/libexec/oxed-editor" "${target_dir}/release/oxed"
+strip --strip-debug -o "${app_dir}/bin/oxed" "${target_dir}/release/cli"
+
+mkdir -p "${app_dir}/share/icons/hicolor/512x512/apps" "${app_dir}/share/icons/hicolor/1024x1024/apps"
+cp "crates/zed/resources/app-icon${suffix}.png" "${app_dir}/share/icons/hicolor/512x512/apps/oxed.png"
+cp "crates/zed/resources/app-icon${suffix}@2x.png" "${app_dir}/share/icons/hicolor/1024x1024/apps/oxed.png"
+
+mkdir -p "${app_dir}/share/applications"
+APP_NAME="$app_name" APP_ID="$app_id" APP_CLI="oxed" APP_ICON="oxed" \
+    envsubst '$APP_NAME $APP_ID $APP_CLI $APP_ICON' \
+    < crates/zed/resources/oxed.desktop.in \
+    > "${app_dir}/share/applications/${app_id}.desktop"
+
+cp LICENSE-GPL LICENSE-APACHE "${app_dir}/"
+
+archive="${target_dir}/release/oxed${suffix}-linux-$(uname -m).tar.gz"
+tar -czf "$archive" -C "$temp_dir" "oxed${suffix}.app"
+echo "Bundle written to $archive"
