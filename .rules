@@ -137,11 +137,9 @@ Other entities can then register a callback to handle these events by doing `cx.
 
 # Oxed fork
 
-Oxed is a fork of Zed that tracks Zed's stable tags (`upstream` remote). Keep the diff against upstream small so merges stay cheap.
+Oxed is a standalone, Linux-only fork of Zed. It does not track upstream: remove code that Oxed does not need instead of hiding it.
 
-* Never delete crate directories or edit the `members` list of the root `Cargo.toml`. Cut a removed feature where `crates/zed` depends on and initializes it instead.
-* Core crates (`client`, `rpc`, `remote`, `terminal`, `dap`, `language_model`, ...) stay compiled but inert. A kept crate may still call `SomeGlobal::global(cx)` for a removed feature: initialize an empty global rather than rewriting the caller.
-* Hide entry points instead of rewriting kept crates: skip keymap bindings via `UNAVAILABLE_ACTIONS` in `crates/settings/src/keymap_file.rs`, hide command palette entries via `CommandPaletteFilter` in `initialize_workspace` (`crates/zed/src/zed.rs`), filter settings pages in `settings_data` (`crates/settings_ui/src/page_data.rs`).
-* `disable_ai` defaults to `true` and cannot be turned back on. Zed also disables multi-workspace windows when AI is off.
+* Removing a feature means deleting its crates, its call sites, its settings, its keymap entries, its assets and its tests. Hiding mechanisms (`UNAVAILABLE_ACTIONS` in `crates/settings/src/keymap_file.rs`, the `CommandPaletteFilter` block in `initialize_workspace`, the page filter in `settings_data`, `#[ignore]`d tests) are transitional: shrink them as the code behind them goes away.
+* Some kept crates still call `SomeGlobal::global(cx)` for features that are not initialized anymore; such a call panics at runtime, not at compile time.
 * Run `cargo test -p zed --bin oxed` after any removal: it loads the default keymaps and initializes every panel, and catches startup crashes the type checker misses.
-* Mark tests of removed features with `#[ignore = "<reason>"]` instead of deleting them.
+* Code under `#[cfg(target_os = "macos")]`, `#[cfg(target_os = "windows")]` or `#[cfg(target_family = "wasm")]` is dead: delete it rather than maintaining it.

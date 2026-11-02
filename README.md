@@ -11,7 +11,7 @@ Oxed ships **without** AI features, account sign-in or collaboration, an integra
 
 ## Building
 
-Linux is the primary target. Install the system dependencies listed in `script/linux`, then:
+Oxed runs on Linux only. Install the system dependencies listed in `script/linux`, then:
 
 ```sh
 cargo run              # debug build
@@ -27,24 +27,9 @@ Oxed does not sign in, send telemetry or check for updates. It still contacts:
 - `api.zed.dev`, anonymously, for the extension registry,
 - language server download hosts (e.g. GitHub releases) when a language server is installed.
 
-## Syncing with Zed
+## Relationship with Zed
 
-Oxed tracks Zed's stable releases. The `upstream` remote points to `zed-industries/zed`.
-
-```sh
-git fetch upstream --tags
-git merge v1.27.0          # next stable tag
-cargo check -p zed         # also refreshes Cargo.lock
-```
-
-To keep merges small, removed features are cut where they are wired up rather than deleted from the tree:
-
-- `crates/zed` no longer depends on or initializes their UI crates, which stay in the tree untouched;
-- a few kept crates (`title_bar`, `onboarding`, `recent_projects`, `settings_ui`) hide their entry points;
-- core crates that the editor is built on (`client`, `rpc`, `remote`, `terminal`, `dap`, `language_model`, ...) are still compiled but never connected or started: AI stays disabled, and keymap bindings and command palette entries of removed features are skipped;
-- tests that exercise removed features are marked `#[ignore]` with the reason.
-
-Oxed's own release tags use the `oxed-v*` prefix.
+Oxed is a standalone fork: it does not follow Zed's releases. Code that Oxed does not need is being removed progressively; some core crates (`client`, `rpc`, `remote`, `terminal`, `dap`, `language_model`, ...) are still compiled but never connected or started.
 
 ## License
 

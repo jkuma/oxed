@@ -203,29 +203,6 @@ fn main() {
         return;
     }
 
-    #[cfg(target_os = "windows")]
-    if args.record_etw_trace {
-        let Some(etw_socket) = args.etw_socket else {
-            eprintln!("--etw-socket is required for --record-etw-trace");
-            process::exit(1);
-        };
-
-        if let Err(error) = etw_tracing::record_etw_trace(args.etw_zed_pid, &etw_socket) {
-            eprintln!("ETW trace recording failed: {error:#}");
-            process::exit(1);
-        }
-        return;
-    }
-
-    #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    unsafe {
-        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-
-        if args.foreground {
-            let _ = AttachConsole(ATTACH_PARENT_PROCESS);
-        }
-    }
-
     // `zed --printenv` Outputs environment variables as JSON to stdout
     if args.printenv {
         util::shell_env::print_env();
@@ -322,21 +299,7 @@ fn main() {
     {
         false
     } else {
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-        {
-            crate::zed::listen_for_cli_connections(open_listener.clone()).is_err()
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            !crate::zed::windows_only_instance::handle_single_instance(open_listener.clone(), &args)
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            use zed::mac_only_instance::*;
-            ensure_only_instance() != IsOnlyInstance::Yes
-        }
+        crate::zed::listen_for_cli_connections(open_listener.clone()).is_err()
     };
     if failed_single_instance_check {
         println!("zed is already running");
@@ -507,8 +470,6 @@ fn main() {
         Client::set_global(client.clone(), cx);
 
         zed::init(cx);
-        #[cfg(target_os = "macos")]
-        zed::move_to_applications::init(cx);
         project::Project::init(&client, cx);
         client::init(&client, cx);
         feature_flags::FeatureFlagStore::init(cx);
@@ -605,8 +566,6 @@ fn main() {
         json_schema_store::init(cx);
         miniprofiler_ui::init(*STARTUP_TIME.get().unwrap(), cx);
         which_key::init(cx);
-        #[cfg(target_os = "windows")]
-        etw_tracing::init(cx);
 
         cx.observe_global::<SettingsStore>({
             let http = app_state.client.http_client();

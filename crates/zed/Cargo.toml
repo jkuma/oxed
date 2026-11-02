@@ -17,29 +17,11 @@ tracy = ["ztracing/tracy"]
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
     "gpui/test-support",
-    "gpui_platform/screen-capture",
     "dep:image",
     "workspace/test-support",
     "project/test-support",
     "editor/test-support",
     "image_viewer/test-support",
-    "recent_projects/test-support",
-    "title_bar/test-support",
-]
-visual-tests = [
-    "gpui/test-support",
-    "gpui_platform/screen-capture",
-    "gpui_platform/test-support",
-    "dep:image",
-    "dep:tempfile",
-    "dep:env_logger",
-    "workspace/test-support",
-    "project/test-support",
-    "editor/test-support",
-    "image_viewer/test-support",
-    "clock/test-support",
-    "db/test-support",
-    "fs/test-support",
     "recent_projects/test-support",
     "title_bar/test-support",
 ]
@@ -47,11 +29,6 @@ visual-tests = [
 [[bin]]
 name = "oxed"
 path = "src/main.rs"
-
-[[bin]]
-name = "zed_visual_test_runner"
-path = "src/visual_test_runner.rs"
-required-features = ["visual-tests"]
 
 [dependencies]
 activity_indicator.workspace = true
@@ -86,12 +63,7 @@ git_ui.workspace = true
 git_ui_core.workspace = true
 go_to_line.workspace = true
 gpui = { workspace = true, features = ["profiler", "stacker"] }
-gpui_platform = { workspace = true, features = [
-    "screen-capture",
-    "font-kit",
-    "wayland",
-    "x11",
-] }
+gpui_platform = { workspace = true, features = ["wayland", "x11"] }
 gpui_tokio.workspace = true
 image = { workspace = true, optional = true }
 itertools.workspace = true
@@ -182,17 +154,6 @@ zlog.workspace = true
 zlog_settings.workspace = true
 ztracing.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
-nix = { workspace = true, features = ["user"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-etw_tracing.workspace = true
-windows = { workspace = true, features = ["Win32_System_Console", "Win32_System_Pipes"] }
-gpui = { workspace = true, features = ["profiler", "windows-manifest"] }
-
-[target.'cfg(target_os = "windows")'.build-dependencies]
-windows_resources.workspace = true
-
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 gpui = { workspace = true, features = ["profiler", "wayland", "x11"] }
 ashpd = { workspace = true, features = ["notification"] }
@@ -223,42 +184,6 @@ workspace = { workspace = true, features = ["test-support"] }
 image.workspace = true
 search = { workspace = true, features = ["test-support"] }
 
-
-[package.metadata.bundle-dev]
-icon = ["resources/app-icon-dev@2x.png", "resources/app-icon-dev.png"]
-identifier = "dev.jkuma.Oxed-Dev"
-name = "Oxed Dev"
-category = "Developer Tool"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["oxed"]
-
-[package.metadata.bundle-nightly]
-icon = ["resources/app-icon-nightly@2x.png", "resources/app-icon-nightly.png"]
-identifier = "dev.jkuma.Oxed-Nightly"
-name = "Oxed Nightly"
-category = "Developer Tool"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["oxed"]
-
-[package.metadata.bundle-preview]
-icon = ["resources/app-icon-preview@2x.png", "resources/app-icon-preview.png"]
-identifier = "dev.jkuma.Oxed-Preview"
-name = "Oxed Preview"
-category = "Developer Tool"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["oxed"]
-
-[package.metadata.bundle-stable]
-icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
-identifier = "dev.jkuma.Oxed"
-name = "Oxed"
-category = "Developer Tool"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["oxed"]
 
 [package.metadata.cargo-shear]
 ignored = ["profiling", "tracing"]
