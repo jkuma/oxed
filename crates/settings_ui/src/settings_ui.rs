@@ -6934,6 +6934,7 @@ pub mod test {
     }
 
     #[gpui::test]
+    #[ignore = "requires AI features"]
     async fn test_skills_page_scope_switch_updates_displayed_skills(cx: &mut gpui::TestAppContext) {
         use agent_skills::{
             ProjectSkillGroup, Skill, SkillScopeId, SkillSource, load_skills_from_directory,
@@ -7109,6 +7110,7 @@ pub mod test {
     }
 
     #[gpui::test]
+    #[ignore = "requires AI features"]
     async fn test_open_skill_creator_navigates_to_sub_page(cx: &mut gpui::TestAppContext) {
         use project::Project;
 
@@ -7197,6 +7199,7 @@ pub mod test {
     }
 
     #[gpui::test]
+    #[ignore = "requires AI features"]
     async fn test_open_skill_creator_action_opens_settings_window_at_sub_page(
         cx: &mut gpui::TestAppContext,
     ) {

@@ -59,6 +59,31 @@ pub(crate) static KEY_BINDING_VALIDATORS: LazyLock<BTreeMap<TypeId, Box<dyn KeyB
 #[serde(transparent)]
 pub struct KeymapFile(Vec<KeymapSection>);
 
+/// Action namespaces of features that are not part of this application.
+/// Bindings to them are skipped instead of being reported as errors.
+const UNAVAILABLE_ACTION_NAMESPACES: &[&str] = &[
+    "agent::",
+    "agents_sidebar::",
+    "channel_modal::",
+    "collab_panel::",
+    "inline_assistant::",
+    "repl::",
+];
+
+fn is_unavailable_action(action: &Value) -> bool {
+    let name = match action {
+        Value::String(name) => name,
+        Value::Array(items) => match items.first() {
+            Some(Value::String(name)) => name,
+            _ => return false,
+        },
+        _ => return false,
+    };
+    UNAVAILABLE_ACTION_NAMESPACES
+        .iter()
+        .any(|namespace| name.starts_with(namespace))
+}
+
 /// Keymap section which binds keystrokes to actions.
 #[derive(Debug, Deserialize, Default, Clone, JsonSchema)]
 pub struct KeymapSection {
@@ -309,6 +334,9 @@ impl KeymapFile {
 
             if let Some(unbind) = unbind {
                 for (keystrokes, action) in unbind {
+                    if is_unavailable_action(&action.0) {
+                        continue;
+                    }
                     let result = Self::load_unbinding(
                         keystrokes,
                         action,
@@ -341,6 +369,9 @@ impl KeymapFile {
 
             if let Some(bindings) = bindings {
                 for (keystrokes, action) in bindings {
+                    if is_unavailable_action(&action.0) {
+                        continue;
+                    }
                     let result = Self::load_keybinding(
                         keystrokes,
                         action,
