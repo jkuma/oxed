@@ -88,7 +88,6 @@ lsp_locations.workspace = true
 markdown.workspace = true
 markdown_preview.workspace = true
 menu.workspace = true
-migrator.workspace = true
 mimalloc = { version = "0.1", optional = true }
 miniprofiler_ui.workspace = true
 node_runtime.workspace = true
