@@ -73,9 +73,8 @@ pub fn init(cx: &mut App) {
                     schema_store.notify_schema_changed(ChangedSchemas::Settings, cx);
                 });
             }
-            extension::Event::ExtensionUninstalled(_)
-            | extension::Event::ExtensionInstalled(_)
-            | extension::Event::ConfigureExtensionRequested(_) => {}
+            extension::Event::ExtensionUninstalled(_) | extension::Event::ExtensionInstalled(_) => {
+            }
         })
         .detach();
     }

@@ -5,7 +5,7 @@ use gpui::{App, AssetSource, Result, SharedString};
 
 // Release builds embed the assets; dev builds read them from the checkout at
 // runtime so edits show up on the next launch without a rebuild and no
-// build-time path is baked in (which corgi's sandbox rejects). See
+// build-time path is baked in. See
 // `util::fs_embed!`.
 util::fs_embed! {
     pub struct Assets,
@@ -16,8 +16,6 @@ util::fs_embed! {
         "icons/**/*",
         "images/**/*",
         "themes/**/*",
-        "sounds/**/*",
-        "prompts/**/*",
         "*.md",
     ],
     exclude = ["themes/src/*", "*.DS_Store"],

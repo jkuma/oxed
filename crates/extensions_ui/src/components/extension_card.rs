@@ -209,34 +209,6 @@ impl ExtensionCard {
         })
     }
 
-    fn configure_button(
-        extension_id: &Arc<str>,
-        manifest: Option<Arc<ExtensionManifest>>,
-    ) -> Button {
-        Button::new(
-            SharedString::from(format!("configure-{extension_id}")),
-            "Configure",
-        )
-        .on_click({
-            let extension_id = extension_id.clone();
-            move |_, _, cx| {
-                let manifest = manifest.clone().or_else(|| {
-                    ExtensionStore::global(cx)
-                        .read(cx)
-                        .extension_manifest_for_id(&extension_id)
-                        .cloned()
-                });
-                if let Some(manifest) = manifest
-                    && let Some(events) = extension::ExtensionEvents::try_global(cx)
-                {
-                    events.update(cx, |this, cx| {
-                        this.emit(extension::Event::ConfigureExtensionRequested(manifest), cx)
-                    });
-                }
-            }
-        })
-    }
-
     fn actions_for_manifest_extension(
         extension: &Arc<ExtensionManifest>,
         status: &ExtensionStatus,
@@ -266,20 +238,10 @@ impl ExtensionCard {
                 |button| button.style(ButtonStyle::OutlinedGhost),
             )
             .disabled(Self::disables_actions(status));
-        let configure = (!extension.context_servers.is_empty()).then(|| {
-            Self::configure_button(&extension.id, Some(extension.clone()))
-                .when_else(
-                    is_dev,
-                    |button| button.color(Color::Accent),
-                    |button| button.style(ButtonStyle::OutlinedGhost),
-                )
-                .disabled(Self::disables_actions(status))
-        });
-
         if is_dev {
-            [rebuild, Some(uninstall), configure]
+            [rebuild, Some(uninstall), None]
         } else {
-            [None, configure, Some(uninstall)]
+            [None, None, Some(uninstall)]
         }
     }
 
@@ -310,11 +272,6 @@ impl ExtensionCard {
         state: &PublishedExtensionState,
         cx: &App,
     ) -> ExtensionCardActions {
-        let is_configurable = extension
-            .manifest
-            .provides
-            .contains(&ExtensionProvides::ContextServers);
-
         let status = match state {
             PublishedExtensionState::OverriddenByDevExtension => {
                 return [
@@ -343,12 +300,7 @@ impl ExtensionCard {
                     )
                     .disabled(Self::disables_actions(status))
                 });
-                let configure = is_configurable.then(|| {
-                    Self::configure_button(&extension.id, None)
-                        .disabled(Self::disables_actions(status))
-                });
-
-                [upgrade, configure, Some(uninstall)]
+                [upgrade, None, Some(uninstall)]
             }
             ExtensionStatus::Installed(installed_version) => {
                 let uninstall =
@@ -390,11 +342,7 @@ impl ExtensionCard {
                         }
                     })
                 });
-                let configure = is_configurable.then(|| {
-                    Self::configure_button(&extension.id, None).style(ButtonStyle::OutlinedGhost)
-                });
-
-                [upgrade, configure, Some(uninstall)]
+                [upgrade, None, Some(uninstall)]
             }
         }
     }
