@@ -1580,10 +1580,6 @@ impl Workspace {
 
         cx.subscribe_in(&project, window, move |this, _, event, window, cx| {
             match event {
-                project::Event::RemoteIdChanged(_) => {
-                    this.update_window_title(window, cx);
-                }
-
                 &project::Event::WorktreeRemoved(_) => {
                     this.update_window_title(window, cx);
                     this.serialize_workspace(window, cx);
@@ -1615,10 +1611,6 @@ impl Workspace {
                     if this.rename_persisted_navigation_history_paths(old_abs_path, new_abs_path) {
                         this.serialize_workspace(window, cx);
                     }
-                }
-
-                project::Event::DisconnectedFromHost => {
-                    this.update_window_edited(window, cx);
                 }
 
                 project::Event::DisconnectedFromRemote {
@@ -3206,8 +3198,7 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> oneshot::Receiver<Option<Vec<PathBuf>>> {
-        if self.project.read(cx).is_via_collab()
-            || self.project.read(cx).is_via_remote_server()
+        if self.project.read(cx).is_via_remote_server()
             || !WorkspaceSettings::get_global(cx).use_system_path_prompts
         {
             let prompt = self.on_prompt_for_new_path.take().unwrap();
@@ -3702,11 +3693,10 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Workspace>>> {
         let requesting_window = window.window_handle().downcast::<MultiWorkspace>();
-        let is_remote = self.project.read(cx).is_via_collab();
         let has_worktree = self.project.read(cx).worktrees(cx).next().is_some();
         let has_dirty_items = self.items(cx).any(|item| item.is_dirty(cx));
 
-        let workspace_is_empty = !is_remote && !has_worktree && !has_dirty_items;
+        let workspace_is_empty = !has_worktree && !has_dirty_items;
         if workspace_is_empty {
             open_mode = OpenMode::Activate;
         }
@@ -3959,11 +3949,6 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let project = self.project.read(cx);
-        if project.is_via_collab() {
-            self.show_error("You cannot add folders to someone else's project", cx);
-            return;
-        }
         let paths = self.prompt_for_open_path(
             PathPromptOptions {
                 files: false,
@@ -6096,12 +6081,6 @@ impl Workspace {
             let context =
                 Self::window_title_context(&project, active_project_path.as_ref(), &needs, cx);
             title = render_window_title_format(default_template, separator, &context);
-        }
-
-        if project.is_via_collab() {
-            title.push_str(" ↙");
-        } else if project.is_shared() {
-            title.push_str(" ↗");
         }
 
         let document_path = active_project_path
@@ -11242,36 +11221,6 @@ mod tests {
         fs.set_branch_name(Path::new(path!("/root1/.git")), Some("other"));
         cx.executor().run_until_parked();
         assert_eq!(cx.window_title().as_deref(), Some("root1 — a.txt"));
-    }
-
-    #[gpui::test]
-    async fn test_window_title_collab_indicator_remains_appended(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        let fs = FakeFs::new(cx.executor());
-        let project = Project::test(fs, ["root1".as_ref()], cx).await;
-        project.update(cx, |project, _| project.mark_as_collab_for_testing());
-        let (workspace, cx) =
-            cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
-
-        let item = cx.new(|cx| {
-            TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "src/one.txt", cx)])
-        });
-
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx)
-        });
-
-        cx.update(|_, cx| {
-            SettingsStore::update_global(cx, |settings, cx| {
-                settings.update_user_settings(cx, |settings| {
-                    settings.workspace.window_title_format =
-                        Some("${projectName}${separator}${fileName}".to_string());
-                })
-            });
-        });
-        cx.executor().run_until_parked();
-        assert_eq!(cx.window_title().as_deref(), Some("root1 — one.txt ↙"));
     }
 
     #[gpui::test]
@@ -16499,7 +16448,6 @@ mod tests {
         struct TestPngItemView {
             focus_handle: FocusHandle,
             project_item: Entity<TestPngItem>,
-            project_path: ProjectPath,
         }
         // Model
         struct TestPngItem {
@@ -16583,8 +16531,7 @@ mod tests {
             {
                 Self {
                     focus_handle: cx.focus_handle(),
-                    project_item: item.clone(),
-                    project_path: item.read(cx).project_path.clone(),
+                    project_item: item,
                 }
             }
         }
@@ -16894,43 +16841,6 @@ mod tests {
             workspace.read_with(cx, |workspace, _| {
                 assert_eq!(workspace.panes.len(), 3);
             });
-        }
-
-        #[gpui::test]
-        async fn test_open_url_or_file_resolves_remote_base_path(cx: &mut TestAppContext) {
-            init_test(cx);
-            cx.update(register_project_item::<TestPngItemView>);
-
-            let project = Project::test(FakeFs::new(cx.executor()), [], cx).await;
-            let worktree = project.update(cx, |project, cx| {
-                let worktree = project.add_test_remote_worktree("/remote/project", cx);
-                project.mark_as_collab_for_testing();
-                worktree
-            });
-            let worktree_id = worktree.read_with(cx, |worktree, _| worktree.id());
-            let (workspace, cx) =
-                cx.add_window_view(|window, cx| Workspace::test_new(project, window, cx));
-
-            workspace.update_in(cx, |workspace, window, cx| {
-                workspace.open_url_or_file(
-                    "./sibling.png",
-                    Some(Path::new("/remote/project/docs")),
-                    window,
-                    cx,
-                );
-            });
-            cx.run_until_parked();
-
-            let opened_item = workspace
-                .read_with(cx, |workspace, cx| {
-                    workspace
-                        .active_item(cx)
-                        .and_then(|item| item.downcast::<TestPngItemView>())
-                })
-                .expect("resolved remote project item should be opened");
-            let project_path = opened_item.read_with(cx, |item, _| item.project_path.clone());
-            assert_eq!(project_path.worktree_id, worktree_id);
-            assert_eq!(project_path.path.as_ref(), rel_path("docs/sibling.png"));
         }
 
         #[gpui::test]

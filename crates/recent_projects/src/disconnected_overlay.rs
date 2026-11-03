@@ -53,11 +53,7 @@ impl DisconnectedOverlay {
             workspace.project(),
             window,
             |workspace, project, event, window, cx| {
-                if !matches!(
-                    event,
-                    project::Event::DisconnectedFromHost
-                        | project::Event::DisconnectedFromRemote { .. }
-                ) {
+                if !matches!(event, project::Event::DisconnectedFromRemote { .. }) {
                     return;
                 }
                 let handle = cx.entity().downgrade();

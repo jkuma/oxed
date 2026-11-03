@@ -1090,7 +1090,7 @@ impl ExtensionsPage {
     ) -> impl IntoElement {
         let docs_url_button = Button::new("open_docs", "View Documentation")
             .end_icon(Icon::new(IconName::ArrowUpRight).size(IconSize::Small))
-            .on_click({ move |_event, _window, cx| cx.open_url(docs_url) });
+            .on_click(move |_event, _window, cx| cx.open_url(docs_url));
 
         div()
             .pt_4()
