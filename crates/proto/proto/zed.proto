@@ -59,10 +59,6 @@ message Envelope {
 
     GetDefinition get_definition = 32;
     GetDefinitionResponse get_definition_response = 33;
-    GetEditPredictionDefinition get_edit_prediction_definition = 462;
-    GetEditPredictionDefinitionResponse get_edit_prediction_definition_response = 463;
-    GetEditPredictionTypeDefinition get_edit_prediction_type_definition = 464;
-    GetEditPredictionTypeDefinitionResponse get_edit_prediction_type_definition_response = 465;
     GetDeclaration get_declaration = 237;
     GetDeclarationResponse get_declaration_response = 238;
     GetTypeDefinition get_type_definition = 34;
@@ -553,6 +549,7 @@ message Envelope {
   reserved 211 to 216, 232 to 233;
   reserved 397 to 398;
   reserved 406 to 408;
+  reserved 462 to 465;
 }
 
 message Hello {

@@ -540,7 +540,6 @@ impl<T: 'static> Drop for PendingEntitySubscription<T> {
 pub struct TelemetrySettings {
     pub diagnostics: bool,
     pub metrics: bool,
-    pub anthropic_retention: bool,
 }
 
 impl settings::Settings for TelemetrySettings {
@@ -549,7 +548,6 @@ impl settings::Settings for TelemetrySettings {
         Self {
             diagnostics: telemetry.diagnostics.unwrap(),
             metrics: telemetry.metrics.unwrap(),
-            anthropic_retention: telemetry.anthropic_retention.unwrap(),
         }
     }
 }

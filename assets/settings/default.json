@@ -1430,9 +1430,6 @@
     "diagnostics": false,
     // Send anonymized usage data like what languages you're using Zed with.
     "metrics": false,
-    // Allow sending requests to Anthropic models that cannot be offered with
-    // Zero Data Retention
-    "anthropic_retention": false,
   },
   // How to render LSP `textDocument/documentColor` colors in the editor.
   //

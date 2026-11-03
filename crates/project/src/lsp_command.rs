@@ -5,7 +5,7 @@ use crate::{
     DocumentHighlight, DocumentSymbol, Hover, HoverBlock, HoverBlockKind, InlayHint,
     InlayHintLabel, InlayHintLabelPart, InlayHintLabelPartTooltip, InlayHintTextEdits,
     InlayHintTooltip, Location, LocationLink, LspAction, LspPullDiagnostics, MarkupContent,
-    PrepareRenameResponse, ProjectPath, ProjectTransaction, PulledDiagnostics, ResolveState,
+    PrepareRenameResponse, ProjectTransaction, PulledDiagnostics, ResolveState,
     lsp_store::{LanguageServerToQuery, LocalLspStore, LspDocumentLink, LspFoldingRange, LspStore},
 };
 use anyhow::{Context as _, Result};
@@ -36,7 +36,6 @@ use serde_json::Value;
 use signature_help::{lsp_to_proto_signature, proto_to_lsp_signature};
 use std::{cmp::Reverse, collections::hash_map, ops::Range, path::Path, str::FromStr, sync::Arc};
 use text::{BufferId, LineEnding};
-use util::rel_path::RelPath;
 use util::{ResultExt as _, debug_panic};
 
 pub use signature_help::SignatureHelp;
@@ -175,17 +174,6 @@ pub struct GetDefinitions {
     pub position: PointUtf16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EditPredictionDefinition {
-    pub path: ProjectPath,
-    pub range: Range<Unclipped<PointUtf16>>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GetEditPredictionDefinitions {
-    pub position: PointUtf16,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetDeclarations {
     pub position: PointUtf16,
@@ -193,11 +181,6 @@ pub(crate) struct GetDeclarations {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetTypeDefinitions {
-    pub position: PointUtf16,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GetEditPredictionTypeDefinitions {
     pub position: PointUtf16,
 }
 
@@ -1383,107 +1366,6 @@ impl LspCommand for GetDefinitions {
 }
 
 #[async_trait(?Send)]
-impl LspCommand for GetEditPredictionDefinitions {
-    type Response = Vec<EditPredictionDefinition>;
-    type LspRequest = lsp::request::GotoDefinition;
-    type ProtoRequest = proto::GetEditPredictionDefinition;
-
-    fn display_name(&self) -> &str {
-        "Get edit prediction definition"
-    }
-
-    fn check_capabilities(&self, capabilities: AdapterServerCapabilities<'_>) -> bool {
-        capabilities
-            .server_capabilities
-            .definition_provider
-            .as_ref()
-            .is_some_and(|capability| match capability {
-                OneOf::Left(supported) => *supported,
-                OneOf::Right(_options) => true,
-            })
-    }
-
-    fn to_lsp(
-        &self,
-        path: &Path,
-        _: &Buffer,
-        _: &Arc<LanguageServer>,
-        _: &App,
-    ) -> Result<lsp::GotoDefinitionParams> {
-        Ok(lsp::GotoDefinitionParams {
-            text_document_position_params: make_lsp_text_document_position(path, self.position)?,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-        })
-    }
-
-    async fn response_from_lsp(
-        self,
-        message: Option<lsp::GotoDefinitionResponse>,
-        lsp_store: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: LanguageServerId,
-        cx: AsyncApp,
-    ) -> Result<Vec<EditPredictionDefinition>> {
-        edit_prediction_definitions_from_lsp(message, lsp_store, cx)
-    }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetEditPredictionDefinition {
-        proto::GetEditPredictionDefinition {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetEditPredictionDefinition,
-        _: Entity<LspStore>,
-        buffer: Entity<Buffer>,
-        mut cx: AsyncApp,
-    ) -> Result<Self> {
-        Ok(Self {
-            position: edit_prediction_position_from_proto(
-                message.position,
-                message.version,
-                buffer,
-                &mut cx,
-            )
-            .await?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<EditPredictionDefinition>,
-        _: &mut LspStore,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut App,
-    ) -> proto::GetEditPredictionDefinitionResponse {
-        proto::GetEditPredictionDefinitionResponse {
-            definitions: edit_prediction_definitions_to_proto(response),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetEditPredictionDefinitionResponse,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> Result<Vec<EditPredictionDefinition>> {
-        edit_prediction_definitions_from_proto(message.definitions)
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetEditPredictionDefinition) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
-}
-
-#[async_trait(?Send)]
 impl LspCommand for GetDeclarations {
     type Response = Vec<LocationLink>;
     type LspRequest = lsp::request::GotoDeclaration;
@@ -1789,103 +1671,6 @@ impl LspCommand for GetTypeDefinitions {
     }
 }
 
-#[async_trait(?Send)]
-impl LspCommand for GetEditPredictionTypeDefinitions {
-    type Response = Vec<EditPredictionDefinition>;
-    type LspRequest = lsp::request::GotoTypeDefinition;
-    type ProtoRequest = proto::GetEditPredictionTypeDefinition;
-
-    fn display_name(&self) -> &str {
-        "Get edit prediction type definition"
-    }
-
-    fn check_capabilities(&self, capabilities: AdapterServerCapabilities<'_>) -> bool {
-        !matches!(
-            &capabilities.server_capabilities.type_definition_provider,
-            None | Some(lsp::TypeDefinitionProviderCapability::Simple(false))
-        )
-    }
-
-    fn to_lsp(
-        &self,
-        path: &Path,
-        _: &Buffer,
-        _: &Arc<LanguageServer>,
-        _: &App,
-    ) -> Result<lsp::GotoTypeDefinitionParams> {
-        Ok(lsp::GotoTypeDefinitionParams {
-            text_document_position_params: make_lsp_text_document_position(path, self.position)?,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-        })
-    }
-
-    async fn response_from_lsp(
-        self,
-        message: Option<lsp::GotoDefinitionResponse>,
-        lsp_store: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: LanguageServerId,
-        cx: AsyncApp,
-    ) -> Result<Vec<EditPredictionDefinition>> {
-        edit_prediction_definitions_from_lsp(message, lsp_store, cx)
-    }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetEditPredictionTypeDefinition {
-        proto::GetEditPredictionTypeDefinition {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetEditPredictionTypeDefinition,
-        _: Entity<LspStore>,
-        buffer: Entity<Buffer>,
-        mut cx: AsyncApp,
-    ) -> Result<Self> {
-        Ok(Self {
-            position: edit_prediction_position_from_proto(
-                message.position,
-                message.version,
-                buffer,
-                &mut cx,
-            )
-            .await?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<EditPredictionDefinition>,
-        _: &mut LspStore,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut App,
-    ) -> proto::GetEditPredictionTypeDefinitionResponse {
-        proto::GetEditPredictionTypeDefinitionResponse {
-            definitions: edit_prediction_definitions_to_proto(response),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetEditPredictionTypeDefinitionResponse,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> Result<Vec<EditPredictionDefinition>> {
-        edit_prediction_definitions_from_proto(message.definitions)
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetEditPredictionTypeDefinition) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
-}
-
 fn language_server_for_buffer(
     lsp_store: &Entity<LspStore>,
     buffer: &Entity<Buffer>,
@@ -2060,60 +1845,6 @@ fn definition_locations_from_lsp(
     locations
 }
 
-fn edit_prediction_definitions_from_lsp(
-    message: Option<lsp::GotoDefinitionResponse>,
-    lsp_store: Entity<LspStore>,
-    mut cx: AsyncApp,
-) -> Result<Vec<EditPredictionDefinition>> {
-    let unresolved_locations = definition_locations_from_lsp(message);
-    lsp_store.update(&mut cx, |lsp_store, cx| {
-        use util::paths::UrlExt as _;
-        let mut definitions = Vec::new();
-        let worktree_store = lsp_store.worktree_store().read(cx);
-        let path_style = worktree_store.path_style();
-
-        for (_, uri, range) in unresolved_locations {
-            let Ok(abs_path) = uri.to_file_path_ext(path_style) else {
-                continue;
-            };
-            let Some((worktree, relative_path)) = worktree_store.find_worktree(&abs_path, cx)
-            else {
-                continue;
-            };
-            let worktree = worktree.read(cx);
-            if !worktree.is_visible() || worktree.is_single_file() {
-                continue;
-            }
-            definitions.push(EditPredictionDefinition {
-                path: ProjectPath {
-                    worktree_id: worktree.id(),
-                    path: relative_path,
-                },
-                range: range_from_lsp(range),
-            });
-        }
-
-        Ok(definitions)
-    })
-}
-
-async fn edit_prediction_position_from_proto(
-    position: Option<proto::Anchor>,
-    version: Vec<proto::VectorClockEntry>,
-    buffer: Entity<Buffer>,
-    cx: &mut AsyncApp,
-) -> Result<PointUtf16> {
-    let position = position
-        .and_then(deserialize_anchor)
-        .context("invalid position")?;
-    buffer
-        .update(cx, |buffer, _| {
-            buffer.wait_for_version(deserialize_version(&version))
-        })
-        .await?;
-    Ok(buffer.read_with(cx, |buffer, _| position.to_point_utf16(buffer)))
-}
-
 pub async fn location_link_from_lsp(
     link: lsp::LocationLink,
     lsp_store: &Entity<LspStore>,
@@ -2217,48 +1948,6 @@ pub fn location_link_to_proto(
         origin,
         target: Some(target),
     }
-}
-
-fn edit_prediction_definitions_to_proto(
-    definitions: Vec<EditPredictionDefinition>,
-) -> Vec<proto::EditPredictionDefinition> {
-    definitions
-        .into_iter()
-        .map(|definition| proto::EditPredictionDefinition {
-            worktree_id: definition.path.worktree_id.to_proto(),
-            path: definition.path.path.as_ref().as_unix_str().to_owned(),
-            start: Some(proto::PointUtf16 {
-                row: definition.range.start.0.row,
-                column: definition.range.start.0.column,
-            }),
-            end: Some(proto::PointUtf16 {
-                row: definition.range.end.0.row,
-                column: definition.range.end.0.column,
-            }),
-        })
-        .collect()
-}
-
-fn edit_prediction_definitions_from_proto(
-    definitions: Vec<proto::EditPredictionDefinition>,
-) -> Result<Vec<EditPredictionDefinition>> {
-    definitions
-        .into_iter()
-        .map(|definition| {
-            let start = definition.start.context("missing definition start")?;
-            let end = definition.end.context("missing definition end")?;
-            Ok(EditPredictionDefinition {
-                path: ProjectPath {
-                    worktree_id: worktree::WorktreeId::from_proto(definition.worktree_id),
-                    path: RelPath::from_unix_str(&definition.path)
-                        .context("invalid path")?
-                        .into(),
-                },
-                range: Unclipped(PointUtf16::new(start.row, start.column))
-                    ..Unclipped(PointUtf16::new(end.row, end.column)),
-            })
-        })
-        .collect()
 }
 
 #[async_trait(?Send)]

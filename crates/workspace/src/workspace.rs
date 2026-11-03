@@ -1023,9 +1023,6 @@ pub fn init(app_state: Arc<AppState>, cx: &mut App) {
         });
 }
 
-type BuildProjectItemFn =
-    fn(AnyEntity, Entity<Project>, Option<&Pane>, &mut Window, &mut App) -> Box<dyn ItemHandle>;
-
 type BuildProjectItemForPathFn =
     fn(
         &Entity<Project>,
@@ -1036,20 +1033,11 @@ type BuildProjectItemForPathFn =
 
 #[derive(Clone, Default)]
 struct ProjectItemRegistry {
-    build_project_item_fns_by_type: TypeIdHashMap<BuildProjectItemFn>,
     build_project_item_for_path_fns: Vec<BuildProjectItemForPathFn>,
 }
 
 impl ProjectItemRegistry {
     fn register<T: ProjectItem>(&mut self) {
-        self.build_project_item_fns_by_type.insert(
-            TypeId::of::<T::Item>(),
-            |item, project, pane, window, cx| {
-                let item = item.downcast().unwrap();
-                Box::new(cx.new(|cx| T::for_project_item(project, pane, item, window, cx)))
-                    as Box<dyn ItemHandle>
-            },
-        );
         self.build_project_item_for_path_fns
             .push(|project, project_path, window, cx| {
                 let project_path = project_path.clone();
@@ -1134,20 +1122,6 @@ impl ProjectItemRegistry {
             return Task::ready(Err(anyhow!("cannot open file {:?}", path.path)));
         };
         open_project_item
-    }
-
-    fn build_item<T: project::ProjectItem>(
-        &self,
-        item: Entity<T>,
-        project: Entity<Project>,
-        pane: Option<&Pane>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Option<Box<dyn ItemHandle>> {
-        let build = self
-            .build_project_item_fns_by_type
-            .get(&TypeId::of::<T>())?;
-        Some(build(item.into_any(), project, pane, window, cx))
     }
 }
 
@@ -1839,10 +1813,6 @@ impl Workspace {
                             })
                         },
                     );
-                }
-
-                project::Event::AgentLocationChanged => {
-                    this.handle_agent_location_changed(window, cx)
                 }
 
                 _ => {}
@@ -7155,69 +7125,6 @@ impl Workspace {
         .context("no follower state")?;
 
         Ok(())
-    }
-
-    fn handle_agent_location_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(follower_state) = self.follower_states.get_mut(&CollaboratorId::Agent) else {
-            return;
-        };
-
-        if let Some(agent_location) = self.project.read(cx).agent_location() {
-            let buffer_entity_id = agent_location.buffer.entity_id();
-            let view_id = ViewId {
-                creator: CollaboratorId::Agent,
-                id: buffer_entity_id.as_u64(),
-            };
-            follower_state.active_view_id = Some(view_id);
-
-            let item = match follower_state.items_by_leader_view_id.entry(view_id) {
-                hash_map::Entry::Occupied(entry) => Some(entry.into_mut()),
-                hash_map::Entry::Vacant(entry) => {
-                    let existing_view =
-                        follower_state
-                            .center_pane
-                            .read(cx)
-                            .items()
-                            .find_map(|item| {
-                                let item = item.to_followable_item_handle(cx)?;
-                                if item.buffer_kind(cx) == ItemBufferKind::Singleton
-                                    && item.project_item_model_ids(cx).as_slice()
-                                        == [buffer_entity_id]
-                                {
-                                    Some(item)
-                                } else {
-                                    None
-                                }
-                            });
-                    let view = existing_view.or_else(|| {
-                        agent_location.buffer.upgrade().and_then(|buffer| {
-                            cx.update_default_global(|registry: &mut ProjectItemRegistry, cx| {
-                                registry.build_item(buffer, self.project.clone(), None, window, cx)
-                            })?
-                            .to_followable_item_handle(cx)
-                        })
-                    });
-
-                    view.map(|view| {
-                        entry.insert(FollowerView {
-                            view,
-                            location: None,
-                        })
-                    })
-                }
-            };
-
-            if let Some(item) = item {
-                item.view
-                    .set_leader_id(Some(CollaboratorId::Agent), window, cx);
-                item.view
-                    .update_agent_location(agent_location.position, window, cx);
-            }
-        } else {
-            follower_state.active_view_id = None;
-        }
-
-        self.leader_updated(CollaboratorId::Agent, window, cx);
     }
 
     pub fn update_active_view_for_followers(&mut self, window: &mut Window, cx: &mut App) {

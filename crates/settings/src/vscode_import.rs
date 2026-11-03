@@ -841,7 +841,6 @@ impl VsCodeSettings {
             Some(TelemetrySettingsContent {
                 metrics: Some(metrics),
                 diagnostics: Some(diagnostics),
-                anthropic_retention: None,
             })
         })
     }

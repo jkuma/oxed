@@ -2768,7 +2768,7 @@ impl Editor {
             key_context.add("DebuggerHover");
         }
 
-        // Disable vim contexts when a sub-editor (e.g. rename/inline assistant) is focused.
+        // Addon contexts stay off while a sub-editor, such as rename, has focus.
         if !self.focus_handle(cx).contains_focused(window, cx)
             || (self.is_focused(window) || self.mouse_menu_is_focused(window, cx))
         {
@@ -11997,34 +11997,22 @@ impl EditorSnapshot {
         self.buffer_snapshot()
             .selections_in_range(range, false)
             .filter_map(move |(replica_id, line_mode, cursor_shape, selection)| {
-                if replica_id == ReplicaId::AGENT {
-                    Some(RemoteSelection {
-                        replica_id,
-                        selection,
-                        cursor_shape,
-                        line_mode,
-                        collaborator_id: CollaboratorId::Agent,
-                        user_name: Some("Agent".into()),
-                        color: cx.theme().players().agent(),
-                    })
-                } else {
-                    let collaborator = collaborators_by_replica_id.get(&replica_id)?;
-                    let participant_index = participant_indices.get(&collaborator.user_id).copied();
-                    let user_name = participant_names.get(&collaborator.user_id).cloned();
-                    Some(RemoteSelection {
-                        replica_id,
-                        selection,
-                        cursor_shape,
-                        line_mode,
-                        collaborator_id: CollaboratorId::PeerId(collaborator.peer_id),
-                        user_name,
-                        color: if let Some(index) = participant_index {
-                            cx.theme().players().color_for_participant(index.0)
-                        } else {
-                            cx.theme().players().absent()
-                        },
-                    })
-                }
+                let collaborator = collaborators_by_replica_id.get(&replica_id)?;
+                let participant_index = participant_indices.get(&collaborator.user_id).copied();
+                let user_name = participant_names.get(&collaborator.user_id).cloned();
+                Some(RemoteSelection {
+                    replica_id,
+                    selection,
+                    cursor_shape,
+                    line_mode,
+                    collaborator_id: CollaboratorId::PeerId(collaborator.peer_id),
+                    user_name,
+                    color: if let Some(index) = participant_index {
+                        cx.theme().players().color_for_participant(index.0)
+                    } else {
+                        cx.theme().players().absent()
+                    },
+                })
             })
     }
 
