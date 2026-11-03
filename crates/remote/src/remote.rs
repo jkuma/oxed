@@ -6,8 +6,6 @@ pub mod remote_client;
 pub mod remote_identity;
 mod transport;
 
-#[cfg(target_os = "windows")]
-pub use remote_client::OpenWslPath;
 pub use remote_client::{
     CommandTemplate, ConnectionIdentifier, ConnectionState, Interactive, RemoteArch, RemoteClient,
     RemoteClientDelegate, RemoteClientEvent, RemoteConnection, RemoteConnectionOptions, RemoteOs,

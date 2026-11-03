@@ -15,7 +15,6 @@ use project::Project;
 use project::git_store::Repository;
 use project::project_settings::ProjectSettings;
 use project::trusted_worktrees::{PathTrust, TrustedWorktrees};
-use remote::RemoteConnectionOptions;
 use settings::Settings;
 use ui::prelude::*;
 use workspace::{
@@ -781,7 +780,6 @@ fn create_worktree_workspace_inner(
         workspace.capture_state_for_worktree_switch(window, fallback_focused_dock, cx);
     let workspace_handle = workspace.weak_handle();
     let window_handle = window.window_handle().downcast::<MultiWorkspace>();
-    let remote_connection_options = project.read(cx).remote_connection_options(cx);
 
     let (git_repos, non_git_paths) = classify_worktrees(project.read(cx), cx);
 
@@ -794,25 +792,6 @@ fn create_worktree_workspace_inner(
             cx,
         );
         return Task::ready(Err(anyhow!("No git repositories found in the project")));
-    }
-
-    if remote_connection_options.is_some() {
-        let is_disconnected = project
-            .read(cx)
-            .remote_client()
-            .is_some_and(|client| client.read(cx).is_disconnected());
-        if is_disconnected {
-            let toast_workspace = cx.entity();
-            show_error_toast(
-                toast_workspace,
-                "worktree create",
-                anyhow!("Cannot create worktree: remote connection is not active"),
-                cx,
-            );
-            return Task::ready(Err(anyhow!(
-                "Cannot create worktree: remote connection is not active"
-            )));
-        }
     }
 
     let worktree_name = action.worktree_name.clone();
@@ -855,7 +834,6 @@ fn create_worktree_workspace_inner(
             previous_state,
             workspace_handle.clone(),
             window_handle,
-            remote_connection_options,
             activate,
             &mut cx,
         )
@@ -912,7 +890,6 @@ pub fn handle_switch_worktree(
         workspace.capture_state_for_worktree_switch(window, fallback_focused_dock, cx);
     let workspace_handle = workspace.weak_handle();
     let window_handle = window.window_handle().downcast::<MultiWorkspace>();
-    let remote_connection_options = project.read(cx).remote_connection_options(cx);
 
     let (git_repos, non_git_paths) = classify_worktrees(project.read(cx), cx);
 
@@ -935,7 +912,6 @@ pub fn handle_switch_worktree(
             previous_state,
             workspace_handle.clone(),
             window_handle,
-            remote_connection_options,
             &mut cx,
         )
         .await;
@@ -965,7 +941,6 @@ async fn do_create_worktree(
     previous_state: PreviousWorkspaceState,
     workspace: WeakEntity<Workspace>,
     window_handle: Option<gpui::WindowHandle<MultiWorkspace>>,
-    remote_connection_options: Option<RemoteConnectionOptions>,
     activate: bool,
     cx: &mut AsyncWindowContext,
 ) -> anyhow::Result<CreatedWorktreeWorkspace> {
@@ -1048,25 +1023,7 @@ async fn do_create_worktree(
 
     let fs = cx.update(|_, cx| <dyn Fs>::global(cx))?;
 
-    let creation_pairs: Vec<(Entity<Repository>, PathBuf)> = creation_infos
-        .iter()
-        .map(|(repo, path, _)| (repo.clone(), path.clone()))
-        .collect();
-
     let created_paths = await_and_rollback_on_failure(creation_infos, fs, cx).await?;
-
-    // Record each created worktree so thread archival can later verify that
-    // Zed created it before deleting it from disk. Failures are non-fatal:
-    // the worktree just won't be eligible for automatic archival.
-    for (repo, path) in creation_pairs {
-        crate::created_worktrees::record_created_worktree_for_repo(
-            &repo,
-            &path,
-            remote_connection_options.as_ref(),
-            cx,
-        )
-        .await;
-    }
 
     // `path_remapping` has one entry per source git repo, while `created_paths`
     // has one per *unique* target worktree. When the former is larger, two or
@@ -1086,7 +1043,6 @@ async fn do_create_worktree(
         previous_state,
         workspace,
         window_handle,
-        remote_connection_options,
         WorktreeOperation::Create,
         activate,
         cx,
@@ -1106,7 +1062,6 @@ async fn do_switch_worktree(
     previous_state: PreviousWorkspaceState,
     workspace: WeakEntity<Workspace>,
     window_handle: Option<gpui::WindowHandle<MultiWorkspace>>,
-    remote_connection_options: Option<RemoteConnectionOptions>,
     cx: &mut AsyncWindowContext,
 ) -> anyhow::Result<Entity<Workspace>> {
     let path_remapping: Vec<(PathBuf, PathBuf)> = git_repo_work_dirs
@@ -1126,7 +1081,6 @@ async fn do_switch_worktree(
         previous_state,
         workspace,
         window_handle,
-        remote_connection_options,
         WorktreeOperation::Switch,
         // Switching is always an explicit, foreground user action.
         true,
@@ -1146,7 +1100,6 @@ async fn open_worktree_workspace(
     previous_state: PreviousWorkspaceState,
     workspace: WeakEntity<Workspace>,
     window_handle: Option<gpui::WindowHandle<MultiWorkspace>>,
-    remote_connection_options: Option<RemoteConnectionOptions>,
     operation: WorktreeOperation,
     activate: bool,
     cx: &mut AsyncWindowContext,
@@ -1171,54 +1124,39 @@ async fn open_worktree_workspace(
         None
     };
 
-    let (workspace_task, modal_workspace) =
-        window_handle.update(cx, |multi_workspace, window, cx| {
-            let path_list = util::path_list::PathList::new(&all_paths);
-            let active_workspace = multi_workspace.workspace().clone();
-            let modal_workspace = active_workspace.clone();
+    let workspace_task = window_handle.update(cx, |multi_workspace, window, cx| {
+        let path_list = util::path_list::PathList::new(&all_paths);
 
-            let init: Option<
-                Box<
-                    dyn FnOnce(&mut Workspace, &mut gpui::Window, &mut gpui::Context<Workspace>)
-                        + Send,
-                >,
-            > = if transfer_state {
-                let dock_structure = previous_state.dock_structure;
-                Some(Box::new(
-                    move |workspace: &mut Workspace,
-                          window: &mut gpui::Window,
-                          cx: &mut gpui::Context<Workspace>| {
-                        workspace.set_dock_structure(dock_structure, window, cx);
-                    },
-                ))
-            } else {
-                None
-            };
-
-            let task = multi_workspace.find_or_create_workspace(
-                path_list,
-                remote_connection_options,
-                None,
-                move |connection_options, window, cx| {
-                    remote_connection::connect_with_modal(
-                        &active_workspace,
-                        connection_options,
-                        window,
-                        cx,
-                    )
+        let init: Option<
+            Box<
+                dyn FnOnce(&mut Workspace, &mut gpui::Window, &mut gpui::Context<Workspace>) + Send,
+            >,
+        > = if transfer_state {
+            let dock_structure = previous_state.dock_structure;
+            Some(Box::new(
+                move |workspace: &mut Workspace,
+                      window: &mut gpui::Window,
+                      cx: &mut gpui::Context<Workspace>| {
+                    workspace.set_dock_structure(dock_structure, window, cx);
                 },
-                init,
-                OpenMode::Add,
-                source_for_transfer.clone(),
-                window,
-                cx,
-            );
-            (task, modal_workspace)
-        })?;
+            ))
+        } else {
+            None
+        };
 
-    let result = workspace_task.await;
-    remote_connection::dismiss_connection_modal(&modal_workspace, cx);
-    let new_workspace = result?;
+        let task = multi_workspace.find_or_create_workspace(
+            path_list,
+            None,
+            init,
+            OpenMode::Add,
+            source_for_transfer.clone(),
+            window,
+            cx,
+        );
+        task
+    })?;
+
+    let new_workspace = workspace_task.await?;
 
     let panels_task = new_workspace.update(cx, |workspace, _cx| workspace.take_panels_task());
 

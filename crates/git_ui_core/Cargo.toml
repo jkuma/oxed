@@ -18,7 +18,6 @@ anyhow.workspace = true
 askpass.workspace = true
 buffer_diff.workspace = true
 collections.workspace = true
-db.workspace = true
 editor.workspace = true
 fs.workspace = true
 futures.workspace = true
@@ -33,9 +32,6 @@ picker.workspace = true
 project.workspace = true
 proto.workspace = true
 rand.workspace = true
-remote.workspace = true
-remote_connection.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 settings.workspace = true
 terminal.workspace = true
@@ -53,7 +49,6 @@ fs = { workspace = true, features = ["test-support"] }
 git = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 project = { workspace = true, features = ["test-support"] }
-remote_connection = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
 task.workspace = true
 theme.workspace = true

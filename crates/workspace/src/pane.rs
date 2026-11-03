@@ -3301,10 +3301,11 @@ impl Pane {
 
                             let visible_in_project_panel = relative_path.is_some()
                                 && worktree.is_some_and(|worktree| worktree.read(cx).is_visible());
-                            let is_local = pane.read(cx).project.upgrade().is_some_and(|project| {
-                                let project = project.read(cx);
-                                project.is_local() || project.is_via_wsl_with_host_interop(cx)
-                            });
+                            let is_local = pane
+                                .read(cx)
+                                .project
+                                .upgrade()
+                                .is_some_and(|project| project.read(cx).is_local());
                             let is_remote = pane
                                 .read(cx)
                                 .project
@@ -4119,24 +4120,16 @@ impl Pane {
         let mut to_pane = cx.entity();
         let mut split_direction = self.drag_split_direction;
         let paths = paths.paths().to_vec();
-        let (should_block, needs_wsl_translation) = self
+        let should_block = self
             .workspace
             .update(cx, |workspace, cx| {
-                let project = workspace.project().read(cx);
-
-                if project.is_via_remote_server() {
-                    if !project.is_via_wsl(cx) {
-                        workspace.show_error(
-                            "Cannot drop local files on a remote SSH/Docker project",
-                            cx,
-                        );
-                        return (true, false);
-                    }
-                    return (false, true);
+                if workspace.project().read(cx).is_via_remote_server() {
+                    workspace.show_error("Cannot drop local files on a remote project", cx);
+                    return true;
                 }
-                (false, false)
+                false
             })
-            .unwrap_or((true, false));
+            .unwrap_or(true);
         if should_block {
             return;
         }
@@ -4144,9 +4137,7 @@ impl Pane {
         self.workspace
             .update(cx, |workspace, cx| {
                 let fs = Arc::clone(workspace.project().read(cx).fs());
-                let project = workspace.project().clone();
                 cx.spawn_in(window, async move |workspace, cx| {
-                    // `fs` is the host's file system even for remote projects, so probe the paths as they were dropped, before translating them to the remote's path style.
                     let mut is_file_checks = FuturesUnordered::new();
                     for path in &paths {
                         is_file_checks.push(fs.is_file(path))
@@ -4162,40 +4153,6 @@ impl Pane {
                     if !has_files_to_open {
                         split_direction = None;
                     }
-
-                    let paths = if needs_wsl_translation {
-                        let mut translated = Vec::with_capacity(paths.len());
-                        for path in &paths {
-                            log::debug!("dropped Windows path {}", path.display());
-                            let fut = project.read_with(cx, |project, cx| {
-                                project.try_windows_path_to_wsl(path, cx)
-                            });
-                            match fut.await {
-                                Ok(wsl_path) => {
-                                    log::debug!("translated to WSL path {}", wsl_path.display());
-                                    translated.push(wsl_path);
-                                }
-                                Err(e) => log::warn!(
-                                    "wslpath failed for {}: {e:#}, dropping this path",
-                                    path.display()
-                                ),
-                            }
-                        }
-                        if translated.is_empty() && !paths.is_empty() {
-                            workspace
-                                .update_in(cx, |workspace, _, cx| {
-                                    workspace.show_error(
-                                        "Could not translate the dropped paths into WSL paths",
-                                        cx,
-                                    );
-                                })
-                                .ok();
-                            return;
-                        }
-                        translated
-                    } else {
-                        paths
-                    };
 
                     if let Ok((open_task, to_pane)) =
                         workspace.update_in(cx, |workspace, window, cx| {
@@ -4413,11 +4370,7 @@ impl Render for Pane {
         let Some(project) = self.project.upgrade() else {
             return div().track_focus(&self.focus_handle(cx));
         };
-        // WSL remotes accept dropped host files too, since their paths can be translated with `wslpath`; see `Pane::handle_external_paths_drop`.
-        let accepts_external_paths = {
-            let project = project.read(cx);
-            project.is_local() || project.is_via_wsl(cx)
-        };
+        let accepts_external_paths = project.read(cx).is_local();
 
         v_flex()
             .key_context(key_context)

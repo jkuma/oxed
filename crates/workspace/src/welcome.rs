@@ -1,6 +1,5 @@
 use crate::{
-    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerializedWorkspaceLocation, Workspace,
-    WorkspaceSettings,
+    NewFile, Open, OpenMode, PathList, RecentWorkspace, Workspace, WorkspaceSettings,
     item::{Item, ItemEvent},
     persistence::WorkspaceDb,
 };
@@ -300,25 +299,18 @@ impl WelcomePage {
     ) {
         if let Some(recent_workspaces) = &self.recent_workspaces {
             if let Some(workspace) = recent_workspaces.get(action.index) {
-                let is_local = matches!(workspace.location, SerializedWorkspaceLocation::Local);
-
-                if is_local {
-                    let paths = workspace.paths.paths().to_vec();
-                    let open_mode = match WorkspaceSettings::get_global(cx).default_open_behavior {
-                        DefaultOpenBehavior::ExistingWindow => OpenMode::Activate,
-                        DefaultOpenBehavior::NewWindow => OpenMode::NewWindow,
-                    };
-                    self.workspace
-                        .update(cx, |workspace, cx| {
-                            workspace
-                                .open_workspace_for_paths(open_mode, paths, window, cx)
-                                .detach_and_log_err(cx);
-                        })
-                        .log_err();
-                } else {
-                    use zed_actions::OpenRecent;
-                    window.dispatch_action(OpenRecent::default().boxed_clone(), cx);
-                }
+                let paths = workspace.paths.paths().to_vec();
+                let open_mode = match WorkspaceSettings::get_global(cx).default_open_behavior {
+                    DefaultOpenBehavior::ExistingWindow => OpenMode::Activate,
+                    DefaultOpenBehavior::NewWindow => OpenMode::NewWindow,
+                };
+                self.workspace
+                    .update(cx, |workspace, cx| {
+                        workspace
+                            .open_workspace_for_paths(open_mode, paths, window, cx)
+                            .detach_and_log_err(cx);
+                    })
+                    .log_err();
             }
         }
     }
@@ -337,19 +329,11 @@ impl WelcomePage {
         &self,
         project_index: usize,
         tab_index: usize,
-        location: &SerializedWorkspaceLocation,
         paths: &PathList,
     ) -> impl IntoElement {
-        let name = project_name(paths);
-
-        let (icon, title) = match location {
-            SerializedWorkspaceLocation::Local => (IconName::Folder, name),
-            SerializedWorkspaceLocation::Remote(_) => (IconName::Server, name),
-        };
-
         SectionButton::new(
-            title,
-            icon,
+            project_name(paths),
+            IconName::Folder,
             &OpenRecentProject {
                 index: project_index,
             },
@@ -376,7 +360,6 @@ impl Render for WelcomePage {
                 self.render_recent_project(
                     index,
                     first_section_entries + index,
-                    &workspace.location,
                     &workspace.identity_paths,
                 )
             })

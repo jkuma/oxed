@@ -1142,7 +1142,7 @@ impl ProjectPanel {
             let is_unfoldable = auto_fold_dirs && self.is_unfoldable(entry, worktree);
             let is_read_only = project.is_read_only(cx);
             let is_remote = project.is_remote();
-            let is_local = project.is_local() || project.is_via_wsl_with_host_interop(cx);
+            let is_local = project.is_local();
             let file_name = Path::new(entry_file_name(entry, worktree.root_name()));
             let is_markdown =
                 !is_dir && MarkdownPreviewView::is_markdown_path(file_name, project.languages());
@@ -7639,14 +7639,11 @@ impl Render for ProjectPanel {
                         .on_action(cx.listener(Self::undo))
                         .on_action(cx.listener(Self::redo))
                 })
-                .when(
-                    project.is_local() || project.is_via_wsl_with_host_interop(cx),
-                    |el| {
-                        el.on_action(cx.listener(Self::reveal_in_finder))
-                            .on_action(cx.listener(Self::open_system))
-                            .on_action(cx.listener(Self::open_in_terminal))
-                    },
-                )
+                .when(project.is_local(), |el| {
+                    el.on_action(cx.listener(Self::reveal_in_finder))
+                        .on_action(cx.listener(Self::open_system))
+                        .on_action(cx.listener(Self::open_in_terminal))
+                })
                 .when(project.is_via_remote_server(), |el| {
                     el.on_action(cx.listener(Self::open_in_terminal))
                         .on_action(cx.listener(Self::download_from_remote))

@@ -98,7 +98,6 @@ project_symbols.workspace = true
 rayon.workspace = true
 recent_projects.workspace = true
 release_channel.workspace = true
-remote.workspace = true
 reqwest_client.workspace = true
 rope.workspace = true
 search.workspace = true
@@ -158,7 +157,6 @@ itertools.workspace = true
 language = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true
 project = { workspace = true, features = ["test-support"] }
-remote = { workspace = true, features = ["test-support"] }
 semver.workspace = true
 title_bar = { workspace = true, features = ["test-support"] }
 workspace = { workspace = true, features = ["test-support"] }

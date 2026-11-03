@@ -3867,7 +3867,7 @@ impl SettingsWindow {
                             .clone()
                             .update(cx, |workspace, cx| {
                                 workspace
-                                    .with_local_or_wsl_workspace(
+                                    .with_local_workspace(
                                         window,
                                         cx,
                                         open_user_settings_in_workspace,
@@ -4339,24 +4339,16 @@ fn open_user_settings_in_workspace(
     let project = workspace.project().clone();
 
     cx.spawn_in(window, async move |workspace, cx| {
-        let (config_dir, settings_file) = project.update(cx, |project, cx| {
-            (
-                project.try_windows_path_to_wsl(paths::config_dir().as_path(), cx),
-                project.try_windows_path_to_wsl(paths::settings_file().as_path(), cx),
-            )
-        });
-        let config_dir = config_dir.await?;
-        let settings_file = settings_file.await?;
         project
             .update(cx, |project, cx| {
-                project.find_or_create_worktree(&config_dir, false, cx)
+                project.find_or_create_worktree(paths::config_dir(), false, cx)
             })
             .await
             .ok();
         workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_paths(
-                    vec![settings_file],
+                    vec![paths::settings_file().clone()],
                     OpenOptions {
                         visible: Some(OpenVisible::None),
                         ..Default::default()

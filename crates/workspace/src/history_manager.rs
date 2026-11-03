@@ -6,10 +6,7 @@ use smallvec::SmallVec;
 use ui::{App, Context};
 use util::{ResultExt, paths::PathExt};
 
-use crate::{
-    NewWindow, SerializedWorkspaceLocation, WorkspaceId, path_list::PathList,
-    persistence::WorkspaceDb,
-};
+use crate::{NewWindow, WorkspaceId, path_list::PathList, persistence::WorkspaceDb};
 
 pub fn init(fs: Arc<dyn Fs>, cx: &mut App) {
     let manager = cx.new(|_| HistoryManager::new());
@@ -49,16 +46,7 @@ impl HistoryManager {
                 .unwrap_or_default()
                 .into_iter()
                 .rev()
-                .filter_map(|workspace| {
-                    if matches!(workspace.location, SerializedWorkspaceLocation::Local) {
-                        Some(HistoryManagerEntry::new(
-                            workspace.workspace_id,
-                            &workspace.paths,
-                        ))
-                    } else {
-                        None
-                    }
-                })
+                .map(|workspace| HistoryManagerEntry::new(workspace.workspace_id, &workspace.paths))
                 .collect::<Vec<_>>();
             this.update(cx, |this, cx| {
                 this.history = recent_folders;

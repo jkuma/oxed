@@ -17,7 +17,6 @@ use project::{
     Project, ProjectGroupKey, bookmark_store::SerializedBookmark,
     debugger::breakpoint_store::SourceBreakpoint,
 };
-use remote::RemoteConnectionOptions;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -27,37 +26,11 @@ use std::{
 use util::{ResultExt, path_list::SerializedPathList};
 use uuid::Uuid;
 
-#[derive(
-    Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, serde::Serialize, serde::Deserialize,
-)]
-pub(crate) struct RemoteConnectionId(pub u64);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum RemoteConnectionKind {
-    Ssh,
-    Wsl,
-    Docker,
-}
-
-#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
-pub enum SerializedWorkspaceLocation {
-    Local,
-    Remote(RemoteConnectionOptions),
-}
-
-impl SerializedWorkspaceLocation {
-    /// Get sorted paths
-    pub fn sorted_paths(&self) -> Arc<Vec<PathBuf>> {
-        unimplemented!()
-    }
-}
-
 /// A workspace entry from a previous session, containing all the info needed
 /// to restore it including which window it belonged to (for MultiWorkspace grouping).
 #[derive(Debug, PartialEq, Clone)]
 pub struct SessionWorkspace {
     pub workspace_id: WorkspaceId,
-    pub location: SerializedWorkspaceLocation,
     pub paths: PathList,
     pub window_id: Option<WindowId>,
 }
@@ -65,7 +38,6 @@ pub struct SessionWorkspace {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SerializedProjectGroup {
     pub path_list: SerializedPathList,
-    pub(crate) location: SerializedWorkspaceLocation,
     #[serde(default = "default_expanded")]
     pub expanded: bool,
 }
@@ -78,22 +50,14 @@ impl SerializedProjectGroup {
     pub fn from_group(key: &ProjectGroupKey, expanded: bool) -> Self {
         Self {
             path_list: key.path_list().serialize(),
-            location: match key.host() {
-                Some(host) => SerializedWorkspaceLocation::Remote(host),
-                None => SerializedWorkspaceLocation::Local,
-            },
             expanded,
         }
     }
 
     pub fn into_restored_state(self) -> SerializedProjectGroupState {
         let path_list = PathList::deserialize(&self.path_list);
-        let host = match self.location {
-            SerializedWorkspaceLocation::Local => None,
-            SerializedWorkspaceLocation::Remote(opts) => Some(opts),
-        };
         SerializedProjectGroupState {
-            key: ProjectGroupKey::new(host, path_list),
+            key: ProjectGroupKey::new(None, path_list),
             expanded: self.expanded,
         }
     }
@@ -128,7 +92,6 @@ pub struct SerializedMultiWorkspace {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct SerializedWorkspace {
     pub(crate) id: WorkspaceId,
-    pub(crate) location: SerializedWorkspaceLocation,
     pub(crate) paths: PathList,
     /// The workspace's main worktree paths at the time this workspace was saved.
     ///
@@ -155,25 +118,6 @@ pub struct DockStructure {
     pub left: DockData,
     pub right: DockData,
     pub bottom: DockData,
-}
-
-impl RemoteConnectionKind {
-    pub(crate) fn serialize(&self) -> &'static str {
-        match self {
-            RemoteConnectionKind::Ssh => "ssh",
-            RemoteConnectionKind::Wsl => "wsl",
-            RemoteConnectionKind::Docker => "docker",
-        }
-    }
-
-    pub(crate) fn deserialize(text: &str) -> Option<Self> {
-        match text {
-            "ssh" => Some(Self::Ssh),
-            "wsl" => Some(Self::Wsl),
-            "docker" => Some(Self::Docker),
-            _ => None,
-        }
-    }
 }
 
 impl Column for DockStructure {

@@ -2260,39 +2260,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dev_container"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-tar",
- "async-trait",
- "env_logger 0.11.8",
- "fs",
- "futures",
- "gpui",
- "http",
- "http_client",
- "indoc",
- "log",
- "menu",
- "picker",
- "project",
- "regex",
- "serde",
- "serde_json",
- "serde_json_lenient",
- "serde_yaml_ng",
- "settings",
- "shlex",
- "ui",
- "util",
- "walkdir",
- "workspace",
- "worktree",
- "yaml-rust2",
-]
-
-[[package]]
 name = "diagnostics"
 version = "0.1.0"
 dependencies = [
@@ -3780,7 +3747,6 @@ dependencies = [
  "project",
  "rand 0.9.4",
  "release_channel",
- "remote_connection",
  "schemars",
  "search",
  "serde",
@@ -3815,7 +3781,6 @@ dependencies = [
  "askpass",
  "buffer_diff",
  "collections",
- "db",
  "editor",
  "fs",
  "futures",
@@ -3830,9 +3795,6 @@ dependencies = [
  "project",
  "proto",
  "rand 0.9.4",
- "remote",
- "remote_connection",
- "serde",
  "serde_json",
  "settings",
  "task",
@@ -9012,41 +8974,21 @@ dependencies = [
 name = "recent_projects"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "askpass",
  "chrono",
- "db",
- "dev_container",
  "editor",
- "extension",
- "extension_host",
  "fs",
  "futures",
  "fuzzy_nucleo",
  "gpui",
- "http_client",
- "indoc",
- "language",
- "log",
  "menu",
- "node_runtime",
- "open_path_prompt",
- "ordered-float 5.5.0",
  "paths",
  "picker",
  "project",
- "release_channel",
- "remote",
- "remote_connection",
- "rpc",
- "semver",
  "serde_json",
  "settings",
  "ui",
  "util",
- "windows-registry 0.6.1",
  "workspace",
- "worktree",
  "zed_actions",
 ]
 
@@ -9186,29 +9128,6 @@ dependencies = [
  "urlencoding",
  "util",
  "which",
-]
-
-[[package]]
-name = "remote_connection"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "askpass",
- "editor",
- "futures",
- "gpui",
- "log",
- "markdown",
- "menu",
- "release_channel",
- "remote",
- "semver",
- "settings",
- "theme",
- "theme_settings",
- "ui",
- "ui_input",
- "workspace",
 ]
 
 [[package]]
@@ -9938,19 +9857,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_yaml_ng"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4db627b98b36d4203a7b458cf3573730f2bb591b28871d916dfa9efabfd41f"
-dependencies = [
- "indexmap",
- "itoa",
- "ryu",
- "serde",
- "unsafe-libyaml",
 ]
 
 [[package]]
@@ -11308,7 +11214,6 @@ dependencies = [
  "platform_title_bar",
  "project",
  "recent_projects",
- "remote",
  "schemars",
  "serde",
  "settings",
@@ -12099,12 +12004,6 @@ name = "unindent"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7264e107f553ccae879d21fbea1d6724ac785e8c3bfc762137959b5802826ef3"
-
-[[package]]
-name = "unsafe-libyaml"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "untrusted"
@@ -13597,17 +13496,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-registry"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02752bf7fbdcce7f2a27a742f798510f3e5ad88dbe84871e5168e2120c3d5720"
-dependencies = [
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
-]
-
-[[package]]
 name = "windows-result"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14226,7 +14114,6 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "chrono",
- "clock",
  "collections",
  "component",
  "db",
@@ -14244,7 +14131,6 @@ dependencies = [
  "menu",
  "node_runtime",
  "parking_lot",
- "postage",
  "pretty_assertions",
  "project",
  "proptest",
@@ -14676,7 +14562,6 @@ dependencies = [
  "rayon",
  "recent_projects",
  "release_channel",
- "remote",
  "reqwest_client",
  "rope",
  "search",
@@ -14784,7 +14669,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
- "windows-registry 0.4.0",
+ "windows-registry",
 ]
 
 [[package]]

@@ -28,7 +28,7 @@ pub mod search_history;
 pub mod yarn;
 
 use dap::inline_value::{InlineValueLocation, VariableLookupKind, VariableScope};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use crate::{
     bookmark_store::BookmarkStore,
@@ -2317,23 +2317,6 @@ impl Project {
         !self.is_local()
     }
 
-    #[inline]
-    pub fn is_via_wsl_with_host_interop(&self, cx: &App) -> bool {
-        matches!(
-            &self.remote_client, Some(remote_client)
-            if remote_client.read(cx).has_wsl_interop()
-        )
-    }
-
-    /// Whether this project is served by a WSL distribution.
-    #[inline]
-    pub fn is_via_wsl(&self, cx: &App) -> bool {
-        matches!(
-            self.remote_connection_options(cx),
-            Some(RemoteConnectionOptions::Wsl(_))
-        )
-    }
-
     pub fn disable_worktree_scanner(&mut self, cx: &mut Context<Self>) {
         self.worktree_store.update(cx, |worktree_store, _cx| {
             worktree_store.disable_scanner();
@@ -3968,28 +3951,6 @@ impl Project {
         self.worktree_store.update(cx, |worktree_store, cx| {
             worktree_store.move_worktree(source, destination, cx)
         })
-    }
-
-    /// Attempts to convert the input path to a WSL path if this is a wsl remote project and the input path is a host windows path.
-    pub fn try_windows_path_to_wsl(
-        &self,
-        abs_path: &Path,
-        cx: &App,
-    ) -> impl Future<Output = Result<PathBuf>> + use<> {
-        let fut = if cfg!(windows)
-            && let Some(remote_client) = &self.remote_client
-            && let RemoteConnectionOptions::Wsl(wsl) = remote_client.read(cx).connection_options()
-        {
-            Either::Left(wsl.abs_windows_path_to_wsl_path(abs_path))
-        } else {
-            Either::Right(abs_path.to_owned())
-        };
-        async move {
-            match fut {
-                Either::Left(fut) => fut.await.map(Into::into),
-                Either::Right(path) => Ok(path),
-            }
-        }
     }
 
     pub fn find_or_create_worktree(
