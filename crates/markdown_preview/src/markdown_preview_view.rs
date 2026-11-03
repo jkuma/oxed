@@ -1737,10 +1737,6 @@ impl Item for MarkdownPreviewView {
             .tab_tooltip_text(cx)
     }
 
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        Some("Markdown Preview Opened")
-    }
-
     fn tab_extra_context_menu_actions(
         &self,
         _: &mut Window,

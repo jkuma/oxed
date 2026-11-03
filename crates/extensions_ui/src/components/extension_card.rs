@@ -189,7 +189,7 @@ impl ExtensionCard {
         (SharedString::from(extension_id.clone()), operation as usize).into()
     }
 
-    fn uninstall_button(extension_id: &Arc<str>, is_dev: bool) -> Button {
+    fn uninstall_button(extension_id: &Arc<str>) -> Button {
         Button::new(
             Self::button_id(extension_id, ExtensionOperation::Remove),
             "Uninstall",
@@ -197,9 +197,6 @@ impl ExtensionCard {
         .on_click({
             let extension_id = extension_id.clone();
             move |_, _, cx| {
-                if !is_dev {
-                    telemetry::event!("Extension Uninstalled", extension_id);
-                }
                 ExtensionStore::global(cx).update(cx, |store, cx| {
                     store
                         .uninstall_extension(extension_id.clone(), cx)
@@ -231,7 +228,7 @@ impl ExtensionCard {
                 }
             })
         });
-        let uninstall = Self::uninstall_button(&extension.id, is_dev)
+        let uninstall = Self::uninstall_button(&extension.id)
             .when_else(
                 is_dev,
                 |button| button.color(Color::Accent),
@@ -259,7 +256,6 @@ impl ExtensionCard {
         .on_click({
             let extension_id = extension_id.clone();
             move |_, _, cx| {
-                telemetry::event!("Extension Installed");
                 ExtensionStore::global(cx).update(cx, |store, cx| {
                     store.install_latest_extension(extension_id.clone(), cx)
                 });
@@ -290,7 +286,7 @@ impl ExtensionCard {
                 Some(Self::install_button(&extension.id).disabled(Self::disables_actions(status))),
             ],
             ExtensionStatus::Upgrading | ExtensionStatus::Removing => {
-                let uninstall = Self::uninstall_button(&extension.id, false)
+                let uninstall = Self::uninstall_button(&extension.id)
                     .style(ButtonStyle::OutlinedGhost)
                     .disabled(Self::disables_actions(status));
                 let upgrade = matches!(status, ExtensionStatus::Upgrading).then(|| {
@@ -304,7 +300,7 @@ impl ExtensionCard {
             }
             ExtensionStatus::Installed(installed_version) => {
                 let uninstall =
-                    Self::uninstall_button(&extension.id, false).style(ButtonStyle::OutlinedGhost);
+                    Self::uninstall_button(&extension.id).style(ButtonStyle::OutlinedGhost);
                 let upgrade = (installed_version != &extension.manifest.version).then(|| {
                     let is_compatible = extension_host::is_version_compatible(
                         ReleaseChannel::global(cx),
@@ -333,7 +329,6 @@ impl ExtensionCard {
                         let extension_id = extension.id.clone();
                         let version = extension.manifest.version.clone();
                         move |_, _, cx| {
-                            telemetry::event!("Extension Installed", extension_id, version);
                             ExtensionStore::global(cx).update(cx, |store, cx| {
                                 store
                                     .upgrade_extension(extension_id.clone(), version.clone(), cx)

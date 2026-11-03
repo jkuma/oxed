@@ -27,7 +27,7 @@ use settings::{
 use std::{
     any::{Any, TypeId, type_name},
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     num::{NonZero, NonZeroU32},
     ops::Range,
     rc::Rc,
@@ -240,15 +240,9 @@ impl<T: PartialEq + Clone + Send + Sync + 'static> AnySettingField for SettingFi
             } else {
                 None
             };
-            update_settings_file(
-                current_file.clone(),
-                None,
-                window,
-                cx,
-                move |settings, app| {
-                    (this.write)(settings, value_to_set, app);
-                },
-            )
+            update_settings_file(current_file.clone(), window, cx, move |settings, app| {
+                (this.write)(settings, value_to_set, app);
+            })
             // todo(settings_ui): Don't log err
             .log_err();
         }));
@@ -788,8 +782,6 @@ fn open_settings_editor_with(
     cx: &mut App,
     callback: impl FnOnce(&mut SettingsWindow, &mut Window, &mut Context<SettingsWindow>) + 'static,
 ) {
-    telemetry::event!("Settings Viewed");
-
     let existing_window = cx
         .windows()
         .into_iter()
@@ -918,7 +910,6 @@ pub struct SettingsWindow {
     search_index: Option<Arc<SearchIndex>>,
     list_state: ListState,
     bottom_spacer_height: Pixels,
-    shown_errors: HashSet<String>,
     pub(crate) regex_validation_error: Option<String>,
     last_copied_link_path: Option<&'static str>,
 }
@@ -1764,8 +1755,6 @@ impl SettingsWindow {
                     window.remove_window();
                 })
                 .ok();
-
-                telemetry::event!("Settings Closed")
             }
         })
         .detach();
@@ -1898,7 +1887,6 @@ impl SettingsWindow {
                 .tab_index(HEADER_CONTAINER_TAB_INDEX)
                 .tab_stop(false),
             search_index: None,
-            shown_errors: HashSet::default(),
             regex_validation_error: None,
             list_state,
             bottom_spacer_height: px(0.),
@@ -2252,7 +2240,6 @@ impl SettingsWindow {
             .ok();
 
             cx.background_executor().timer(Duration::from_secs(1)).await;
-            telemetry::event!("Settings Searched", query = query)
         }));
     }
 
@@ -2609,9 +2596,7 @@ impl SettingsWindow {
         }
         self.current_file = self.files[ix].0.clone();
 
-        if let SettingsUiFile::Project((_, _)) = &self.current_file {
-            telemetry::event!("Setting Project Clicked");
-        }
+        if let SettingsUiFile::Project((_, _)) = &self.current_file {}
 
         self.build_ui(window, cx);
 
@@ -2640,9 +2625,7 @@ impl SettingsWindow {
         }
         self.current_file = self.files[ix].0.clone();
 
-        if let SettingsUiFile::Project((_, _)) = &self.current_file {
-            telemetry::event!("Setting Project Clicked");
-        }
+        if let SettingsUiFile::Project((_, _)) = &self.current_file {}
 
         let sub_page_stack = std::mem::take(&mut self.sub_page_stack);
         self.build_ui(window, cx);
@@ -3110,10 +3093,6 @@ impl SettingsWindow {
                                                 ))
                                         })
                                         .on_click({
-                                            let category = this.pages[entry.page_index].title;
-                                            let subcategory =
-                                                (!entry.is_root).then_some(entry.title);
-
                                             cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
                                                 if this.toggle_navbar_entry_on_double_click(
                                                         entry_index,
@@ -3125,11 +3104,6 @@ impl SettingsWindow {
                                                     return;
                                                 }
 
-                                                telemetry::event!(
-                                                    "Settings Navigation Clicked",
-                                                    category = category,
-                                                    subcategory = subcategory
-                                                );
 
                                                 this.open_and_scroll_to_navbar_entry(
                                                     entry_index,
@@ -3727,12 +3701,8 @@ impl SettingsWindow {
             fn banner(
                 label: &'static str,
                 error: String,
-                shown_errors: &mut HashSet<String>,
                 cx: &mut Context<SettingsWindow>,
             ) -> impl IntoElement {
-                if shown_errors.insert(error.clone()) {
-                    telemetry::event!("Settings Error Shown", label = label, error = &error);
-                }
                 Banner::new()
                     .severity(Severity::Warning)
                     .child(
@@ -3762,7 +3732,6 @@ impl SettingsWindow {
                     this.child(banner(
                         "Failed to load your settings. Some values may be incorrect and changes may be lost.",
                         err,
-                        &mut self.shown_errors,
                         cx,
                     ))
                 })
@@ -4482,13 +4451,12 @@ fn open_user_settings_in_workspace(
 
 fn update_settings_file(
     file: SettingsUiFile,
-    file_name: Option<&'static str>,
     window: &mut Window,
     cx: &mut App,
     update: impl 'static + Send + FnOnce(&mut SettingsContent, &App),
 ) -> Result<()> {
     let mut update = Some(update);
-    update_settings_file_inner(file, file_name, window, cx, &mut || {
+    update_settings_file_inner(file, window, cx, &mut || {
         Box::new(update.take().expect("called once"))
     })
 }
@@ -4496,13 +4464,10 @@ fn update_settings_file(
 #[inline(never)]
 fn update_settings_file_inner(
     file: SettingsUiFile,
-    file_name: Option<&'static str>,
     window: &mut Window,
     cx: &mut App,
     update: &mut dyn FnMut() -> Box<dyn Send + FnOnce(&mut SettingsContent, &App)>,
 ) -> Result<()> {
-    telemetry::event!("Settings Change", setting = file_name, type = file.setting_type());
-
     match file {
         SettingsUiFile::Project((worktree_id, rel_path)) => {
             let rel_path = rel_path.join(paths::local_settings_file_relative_path());
@@ -4751,15 +4716,9 @@ fn render_text_field<T: From<String> + Into<String> + AsRef<str> + Clone>(
         )
         .on_confirm({
             move |new_text, window, cx| {
-                update_settings_file(
-                    file.clone(),
-                    field.json_path,
-                    window,
-                    cx,
-                    move |settings, app| {
-                        (field.write)(settings, new_text.map(Into::into), app);
-                    },
-                )
+                update_settings_file(file.clone(), window, cx, move |settings, app| {
+                    (field.write)(settings, new_text.map(Into::into), app);
+                })
                 .log_err(); // todo(settings_ui) don't log err
             }
         })
@@ -4795,10 +4754,8 @@ fn render_toggle_button<B: Into<bool> + From<bool> + Copy>(
         .disabled(disabled)
         .on_click({
             move |state, window, cx| {
-                telemetry::event!("Settings Change", setting = field.json_path, type = file.setting_type());
-
                 let state = *state == ui::ToggleState::Selected;
-                update_settings_file(file.clone(), field.json_path, window, cx, move |settings, app| {
+                update_settings_file(file.clone(), window, cx, move |settings, app| {
                     (field.write)(settings, Some(state.into()), app);
                 })
                 .log_err(); // todo(settings_ui) don't log err
@@ -4834,15 +4791,9 @@ fn render_editable_number_field<T: NumberFieldType + Send + Sync>(
         .on_change({
             move |value, window, cx| {
                 let value = *value;
-                update_settings_file(
-                    file.clone(),
-                    field.json_path,
-                    window,
-                    cx,
-                    move |settings, app| {
-                        (field.write)(settings, Some(value), app);
-                    },
-                )
+                update_settings_file(file.clone(), window, cx, move |settings, app| {
+                    (field.write)(settings, Some(value), app);
+                })
                 .log_err(); // todo(settings_ui) don't log err
             }
         })
@@ -4877,15 +4828,9 @@ where
             if value == current_value {
                 return;
             }
-            update_settings_file(
-                file.clone(),
-                field.json_path,
-                window,
-                cx,
-                move |settings, app| {
-                    (field.write)(settings, Some(value), app);
-                },
-            )
+            update_settings_file(file.clone(), window, cx, move |settings, app| {
+                (field.write)(settings, Some(value), app);
+            })
             .log_err(); // todo(settings_ui) don't log err
         }
     })
@@ -4966,15 +4911,9 @@ fn render_font_picker(
                 font_picker(
                     current_value,
                     move |font_name, window, cx| {
-                        update_settings_file(
-                            file.clone(),
-                            field.json_path,
-                            window,
-                            cx,
-                            move |settings, app| {
-                                (field.write)(settings, Some(font_name.to_string().into()), app);
-                            },
-                        )
+                        update_settings_file(file.clone(), window, cx, move |settings, app| {
+                            (field.write)(settings, Some(font_name.to_string().into()), app);
+                        })
                         .log_err(); // todo(settings_ui) don't log err
                     },
                     window,
@@ -5023,19 +4962,13 @@ fn render_theme_picker(
                 theme_picker(
                     current_value,
                     move |theme_name, window, cx| {
-                        update_settings_file(
-                            file.clone(),
-                            field.json_path,
-                            window,
-                            cx,
-                            move |settings, app| {
-                                (field.write)(
-                                    settings,
-                                    Some(settings::ThemeName(theme_name.into())),
-                                    app,
-                                );
-                            },
-                        )
+                        update_settings_file(file.clone(), window, cx, move |settings, app| {
+                            (field.write)(
+                                settings,
+                                Some(settings::ThemeName(theme_name.into())),
+                                app,
+                            );
+                        })
                         .log_err(); // todo(settings_ui) don't log err
                     },
                     window,
@@ -5084,19 +5017,13 @@ fn render_icon_theme_picker(
                 icon_theme_picker(
                     current_value,
                     move |theme_name, window, cx| {
-                        update_settings_file(
-                            file.clone(),
-                            field.json_path,
-                            window,
-                            cx,
-                            move |settings, app| {
-                                (field.write)(
-                                    settings,
-                                    Some(settings::IconThemeName(theme_name.into())),
-                                    app,
-                                );
-                            },
-                        )
+                        update_settings_file(file.clone(), window, cx, move |settings, app| {
+                            (field.write)(
+                                settings,
+                                Some(settings::IconThemeName(theme_name.into())),
+                                app,
+                            );
+                        })
                         .log_err(); // todo(settings_ui) don't log err
                     },
                     window,
@@ -5166,7 +5093,6 @@ pub mod test {
                 search_index: None,
                 list_state: ListState::new(0, gpui::ListAlignment::Top, px(0.0)),
                 bottom_spacer_height: px(0.),
-                shown_errors: HashSet::default(),
                 regex_validation_error: None,
                 last_copied_link_path: None,
             }
@@ -5293,7 +5219,6 @@ pub mod test {
             search_index: None,
             list_state: ListState::new(0, gpui::ListAlignment::Top, px(0.0)),
             bottom_spacer_height: px(0.),
-            shown_errors: HashSet::default(),
             regex_validation_error: None,
             last_copied_link_path: None,
         };

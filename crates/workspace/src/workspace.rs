@@ -4492,13 +4492,6 @@ impl Workspace {
         let other_is_zoomed = self.zoomed.is_some() && self.zoomed_position != Some(dock_side);
         let was_visible = self.is_dock_at_position_open(dock_side, cx) && !other_is_zoomed;
 
-        if let Some(panel) = self.dock_at_position(dock_side).read(cx).active_panel() {
-            telemetry::event!(
-                "Panel Button Clicked",
-                name = panel.persistent_name(),
-                toggle_state = !was_visible
-            );
-        }
         if was_visible {
             self.save_open_dock_positions(cx);
         }
@@ -4665,12 +4658,6 @@ impl Workspace {
         if !did_focus_panel && WorkspaceSettings::get_global(cx).close_panel_on_toggle {
             self.close_panel::<T>(window, cx);
         }
-
-        telemetry::event!(
-            "Panel Button Clicked",
-            name = T::persistent_name(),
-            toggle_state = did_focus_panel
-        );
 
         did_focus_panel
     }
@@ -10277,7 +10264,7 @@ pub async fn apply_restored_multiworkspace_state(
     if *sidebar_open {
         window_handle
             .update(cx, |multi_workspace, _, cx| {
-                multi_workspace.restore_open_sidebar(cx);
+                multi_workspace.open_sidebar(cx);
             })
             .ok();
     }

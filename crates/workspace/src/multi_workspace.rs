@@ -444,21 +444,6 @@ impl MultiWorkspace {
     }
 
     pub fn open_sidebar(&mut self, cx: &mut Context<Self>) {
-        let side = match self.sidebar_side(cx) {
-            SidebarSide::Left => "left",
-            SidebarSide::Right => "right",
-        };
-        telemetry::event!("Sidebar Toggled", action = "open", side = side);
-        self.apply_open_sidebar(cx);
-    }
-
-    /// Restores the sidebar to open state from persisted session data without
-    /// firing a telemetry event, since this is not a user-initiated action.
-    pub(crate) fn restore_open_sidebar(&mut self, cx: &mut Context<Self>) {
-        self.apply_open_sidebar(cx);
-    }
-
-    fn apply_open_sidebar(&mut self, cx: &mut Context<Self>) {
         self.sidebar_open = true;
         self.retain_active_workspace(cx);
         let sidebar_focus_handle = self.sidebar.as_ref().map(|s| s.focus_handle(cx));
@@ -472,11 +457,6 @@ impl MultiWorkspace {
     }
 
     pub fn close_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let side = match self.sidebar_side(cx) {
-            SidebarSide::Left => "left",
-            SidebarSide::Right => "right",
-        };
-        telemetry::event!("Sidebar Toggled", action = "close", side = side);
         self.sidebar_open = false;
         for workspace in self.workspaces().cloned().collect::<Vec<_>>() {
             workspace.update(cx, |workspace, _cx| {
@@ -1243,10 +1223,6 @@ impl MultiWorkspace {
         let key = workspace.read(cx).project_group_key(cx);
         let index = self.hold(workspace, window, cx);
         self.pin(index, key, cx);
-        telemetry::event!(
-            "Workspace Added",
-            workspace_count = self.held.iter().filter(|held| held.pinned).count()
-        );
         cx.notify();
     }
 

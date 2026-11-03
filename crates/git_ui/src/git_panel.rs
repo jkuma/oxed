@@ -3778,9 +3778,7 @@ impl GitPanel {
         let is_amend = self.amend_pending;
         if self.commit(&self.commit_editor.focus_handle(cx), window, cx) {
             if is_amend {
-                telemetry::event!("Git Amended", source = "Git Panel");
             } else {
-                telemetry::event!("Git Committed", source = "Git Panel");
             }
         }
     }
@@ -3806,9 +3804,7 @@ impl GitPanel {
     }
 
     fn on_amend(&mut self, _: &Amend, window: &mut Window, cx: &mut Context<Self>) {
-        if self.amend(&self.commit_editor.focus_handle(cx), window, cx) {
-            telemetry::event!("Git Amended", source = "Git Panel");
-        }
+        if self.amend(&self.commit_editor.focus_handle(cx), window, cx) {}
     }
 
     /// Enters the amend state on first invocation, loading the last commit
@@ -4025,7 +4021,6 @@ impl GitPanel {
         let Some(repo) = self.active_repository.clone() else {
             return;
         };
-        telemetry::event!("Git Uncommitted");
 
         let confirmation = self.check_for_pushed_commits(window, cx);
         let prior_head = self.load_commit_details("HEAD".to_string(), cx);
@@ -4197,7 +4192,6 @@ impl GitPanel {
             return;
         }
 
-        telemetry::event!("Git Fetched");
         let askpass = self.askpass_delegate("git fetch", window, cx);
         let this = cx.weak_entity();
 
@@ -4351,7 +4345,6 @@ impl GitPanel {
             return;
         }
 
-        telemetry::event!("Git Pulled");
         let remote = self.get_remote(false, false, window, cx);
         cx.spawn_in(window, async move |this, cx| {
             let _clear_pending_remote_operation = cx.on_drop(&this, |this, cx| {
@@ -4420,8 +4413,6 @@ impl GitPanel {
         if !self.start_remote_operation(RemoteOperationKind::Push, cx) {
             return;
         }
-
-        telemetry::event!("Git Pushed");
 
         let options = if force_push {
             Some(PushOptions::Force)
@@ -6532,7 +6523,6 @@ impl GitPanel {
                     .on_click({
                         let git_panel = cx.weak_entity();
                         move |_, window, cx| {
-                            telemetry::event!("Git Committed", source = "Git Panel");
                             git_panel
                                 .update(cx, |git_panel, cx| {
                                     let options = git_panel.commit_options();
@@ -7492,11 +7482,9 @@ impl GitPanel {
                 KeyBinding::for_action_in(&workspace::Open::default(), &focus_handle, cx),
             )
             .on_open_project(|_, window, cx| {
-                telemetry::event!("Git Panel Add Project Clicked");
                 window.dispatch_action(workspace::Open::default().boxed_clone(), cx);
             })
             .on_clone_repo(|_, window, cx| {
-                telemetry::event!("Git Panel Clone Repo Clicked");
                 window.dispatch_action(git::Clone.boxed_clone(), cx);
             })
             .into_any_element()

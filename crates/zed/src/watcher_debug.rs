@@ -400,7 +400,7 @@ impl WatcherDebug {
         let watcher = recording.snapshot();
         let worktree_scan_exclusions = worktree_exclusions(&self.app_state, cx);
         let zed_version = AppVersion::global(cx).to_string();
-        let os_name = client::telemetry::os_name();
+        let os_name = os_name();
         let directory = std::env::home_dir().unwrap_or_default();
         let path = cx.prompt_for_new_path(&directory, Some("filesystem-watcher.json"));
         let fs = self.app_state.fs.clone();
@@ -416,7 +416,7 @@ impl WatcherDebug {
                     let export = Export {
                         zed_version,
                         os_name,
-                        os_version: client::telemetry::os_version(),
+                        os_version: os_version(),
                         watcher,
                         worktree_scan_exclusions,
                         exclusion_scope: EXCLUSION_SCOPE,
@@ -510,6 +510,26 @@ impl Render for WatcherDebug {
                     ),
             )
     }
+}
+
+fn os_name() -> String {
+    format!("Linux {}", gpui::guess_compositor())
+}
+
+/// Reads files, so it must run on a background thread.
+fn os_version() -> String {
+    let content = [
+        "/etc/os-release",
+        "/usr/lib/os-release",
+        "/var/run/os-release",
+    ]
+    .iter()
+    .find_map(|path| std::fs::read_to_string(path).ok())
+    .unwrap_or_else(|| {
+        log::error!("Failed to load /etc/os-release, /usr/lib/os-release, or /var/run/os-release");
+        String::new()
+    });
+    util::parse_os_release(&content).unwrap_or_else(|| "unknown".to_string())
 }
 
 #[cfg(test)]
@@ -888,10 +908,10 @@ mod tests {
         cx.run_until_parked();
         let json: serde_json::Value = serde_json::from_str(&fs.load(&path).await.unwrap()).unwrap();
         assert_eq!(json["zed_version"], "1.2.3+dev.test");
-        assert_eq!(json["os_name"], client::telemetry::os_name());
+        assert_eq!(json["os_name"], super::os_name());
         let os_version = cx
             .background_executor
-            .spawn(async { client::telemetry::os_version() })
+            .spawn(async { super::os_version() })
             .await;
         assert_eq!(json["os_version"], os_version);
         assert!(!os_version.is_empty());

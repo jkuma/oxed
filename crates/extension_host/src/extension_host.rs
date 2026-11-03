@@ -9,7 +9,7 @@ mod extension_store_test;
 use anyhow::{Context as _, Result, anyhow, bail};
 use async_compression::futures::bufread::GzipDecoder;
 use async_tar::Archive;
-use client::{Client, proto, telemetry::Telemetry};
+use client::{Client, proto};
 use cloud_api_types::{ExtensionMetadata, ExtensionProvides, GetExtensionsResponse};
 use collections::{BTreeMap, BTreeSet, FxHashSet, HashMap, HashSet, btree_map};
 pub use extension::ExtensionManifest;
@@ -160,7 +160,6 @@ pub struct ExtensionStore {
     pub extension_index: ExtensionIndex,
     pub fs: Arc<dyn Fs>,
     pub http_client: Arc<HttpClientWithUrl>,
-    pub telemetry: Option<Arc<Telemetry>>,
     pub reload_tx: UnboundedSender<Option<Arc<str>>>,
     pub reload_complete_senders: Vec<oneshot::Sender<()>>,
     pub installed_dir: PathBuf,
@@ -332,7 +331,6 @@ pub fn init(
             fs,
             client.http_client(),
             client.http_client(),
-            Some(client.telemetry().clone()),
             node_runtime,
             cx,
         )
@@ -373,7 +371,6 @@ impl ExtensionStore {
         fs: Arc<dyn Fs>,
         http_client: Arc<HttpClientWithUrl>,
         builder_client: Arc<dyn HttpClient>,
-        telemetry: Option<Arc<Telemetry>>,
         node_runtime: NodeRuntime,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -405,7 +402,6 @@ impl ExtensionStore {
             wasm_extensions: Vec::new(),
             fs,
             http_client,
-            telemetry,
             reload_tx,
             tasks: Vec::new(),
 
@@ -1346,18 +1342,6 @@ impl ExtensionStore {
             || extensions_to_load
                 .iter()
                 .any(|id| new_remote_sync_extensions.contains(id.as_ref()));
-
-        let extension_ids = extensions_to_load
-            .iter()
-            .filter_map(|id| {
-                Some((
-                    id.clone(),
-                    new_index.extensions.get(id)?.manifest.version.clone(),
-                ))
-            })
-            .collect::<Vec<_>>();
-
-        telemetry::event!("Extensions Loaded", id_and_versions = extension_ids);
 
         let themes_to_remove = old_index
             .themes

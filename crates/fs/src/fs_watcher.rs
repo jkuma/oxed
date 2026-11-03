@@ -326,7 +326,6 @@ fn register_existing_path(
             poll_interval().as_millis(),
             path.display()
         );
-        telemetry::event!("fs_watcher_poll", path = path.display().to_string());
         poll_watcher
     } else {
         native_watcher

@@ -81,10 +81,6 @@ impl Item for SharedScreen {
         format!("{}'s screen", self.user.username).into()
     }
 
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        None
-    }
-
     fn set_nav_history(
         &mut self,
         history: ItemNavHistory,

@@ -439,7 +439,6 @@ impl RemoteClient {
                 let platform = remote_connection.remote_platform();
                 let os_version = remote_connection.remote_os_version();
                 let connection_options = remote_connection.connection_options();
-                let connection_type = connection_options.connection_type();
                 let this = cx.new(|_| Self {
                     client: client.clone(),
                     unique_identifier: unique_identifier.clone(),
@@ -514,18 +513,6 @@ impl RemoteClient {
                         heartbeat_task,
                     });
                 });
-
-                // Use the same `remote_*` property schema as the forwarded
-                // remote events (see `client::telemetry::report_remote_event`)
-                // so all remote-origin telemetry can be queried uniformly.
-                telemetry::event!(
-                    "Remote Connection Established",
-                    remote = true,
-                    remote_connection_type = connection_type,
-                    remote_os_name = platform.os.display_name(),
-                    remote_os_version = os_version,
-                    remote_architecture = platform.arch.as_str(),
-                );
 
                 Ok(Some(this))
             });

@@ -1,9 +1,7 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
-mod llm_token;
 mod proxy;
-pub mod telemetry;
 pub mod user;
 pub mod zed_urls;
 
@@ -14,10 +12,8 @@ use async_tungstenite::tungstenite::{
     http::{HeaderValue, Request, StatusCode},
 };
 use clock::SystemClock;
-use cloud_api_client::LlmApiToken;
+use cloud_api_client::CloudApiClient;
 use cloud_api_client::websocket_protocol::MessageToClient;
-use cloud_api_client::{ClientApiError, CloudApiClient};
-use cloud_api_types::OrganizationId;
 use credentials_provider::CredentialsProvider;
 use feature_flags::FeatureFlagAppExt as _;
 use futures::{
@@ -35,7 +31,7 @@ use rand::prelude::*;
 use release_channel::{AppVersion, ReleaseChannel};
 use rpc::proto::{AnyTypedEnvelope, EnvelopedMessage, PeerId, RequestMessage};
 use serde::{Deserialize, Serialize};
-use settings::{RegisterSetting, Settings, SettingsContent};
+use settings::{RegisterSetting, Settings};
 use std::{
     any::TypeId,
     convert::TryFrom,
@@ -49,15 +45,12 @@ use std::{
     time::{Duration, Instant},
 };
 use std::{cmp, pin::Pin};
-use telemetry::Telemetry;
 use thiserror::Error;
 use tokio::net::TcpStream;
 use url::Url;
 use util::{ConnectionResult, ResultExt};
 
-pub use llm_token::*;
 pub use rpc::*;
-pub use telemetry_events::Event;
 pub use user::*;
 
 static ZED_SERVER_URL: LazyLock<Option<String>> =
@@ -209,7 +202,6 @@ pub struct Client {
     peer: Arc<Peer>,
     http: Arc<HttpClientWithUrl>,
     cloud_client: Arc<CloudApiClient>,
-    telemetry: Arc<Telemetry>,
     credentials_provider: ClientCredentialsProvider,
     state: RwLock<ClientState>,
     handler_set: Mutex<ProtoMessageHandlerSet>,
@@ -536,32 +528,15 @@ impl<T: 'static> Drop for PendingEntitySubscription<T> {
     }
 }
 
-#[derive(Copy, Clone, Deserialize, Debug, RegisterSetting)]
-pub struct TelemetrySettings {
-    pub diagnostics: bool,
-    pub metrics: bool,
-}
-
-impl settings::Settings for TelemetrySettings {
-    fn from_settings(content: &SettingsContent) -> Self {
-        let telemetry = content.telemetry.as_ref().unwrap();
-        Self {
-            diagnostics: telemetry.diagnostics.unwrap(),
-            metrics: telemetry.metrics.unwrap(),
-        }
-    }
-}
-
 impl Client {
     pub fn new(
-        clock: Arc<dyn SystemClock>,
+        _clock: Arc<dyn SystemClock>,
         http: Arc<HttpClientWithUrl>,
         cx: &mut App,
     ) -> Arc<Self> {
         Arc::new(Self {
             id: AtomicU64::new(0),
             peer: Peer::new(0),
-            telemetry: Telemetry::new(clock, http.clone(), cx),
             cloud_client: Arc::new(CloudApiClient::new(http.clone())),
             http,
             credentials_provider: ClientCredentialsProvider::new(cx),
@@ -738,7 +713,6 @@ impl Client {
                 }));
             }
             Status::SignedOut | Status::UpgradeRequired => {
-                self.telemetry.set_authenticated_user_info(None, false);
                 state._reconnect_task.take();
                 state._cloud_connection_task.take();
             }
@@ -1334,8 +1308,6 @@ impl Client {
         let user_agent = http.user_agent().cloned();
         let credentials = credentials.clone();
         let rpc_url = self.rpc_url(http, release_channel);
-        let system_id = self.telemetry.system_id();
-        let metrics_id = self.telemetry.metrics_id();
         cx.spawn(async move |cx| {
             use HttpOrHttps::*;
 
@@ -1401,12 +1373,6 @@ impl Client {
             );
             if let Some(user_agent) = user_agent {
                 request_headers.insert(http::header::USER_AGENT, user_agent);
-            }
-            if let Some(system_id) = system_id {
-                request_headers.insert("x-zed-system-id", HeaderValue::from_str(&system_id)?);
-            }
-            if let Some(metrics_id) = metrics_id {
-                request_headers.insert("x-zed-metrics-id", HeaderValue::from_str(&metrics_id)?);
             }
 
             let (stream, _) = async_tungstenite::tokio::client_async_tls_with_connector_and_config(
@@ -1477,7 +1443,6 @@ impl Client {
                     struct NativeAppSignInQueryParams {
                         native_app_port: u16,
                         native_app_public_key: String,
-                        system_id: Option<Arc<str>>,
                     }
 
                     // Open the Zed sign-in page in the user's browser, with query parameters that indicate
@@ -1487,7 +1452,6 @@ impl Client {
                         serde_urlencoded::to_string(&NativeAppSignInQueryParams {
                             native_app_port: port,
                             native_app_public_key: public_key,
-                            system_id: this.telemetry.system_id(),
                         })?
                     ));
 
@@ -1601,79 +1565,6 @@ impl Client {
             user_id: response.user_id,
             access_token: response.access_token,
         })
-    }
-
-    pub async fn cached_llm_token(
-        &self,
-        llm_token: &LlmApiToken,
-        organization_id: OrganizationId,
-    ) -> Result<String, ClientApiError> {
-        let system_id = self.telemetry().system_id().map(|x| x.to_string());
-        let cloud_client = self.cloud_client();
-        let result = llm_token
-            .cached(&cloud_client, system_id, organization_id)
-            .await;
-        if let Err(ClientApiError::Unauthorized) = result {
-            self.request_sign_out();
-        }
-        result
-    }
-
-    /// Sends an authenticated request to the Zed LLM service, retrying once
-    /// with a refreshed token if the server signals that the cached LLM
-    /// token is expired or otherwise rejected. Returns the raw response so
-    /// callers can inspect headers and stream the body.
-    pub async fn authenticated_llm_request(
-        &self,
-        llm_token: &LlmApiToken,
-        organization_id: OrganizationId,
-        build_request: impl Fn(&str) -> Result<http_client::Request<http_client::AsyncBody>>,
-    ) -> Result<http_client::Response<http_client::AsyncBody>> {
-        let http_client = self.http_client();
-        let token = self
-            .cached_llm_token(llm_token, organization_id.clone())
-            .await?;
-        let response = http_client.send(build_request(&token)?).await?;
-        if !response.needs_llm_token_refresh()
-            && response.status() != http_client::http::StatusCode::UNAUTHORIZED
-        {
-            return Ok(response);
-        }
-        log::info!("LLM token rejected; refreshing and retrying request");
-        let token = self.refresh_llm_token(llm_token, organization_id).await?;
-        http_client.send(build_request(&token)?).await
-    }
-
-    pub async fn refresh_llm_token(
-        &self,
-        llm_token: &LlmApiToken,
-        organization_id: OrganizationId,
-    ) -> Result<String, ClientApiError> {
-        let system_id = self.telemetry().system_id().map(|x| x.to_string());
-        let cloud_client = self.cloud_client();
-        let result = llm_token
-            .refresh(&cloud_client, system_id, organization_id)
-            .await;
-        if let Err(ClientApiError::Unauthorized) = result {
-            self.request_sign_out();
-        }
-        result
-    }
-
-    pub async fn clear_and_refresh_llm_token(
-        &self,
-        llm_token: &LlmApiToken,
-        organization_id: OrganizationId,
-    ) -> Result<String, ClientApiError> {
-        let system_id = self.telemetry().system_id().map(|x| x.to_string());
-        let cloud_client = self.cloud_client();
-        let result = llm_token
-            .clear_and_refresh(&cloud_client, system_id, organization_id)
-            .await;
-        if let Err(ClientApiError::Unauthorized) = result {
-            self.request_sign_out();
-        }
-        result
     }
 
     pub async fn sign_out(self: &Arc<Self>, cx: &AsyncApp) {
@@ -1852,10 +1743,6 @@ impl Client {
             }
         });
     }
-
-    pub fn telemetry(&self) -> &Arc<Telemetry> {
-        &self.telemetry
-    }
 }
 
 impl ProtoClient for Client {
@@ -1995,7 +1882,7 @@ mod tests {
     use http_client::FakeHttpClient;
     use parking_lot::Mutex;
     use proto::TypedEnvelope;
-    use settings::SettingsStore;
+    use settings::{SettingsContent, SettingsStore};
     use std::future;
 
     #[test]

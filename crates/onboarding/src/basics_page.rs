@@ -65,12 +65,6 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
                             MODE_NAMES[mode as usize].clone(),
                             move |_, _, cx| {
                                 write_mode_change(mode, cx);
-
-                                telemetry::event!(
-                                    "Welcome Theme mode Changed",
-                                    from = theme_mode,
-                                    to = mode
-                                );
                             },
                         )
                     }),
@@ -153,15 +147,9 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
                         })
                         .on_click({
                             let theme_name = theme.name.clone();
-                            let current_theme_name = current_theme_name.clone();
 
                             move |_, _, cx| {
                                 write_theme_change(theme_name.clone(), theme_mode, cx);
-                                telemetry::event!(
-                                    "Welcome Theme Changed",
-                                    from = current_theme_name,
-                                    to = theme_name
-                                );
                             }
                         })
                         .map(|this| {
@@ -291,8 +279,6 @@ fn render_base_keymap_section(tab_index: &mut isize, cx: &mut App) -> impl IntoE
         update_settings_file(fs, cx, move |setting, _| {
             setting.base_keymap = Some(keymap_base.into());
         });
-
-        telemetry::event!("Welcome Keymap Changed", keymap = keymap_base);
     }
 }
 
@@ -323,11 +309,6 @@ fn render_worktree_auto_trust_switch(tab_index: &mut isize, cx: &mut App) -> imp
                 update_settings_file(fs.clone(), cx, move |setting, _| {
                     setting.session.get_or_insert_default().trust_all_worktrees = Some(trust);
                 });
-
-                telemetry::event!(
-                    "Welcome Page Worktree Auto Trust Toggled",
-                    options = if trust { "on" } else { "off" }
-                );
             }
         },
     )
@@ -358,7 +339,6 @@ fn render_setting_import_button(
                 .color(Color::Success)
         })
         .on_click(move |_, window, cx| {
-            telemetry::event!("Welcome Import Settings", import_source = label,);
             window.dispatch_action(action.boxed_clone(), cx);
         })
 }

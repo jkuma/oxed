@@ -128,8 +128,6 @@ members = [
     "crates/tab_switcher",
     "crates/tabular_data_preview",
     "crates/task",
-    "crates/telemetry",
-    "crates/telemetry_events",
     "crates/terminal",
     "crates/text",
     "crates/theme",
@@ -309,8 +307,6 @@ syntax_theme = { path = "crates/syntax_theme" }
 tab_switcher = { path = "crates/tab_switcher" }
 tabular_data_preview = { path = "crates/tabular_data_preview"}
 task = { path = "crates/task" }
-telemetry = { path = "crates/telemetry" }
-telemetry_events = { path = "crates/telemetry_events" }
 terminal = { path = "crates/terminal" }
 text = { path = "crates/text" }
 theme = { path = "crates/theme" }
@@ -755,7 +751,6 @@ reqwest_client = { codegen-units = 1 }
 session = { codegen-units = 1 }
 snippet = { codegen-units = 1 }
 snippets_ui = { codegen-units = 1 }
-telemetry_events = { codegen-units = 1 }
 theme_selector = { codegen-units = 1 }
 time_format = { codegen-units = 1 }
 ui_input = { codegen-units = 1 }
