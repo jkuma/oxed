@@ -27,8 +27,6 @@ members = [
     "crates/extension_host",
     "crates/extension_suggest",
     "crates/extensions_ui",
-    "crates/feature_flags",
-    "crates/feature_flags_macros",
     "crates/file_content",
     "crates/file_finder",
     "crates/file_icons",
@@ -198,8 +196,6 @@ extension = { path = "crates/extension" }
 extension_host = { path = "crates/extension_host" }
 extension_suggest = { path = "crates/extension_suggest" }
 extensions_ui = { path = "crates/extensions_ui" }
-feature_flags = { path = "crates/feature_flags" }
-feature_flags_macros = { path = "crates/feature_flags_macros" }
 file_content = { path = "crates/file_content" }
 file_finder = { path = "crates/file_finder" }
 file_icons = { path = "crates/file_icons" }
@@ -692,7 +688,6 @@ debug = "full"
 # proc-macros start
 gpui_macros = { opt-level = 3 }
 derive_refineable = { opt-level = 3 }
-feature_flags_macros = { opt-level = 3 }
 settings_macros = { opt-level = 3 }
 sqlez_macros = { opt-level = 3, codegen-units = 1 }
 ui_macros = { opt-level = 3 }
@@ -717,7 +712,6 @@ breadcrumbs = { codegen-units = 1 }
 collections = { codegen-units = 1 }
 command_palette = { codegen-units = 1 }
 command_palette_hooks = { codegen-units = 1 }
-feature_flags = { codegen-units = 1 }
 file_content = { codegen-units = 1 }
 file_icons = { codegen-units = 1 }
 image_viewer = { codegen-units = 1 }

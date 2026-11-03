@@ -51,7 +51,6 @@ env_logger = { workspace = true, optional = true }
 extension.workspace = true
 extension_host.workspace = true
 extensions_ui.workspace = true
-feature_flags.workspace = true
 file_finder.workspace = true
 fs.workspace = true
 futures.workspace = true

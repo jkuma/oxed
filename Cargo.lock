@@ -3141,29 +3141,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 
 [[package]]
-name = "feature_flags"
-version = "0.1.0"
-dependencies = [
- "collections",
- "feature_flags_macros",
- "fs",
- "gpui",
- "inventory",
- "schemars",
- "serde_json",
- "settings",
-]
-
-[[package]]
-name = "feature_flags_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "file_content"
 version = "0.1.0"
 dependencies = [
@@ -5224,7 +5201,6 @@ dependencies = [
  "collections",
  "dap",
  "extension",
- "feature_flags",
  "fs",
  "gpui",
  "language",
@@ -10096,7 +10072,6 @@ dependencies = [
  "collections",
  "component",
  "editor",
- "feature_flags",
  "fs",
  "futures",
  "fuzzy",
@@ -14653,7 +14628,6 @@ dependencies = [
  "extension",
  "extension_host",
  "extensions_ui",
- "feature_flags",
  "file_finder",
  "fs",
  "futures",

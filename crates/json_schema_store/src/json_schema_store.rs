@@ -337,7 +337,7 @@ async fn resolve_dynamic_schema(
                 let deprecations = cx.deprecated_actions_to_preferred_actions();
                 let deprecation_messages = cx.action_deprecation_messages();
 
-                let mut schema =
+                let schema =
                     settings::SettingsStore::json_schema(&settings::SettingsJsonSchemaParams {
                         language_names,
                         font_names,
@@ -349,7 +349,6 @@ async fn resolve_dynamic_schema(
                         deprecations,
                         deprecation_messages,
                     });
-                inject_feature_flags_schema(&mut schema);
                 schema
             })
         }
@@ -362,7 +361,7 @@ async fn resolve_dynamic_schema(
                 .map(|name| name.to_string())
                 .collect::<Vec<_>>();
 
-            let mut schema =
+            let schema =
                 settings::SettingsStore::project_json_schema(&settings::SettingsJsonSchemaParams {
                     language_names,
                     lsp_adapter_names: &lsp_adapter_names,
@@ -377,7 +376,6 @@ async fn resolve_dynamic_schema(
                     deprecations: &HashMap::default(),
                     deprecation_messages: &HashMap::default(),
                 });
-            inject_feature_flags_schema(&mut schema);
             schema
         }
         "debug_tasks" => {
@@ -505,21 +503,6 @@ pub fn all_schema_file_associations(
         }));
 
     file_associations
-}
-
-/// Swaps the placeholder [`settings::FeatureFlagsMap`] subschema produced by
-/// schemars for an enriched one that lists each known flag's variants. The
-/// placeholder is registered in the `settings_content` crate so the
-/// `settings` crate doesn't need a reverse dependency on `feature_flags`.
-fn inject_feature_flags_schema(schema: &mut serde_json::Value) {
-    use schemars::JsonSchema;
-
-    let Some(defs) = schema.get_mut("$defs").and_then(|d| d.as_object_mut()) else {
-        return;
-    };
-    let schema_name = settings::FeatureFlagsMap::schema_name();
-    let enriched = feature_flags::generate_feature_flags_schema().to_value();
-    defs.insert(schema_name.into_owned(), enriched);
 }
 
 fn generate_jsonc_schema() -> serde_json::Value {

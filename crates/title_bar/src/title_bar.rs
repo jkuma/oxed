@@ -17,8 +17,7 @@ use crate::application_menu::{
 
 use gpui::{
     Action, Anchor, AnyElement, App, Context, Element, Entity, Focusable, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, Styled, Subscription, WeakEntity, Window,
-    actions, div,
+    IntoElement, MouseButton, ParentElement, Render, Styled, Subscription, WeakEntity, Window, div,
 };
 use project::{
     Project, git_store::GitStoreEvent, project_settings::ProjectSettings,
@@ -54,18 +53,6 @@ fn linked_worktree_name_anchor<'a>(
             .flatten()
     })
 }
-
-actions!(
-    collab,
-    [
-        /// Toggles the user menu dropdown.
-        ToggleUserMenu,
-        /// Toggles the project menu dropdown.
-        ToggleProjectMenu,
-        /// Switches to a different git branch.
-        SwitchBranch,
-    ]
-);
 
 pub fn init(cx: &mut App) {
     platform_title_bar::PlatformTitleBar::init(cx);

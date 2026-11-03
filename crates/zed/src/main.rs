@@ -471,7 +471,6 @@ fn main() {
         );
 
         zed::init(cx);
-        feature_flags::FeatureFlagStore::init(cx);
 
         let session = cx.foreground_executor().block_on(session);
 
