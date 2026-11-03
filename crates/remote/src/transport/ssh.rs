@@ -18,7 +18,6 @@ use paths::remote_server_dir_relative;
 use release_channel::{AppVersion, ReleaseChannel};
 use rpc::proto::Envelope;
 use semver::Version;
-pub use settings_content::SshPortForwardOption;
 use smol::fs;
 use std::{
     fmt::Write as _,
@@ -150,20 +149,12 @@ pub struct SshConnectionOptions {
     pub upload_binary_over_ssh: bool,
 }
 
-impl From<settings_content::SshConnection> for SshConnectionOptions {
-    fn from(val: settings_content::SshConnection) -> Self {
-        SshConnectionOptions {
-            host: val.host.to_string().into(),
-            username: val.username,
-            port: val.port,
-            password: None,
-            args: Some(val.args),
-            nickname: val.nickname,
-            upload_binary_over_ssh: val.upload_binary_over_ssh.unwrap_or_default(),
-            port_forwards: val.port_forwards,
-            connection_timeout: val.connection_timeout,
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SshPortForwardOption {
+    pub local_host: Option<String>,
+    pub local_port: u16,
+    pub remote_host: Option<String>,
+    pub remote_port: u16,
 }
 
 struct SshSocket {

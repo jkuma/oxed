@@ -216,7 +216,6 @@ impl VsCodeSettings {
                 "off" => Some(ReduceMotionMode::Off),
                 _ => None,
             }),
-            remote: RemoteSettingsContent::default(),
             repl: None,
             session: None,
             status_bar: self.status_bar_settings_content(),

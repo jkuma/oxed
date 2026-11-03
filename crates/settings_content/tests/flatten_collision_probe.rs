@@ -13,7 +13,6 @@ fn no_key_collisions_between_named_fields_and_flattened_sections() {
             section::<settings_content::ExtensionSettingsContent>("extension"),
             section::<settings_content::WorkspaceSettingsContent>("workspace"),
             section::<settings_content::EditorSettingsContent>("editor"),
-            section::<settings_content::RemoteSettingsContent>("remote"),
         ],
     );
     check(
