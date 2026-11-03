@@ -111,10 +111,6 @@ pub struct ExtensionManifest {
     #[serde(default)]
     pub language_servers: BTreeMap<LanguageServerName, LanguageServerManifestEntry>,
     #[serde(default)]
-    pub context_servers: BTreeMap<Arc<str>, ContextServerManifestEntry>,
-    #[serde(default)]
-    pub slash_commands: BTreeMap<Arc<str>, SlashCommandManifestEntry>,
-    #[serde(default)]
     pub snippets: Option<ExtensionSnippets>,
     #[serde(default)]
     pub capabilities: Vec<ExtensionCapability>,
@@ -122,8 +118,6 @@ pub struct ExtensionManifest {
     pub debug_adapters: BTreeMap<Arc<str>, DebugAdapterManifestEntry>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub debug_locators: BTreeMap<Arc<str>, DebugLocatorManifestEntry>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub language_model_providers: BTreeMap<Arc<str>, LanguageModelProviderManifestEntry>,
 }
 
 impl ExtensionManifest {
@@ -148,10 +142,6 @@ impl ExtensionManifest {
 
         if !self.language_servers.is_empty() {
             provides.insert(ExtensionProvides::LanguageServers);
-        }
-
-        if !self.context_servers.is_empty() {
-            provides.insert(ExtensionProvides::ContextServers);
         }
 
         if self.snippets.is_some() {
@@ -293,15 +283,6 @@ impl LanguageServerManifestEntry {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
-pub struct ContextServerManifestEntry {}
-
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
-pub struct SlashCommandManifestEntry {
-    pub description: String,
-    pub requires_argument: bool,
-}
-
 #[derive(Clone, Default, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct DebugAdapterManifestEntry {
     pub schema_path: Option<RelPathBuf>,
@@ -309,16 +290,6 @@ pub struct DebugAdapterManifestEntry {
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct DebugLocatorManifestEntry {}
-
-/// Manifest entry for a language model provider.
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
-pub struct LanguageModelProviderManifestEntry {
-    /// Display name for the provider.
-    pub name: String,
-    /// Path to an SVG icon file relative to the extension root (e.g., "icons/provider.svg").
-    #[serde(default)]
-    pub icon: Option<String>,
-}
 
 impl ExtensionManifest {
     pub async fn load(fs: Arc<dyn Fs>, extension_dir: &Path) -> Result<Self> {
@@ -515,13 +486,10 @@ fn manifest_from_old_manifest(
             .map(|grammar_name| (grammar_name, Default::default()))
             .collect(),
         language_servers: Default::default(),
-        context_servers: BTreeMap::default(),
-        slash_commands: BTreeMap::default(),
         snippets: None,
         capabilities: Vec::new(),
         debug_adapters: Default::default(),
         debug_locators: Default::default(),
-        language_model_providers: Default::default(),
     }
 }
 
@@ -549,13 +517,10 @@ mod tests {
             languages: vec![],
             grammars: BTreeMap::default(),
             language_servers: BTreeMap::default(),
-            context_servers: BTreeMap::default(),
-            slash_commands: BTreeMap::default(),
             snippets: None,
             capabilities: vec![],
             debug_adapters: Default::default(),
             debug_locators: Default::default(),
-            language_model_providers: BTreeMap::default(),
         }
     }
 
