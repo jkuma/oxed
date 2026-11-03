@@ -44,11 +44,8 @@ buffer_diff.workspace = true
 client.workspace = true
 clock.workspace = true
 collections.workspace = true
-context_server.workspace = true
-credentials_provider.workspace = true
 dap.workspace = true
 encoding_rs.workspace = true
-extension.workspace = true
 fancy-regex.workspace = true
 file_content.workspace = true
 fs.workspace = true
@@ -71,7 +68,6 @@ node_runtime.workspace = true
 parking_lot.workspace = true
 path.workspace = true
 paths.workspace = true
-percent-encoding.workspace = true
 postage.workspace = true
 prettier.workspace = true
 rand.workspace = true
@@ -96,14 +92,12 @@ tempfile.workspace = true
 terminal.workspace = true
 text.workspace = true
 toml.workspace = true
-tracing.workspace = true
 url.workspace = true
 util.workspace = true
 watch.workspace = true
 wax.workspace = true
 which.workspace = true
 worktree.workspace = true
-zed_credentials_provider.workspace = true
 zeroize.workspace = true
 zlog.workspace = true
 ztracing.workspace = true
@@ -111,7 +105,6 @@ ztracing.workspace = true
 [dev-dependencies]
 client = { workspace = true, features = ["test-support"] }
 collections = { workspace = true, features = ["test-support"] }
-context_server = { workspace = true, features = ["test-support"] }
 buffer_diff = { workspace = true, features = ["test-support"] }
 dap = { workspace = true, features = ["test-support"] }
 fs = { workspace = true, features = ["test-support"] }

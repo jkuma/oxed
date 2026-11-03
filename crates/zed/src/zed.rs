@@ -2599,8 +2599,8 @@ mod tests {
         DisplayPoint, Editor, MultiBufferOffset, SelectionEffects, display_map::DisplayRow,
     };
     use gpui::{
-        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, OwnedMenuItem,
-        TestAppContext, UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
+        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
+        UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
     };
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
@@ -2627,28 +2627,6 @@ mod tests {
         item::{Item, ItemHandle},
         open_new, open_paths, pane,
     };
-
-    async fn flush_workspace_serialization(
-        window: &WindowHandle<MultiWorkspace>,
-        cx: &mut TestAppContext,
-    ) {
-        let all_tasks = window
-            .update(cx, |multi_workspace, window, cx| {
-                let mut tasks = multi_workspace
-                    .workspaces()
-                    .map(|workspace| {
-                        workspace.update(cx, |workspace, cx| {
-                            workspace.flush_serialization(window, cx)
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                tasks.push(multi_workspace.flush_serialization(cx));
-                tasks
-            })
-            .unwrap();
-
-        futures::future::join_all(all_tasks).await;
-    }
 
     #[gpui::test]
     async fn test_partial_file_index_status_bar_message(cx: &mut TestAppContext) {
@@ -5302,14 +5280,10 @@ mod tests {
                 "client",
                 "collab",
                 "command_palette",
-                "context_server",
-                "copilot",
-                "copilot_edit_predictions",
                 "debug_panel",
                 "debugger",
                 "dev",
                 "diagnostics",
-                "edit_prediction",
                 "editor",
                 "encoding_selector",
                 "feedback",
@@ -5557,7 +5531,6 @@ mod tests {
             project_panel::init(cx);
             outline_panel::init(cx);
             image_viewer::init(cx);
-            language_model::init(cx);
             project::debugger::breakpoint_store::BreakpointStore::init(
                 &app_state.client.clone().into(),
             );
@@ -6209,16 +6182,5 @@ mod tests {
         }
 
         window
-    }
-
-    fn has_view_item(cx: &mut App, item_name: &str) -> bool {
-        cx.get_menus()
-            .expect("reload_keymaps should populate the menu bar")
-            .iter()
-            .find(|menu| menu.name == "View")
-            .expect("expected a View menu")
-            .items
-            .iter()
-            .any(|item| matches!(item, OwnedMenuItem::Action { name, .. } if name == item_name))
     }
 }

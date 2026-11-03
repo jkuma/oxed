@@ -83,6 +83,8 @@ const UNAVAILABLE_ACTIONS: &[&str] = &[
     "dev::EditPredictionContextGoBack",
     "dev::EditPredictionContextGoForward",
     "git::ReviewDiff",
+    "onboarding::OpenAccount",
+    "onboarding::SignIn",
     "editor::DisableBreakpoint",
     "editor::EditLogBreakpoint",
     "editor::EnableBreakpoint",

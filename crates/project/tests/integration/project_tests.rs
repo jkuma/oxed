@@ -1,9 +1,7 @@
 #![allow(clippy::format_collect)]
 
-mod agent_registry_store;
 mod bookmark_store;
 mod color_extractor;
-mod context_server_store;
 mod debugger;
 mod dynamic_registration;
 mod git_store;
@@ -18596,7 +18594,9 @@ async fn test_project_group_key_groups_nested_linked_worktree_under_main_repo(
     assert_eq!(
         project_worktree_paths(&project, cx),
         (
-            vec![PathBuf::from(path!("/root/my-repo/.oxed/worktrees/feature"))],
+            vec![PathBuf::from(path!(
+                "/root/my-repo/.oxed/worktrees/feature"
+            ))],
             vec![PathBuf::from(path!("/root/my-repo"))],
         )
     );

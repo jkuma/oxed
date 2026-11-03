@@ -507,8 +507,6 @@ fn main() {
             cx.background_executor().clone(),
         );
         command_palette::init(cx);
-        // Kept crates expect an (empty) model registry to exist.
-        language_model::init(cx);
         snippet_provider::init(cx);
 
         recent_projects::init(cx);
