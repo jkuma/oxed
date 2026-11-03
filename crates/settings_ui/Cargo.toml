@@ -19,7 +19,6 @@ test-support = []
 [dependencies]
 component.workspace = true
 anyhow.workspace = true
-cloud_api_types.workspace = true
 collections.workspace = true
 editor.workspace = true
 fs.workspace = true

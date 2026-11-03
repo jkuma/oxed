@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use super::*;
-use client::proto;
 use fs::{FakeFs, Fs};
 use gpui::{TestAppContext, VisualTestContext};
+use rpc::proto;
 use serde_json::json;
 use settings::SettingsStore;
 use util::path;

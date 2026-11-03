@@ -8,7 +8,6 @@ use std::{
 
 use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
 
-use client::proto;
 use collections::HashSet;
 use editor::{Editor, EditorEvent};
 use gpui::{Action as _, Anchor, App, Entity, Subscription, Task, TaskExt, WeakEntity, actions};
@@ -19,6 +18,7 @@ use project::{
     LspStore, LspStoreEvent, Worktree, lsp_store::log_store::GlobalLogStore,
     project_settings::ProjectSettings, trusted_worktrees::TrustedWorktrees,
 };
+use rpc::proto;
 use settings::{Settings as _, SettingsStore};
 use ui::{
     ContextMenu, ContextMenuEntry, Indicator, PopoverMenu, PopoverMenuHandle, Tooltip, prelude::*,

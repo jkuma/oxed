@@ -42,10 +42,6 @@ pub use remote::{
 pub use toast_layer::{ToastAction, ToastLayer, ToastView};
 
 use anyhow::{Context as _, Result, anyhow};
-use client::{
-    Client, ErrorExt, UserStore,
-    proto::{self, ErrorCode, PanelId},
-};
 use collections::{HashMap, HashSet, TypeIdHashMap, hash_map};
 use dock::{Dock, DockPosition, PanelButtons, PanelHandle, RESIZE_HANDLE_SIZE};
 use futures::{
@@ -66,6 +62,7 @@ use gpui::{
     transparent_black,
 };
 pub use history_manager::*;
+use http_client::HttpClientWithUrl;
 pub use item::{
     Item, ItemHandle, ItemSettings, PreviewTabsSettings, ProjectItem, SerializableItem,
     SerializableItemHandle, WeakItemHandle,
@@ -91,7 +88,6 @@ pub use persistence::{
     read_serialized_multi_workspaces,
 };
 use persistence::{SerializedWindowBounds, model::SerializedWorkspace};
-use postage::stream::Stream;
 use project::{
     DirectoryLister, Project, ProjectEntryId, ProjectPath, ResolvedPath, Worktree, WorktreeId,
     WorktreeSettings,
@@ -105,6 +101,10 @@ use release_channel::ReleaseChannel;
 use remote::{
     RemoteClientDelegate, RemoteConnection, RemoteConnectionOptions,
     remote_client::ConnectionIdentifier,
+};
+use rpc::{
+    ErrorExt,
+    proto::{self, ErrorCode, PanelId},
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -1226,8 +1226,7 @@ pub fn register_serializable_item<I: SerializableItem>(cx: &mut App) {
 
 pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
-    pub client: Arc<Client>,
-    pub user_store: Entity<UserStore>,
+    pub http_client: Arc<HttpClientWithUrl>,
     pub workspace_store: Entity<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut App) -> WindowOptions,
@@ -1289,21 +1288,16 @@ impl AppState {
         let fs = fs::FakeFs::new(cx.background_executor().clone());
         <dyn Fs>::set_global(fs.clone(), cx);
         let languages = Arc::new(LanguageRegistry::test(cx.background_executor().clone()));
-        let clock = Arc::new(clock::FakeSystemClock::new());
         let http_client = http_client::FakeHttpClient::with_404_response();
-        let client = Client::new(clock, http_client, cx);
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
-        let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new(|_| WorkspaceStore::default());
 
         theme_settings::init(theme::LoadThemes::JustBase, cx);
-        client::init(&client, cx);
 
         Arc::new(Self {
-            client,
+            http_client,
             fs,
             languages,
-            user_store,
             workspace_store,
             node_runtime: NodeRuntime::unavailable(),
             build_window_options: |_, _| Default::default(),
@@ -1482,7 +1476,6 @@ pub struct Workspace {
     app_state: Arc<AppState>,
     dispatching_keystrokes: Rc<RefCell<DispatchingKeystrokes>>,
     _subscriptions: Vec<Subscription>,
-    _observe_current_user: Task<Result<()>>,
     _schedule_serialize_workspace: Option<Task<()>>,
     _serialize_workspace_task: Option<Task<()>>,
     _schedule_serialize_ssh_paths: Option<Task<()>>,
@@ -1740,20 +1733,6 @@ impl Workspace {
                 .insert((any_window_handle, weak_handle.clone()));
         });
 
-        let mut current_user = app_state.user_store.read(cx).watch_current_user();
-        let mut connection_status = app_state.client.status();
-        let _observe_current_user = cx.spawn_in(window, async move |this, cx| {
-            current_user.next().await;
-            connection_status.next().await;
-            let mut stream =
-                Stream::map(current_user, drop).merge(Stream::map(connection_status, drop));
-
-            while stream.recv().await.is_some() {
-                this.update(cx, |_, cx| cx.notify())?;
-            }
-            anyhow::Ok(())
-        });
-
         cx.emit(Event::WorkspaceCreated(weak_handle.clone()));
         let modal_layer = cx.new(|_| ModalLayer::new());
         let toast_layer = cx.new(|_| ToastLayer::new());
@@ -1904,7 +1883,6 @@ impl Workspace {
             dirty_items: Default::default(),
             database_id: workspace_id,
             app_state,
-            _observe_current_user,
             _schedule_serialize_workspace: None,
             _serialize_workspace_task: None,
             _schedule_serialize_ssh_paths: None,
@@ -1949,9 +1927,8 @@ impl Workspace {
         cx: &mut App,
     ) -> Task<anyhow::Result<OpenResult>> {
         let project_handle = Project::local(
-            app_state.client.clone(),
+            app_state.http_client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             env,
@@ -2703,10 +2680,6 @@ impl Workspace {
         self._panels_task.take()
     }
 
-    pub fn user_store(&self) -> &Entity<UserStore> {
-        &self.app_state.user_store
-    }
-
     pub fn project(&self) -> &Entity<Project> {
         &self.project
     }
@@ -3098,10 +3071,6 @@ impl Workspace {
             window,
             cx,
         )
-    }
-
-    pub fn client(&self) -> &Arc<Client> {
-        &self.app_state.client
     }
 
     pub fn set_titlebar_item(&mut self, item: AnyView, _: &mut Window, cx: &mut Context<Self>) {
@@ -7264,16 +7233,14 @@ impl Workspace {
         use node_runtime::NodeRuntime;
         use session::Session;
 
-        let client = project.read(cx).client();
-        let user_store = project.read(cx).user_store();
+        let http_client = project.read(cx).http_client();
         let workspace_store = cx.new(|_| WorkspaceStore::default());
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         window.activate_window();
         let app_state = Arc::new(AppState {
             languages: project.read(cx).languages().clone(),
             workspace_store,
-            client,
-            user_store,
+            http_client,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: NodeRuntime::unavailable(),
@@ -9272,9 +9239,8 @@ pub fn open_workspace_by_id(
     cx: &mut App,
 ) -> Task<anyhow::Result<WindowHandle<MultiWorkspace>>> {
     let project_handle = Project::local(
-        app_state.client.clone(),
+        app_state.http_client.clone(),
         app_state.node_runtime.clone(),
-        app_state.user_store.clone(),
         app_state.languages.clone(),
         app_state.fs.clone(),
         None,
@@ -9688,9 +9654,8 @@ pub fn open_remote_project_with_new_connection(
         let project = cx.update(|cx| {
             project::Project::remote(
                 session,
-                app_state.client.clone(),
+                app_state.http_client.clone(),
                 app_state.node_runtime.clone(),
-                app_state.user_store.clone(),
                 app_state.languages.clone(),
                 app_state.fs.clone(),
                 true,

@@ -6,7 +6,6 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use client::{TypedEnvelope, proto};
 use collections::{BTreeMap, FxHasher, HashSet};
 use extension::{
     Event, Extension, ExtensionDebugAdapterProviderProxy, ExtensionEvents, ExtensionHostProxy,
@@ -22,6 +21,7 @@ use http_client::HttpClient;
 use language::{LanguageConfig, LanguageName, LanguageQueries, LoadedLanguage};
 use lsp::LanguageServerName;
 use node_runtime::NodeRuntime;
+use rpc::{TypedEnvelope, proto};
 use util::ResultExt as _;
 
 use crate::wasm_host::{WasmExtension, WasmHost};

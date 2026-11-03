@@ -14,7 +14,6 @@ doctest = false
 
 [features]
 test-support = [
-    "client/test-support",
     "http_client/test-support",
     "db/test-support",
     "project/test-support",
@@ -29,7 +28,6 @@ test-support = [
 any_vec.workspace = true
 anyhow.workspace = true
 async-recursion.workspace = true
-client.workspace = true
 chrono.workspace = true
 clock.workspace = true
 collections.workspace = true
@@ -53,6 +51,7 @@ postage.workspace = true
 project.workspace = true
 release_channel.workspace = true
 remote.workspace = true
+rpc.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -72,7 +71,6 @@ uuid.workspace = true
 zed_actions.workspace = true
 
 [dev-dependencies]
-client = { workspace = true, features = ["test-support"] }
 db = { workspace = true, features = ["test-support"] }
 fs = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }

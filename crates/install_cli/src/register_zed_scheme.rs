@@ -1,4 +1,4 @@
-use client::ZED_URL_SCHEME;
+const ZED_URL_SCHEME: &str = "zed";
 use gpui::{AsyncApp, actions};
 
 actions!(

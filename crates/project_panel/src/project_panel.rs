@@ -3,7 +3,6 @@ mod undo;
 mod utils;
 
 use anyhow::{Context as _, Result};
-use client::{ErrorCode, ErrorExt};
 use collections::{BTreeSet, HashMap, hash_map};
 use editor::{
     Editor, EditorEvent, MultiBufferOffset,
@@ -41,6 +40,7 @@ use project::{
 };
 use project_panel_settings::ProjectPanelSettings;
 use rayon::slice::ParallelSliceMut;
+use rpc::{ErrorCode, ErrorExt};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use settings::{

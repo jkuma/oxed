@@ -36,9 +36,9 @@ smallvec.workspace = true
 theme.workspace = true
 theme_settings.workspace = true
 rayon.workspace = true
+rpc.workspace = true
 ui.workspace = true
 util.workspace = true
-client.workspace = true
 worktree.workspace = true
 workspace.workspace = true
 language.workspace = true
@@ -51,7 +51,6 @@ log.workspace = true
 svg_preview.workspace = true
 
 [dev-dependencies]
-client = { workspace = true, features = ["test-support"] }
 criterion.workspace = true
 editor = { workspace = true, features = ["test-support"] }
 git_ui = { workspace = true, features = ["test-support"] }

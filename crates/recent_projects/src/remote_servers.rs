@@ -1829,9 +1829,8 @@ impl RemoteServerProjects {
                             session.read(cx).path_style(),
                             project::Project::remote(
                                 session,
-                                app_state.client.clone(),
+                                app_state.http_client.clone(),
                                 app_state.node_runtime.clone(),
-                                app_state.user_store.clone(),
                                 app_state.languages.clone(),
                                 app_state.fs.clone(),
                                 true,

@@ -9,16 +9,12 @@ members = [
     "crates/buffer_diff",
     "crates/call_hierarchy",
     "crates/cli",
-    "crates/client",
     "crates/clock",
-    "crates/cloud_api_client",
     "crates/cloud_api_types",
-    "crates/cloud_llm_client",
     "crates/collections",
     "crates/command_palette",
     "crates/command_palette_hooks",
     "crates/component",
-    "crates/credentials_provider",
     "crates/dap",
     "crates/db",
     "crates/dev_container",
@@ -97,7 +93,6 @@ members = [
     "crates/project_panel",
     "crates/project_symbols",
     "crates/proto",
-    "crates/proxy_handshake",
     "crates/recent_projects",
     "crates/refineable",
     "crates/refineable/derive_refineable",
@@ -148,9 +143,7 @@ members = [
     "crates/worktree",
     "crates/zed",
     "crates/zed_actions",
-    "crates/zed_credentials_provider",
     "crates/zed_env_vars",
-    "crates/zeta_prompt",
     "crates/zlog",
     "crates/zlog_settings",
     "crates/ztracing",
@@ -187,16 +180,12 @@ breadcrumbs = { path = "crates/breadcrumbs" }
 buffer_diff = { path = "crates/buffer_diff" }
 call_hierarchy = { path = "crates/call_hierarchy" }
 cli = { path = "crates/cli", default-features = false }
-client = { path = "crates/client" }
 clock = { path = "crates/clock" }
-cloud_api_client = { path = "crates/cloud_api_client" }
 cloud_api_types = { path = "crates/cloud_api_types" }
-cloud_llm_client = { path = "crates/cloud_llm_client" }
 collections = { path = "crates/collections", version = "0.1.0" }
 command_palette = { path = "crates/command_palette" }
 command_palette_hooks = { path = "crates/command_palette_hooks" }
 component = { path = "crates/component" }
-credentials_provider = { path = "crates/credentials_provider" }
 dap = { path = "crates/dap" }
 db = { path = "crates/db" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
@@ -276,7 +265,6 @@ project = { path = "crates/project" }
 project_panel = { path = "crates/project_panel" }
 project_symbols = { path = "crates/project_symbols" }
 proto = { path = "crates/proto" }
-proxy_handshake = { path = "crates/proxy_handshake" }
 recent_projects = { path = "crates/recent_projects" }
 refineable = { path = "crates/refineable" }
 release_channel = { path = "crates/release_channel" }
@@ -325,9 +313,7 @@ which_key = { path = "crates/which_key" }
 workspace = { path = "crates/workspace" }
 worktree = { path = "crates/worktree" }
 zed_actions = { path = "crates/zed_actions" }
-zed_credentials_provider = { path = "crates/zed_credentials_provider" }
 zed_env_vars = { path = "crates/zed_env_vars" }
-zeta_prompt = { path = "crates/zeta_prompt" }
 zlog = { path = "crates/zlog" }
 zlog_settings = { path = "crates/zlog_settings" }
 ztracing = { path = "crates/ztracing" }

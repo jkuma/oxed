@@ -4,6 +4,7 @@ pub mod git_traversal;
 pub mod job_debug_queue;
 pub mod pending_op;
 
+use crate::ProjectId;
 use crate::{
     Project, ProjectEnvironment, ProjectItem, ProjectPath,
     buffer_store::{BufferStore, BufferStoreEvent},
@@ -19,7 +20,6 @@ use async_lock::Semaphore;
 use buffer_diff::{
     BufferDiff, DiffHunk, DiffHunkSecondaryStatus, DiffOperations, PendingHunk, PendingSense,
 };
-use client::ProjectId;
 use collections::HashMap;
 pub use conflict_set::{ConflictRegion, ConflictSet, ConflictSetSnapshot, ConflictSetUpdate};
 use file_content::{decode_text, encode_text};

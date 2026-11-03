@@ -9148,7 +9148,7 @@ async fn test_rescan_and_remote_updates(cx: &mut gpui::TestAppContext) {
             0,
             ReplicaId::REMOTE_SERVER,
             metadata,
-            project.read(cx).client().into(),
+            rpc::AnyProtoClient::new(rpc::NoopProtoClient::new()),
             project.read(cx).path_style(cx),
             cx,
         )

@@ -3,8 +3,7 @@ use std::rc::Rc;
 use gpui::{App, ElementId, IntoElement, RenderOnce, SharedString};
 use heck::ToTitleCase as _;
 use ui::{
-    ButtonSize, ContextMenu, Disableable as _, DropdownMenu, DropdownStyle, FluentBuilder as _,
-    IconPosition, px,
+    ButtonSize, ContextMenu, DropdownMenu, DropdownStyle, FluentBuilder as _, IconPosition, px,
 };
 
 #[derive(IntoElement)]
@@ -14,7 +13,6 @@ pub struct EnumVariantDropdown {
     labels: &'static [&'static str],
     should_do_title_case: bool,
     tab_index: Option<isize>,
-    disabled: bool,
     aria_label: Option<SharedString>,
     aria_description: Option<SharedString>,
     on_change: Rc<dyn Fn(usize, &mut ui::Window, &mut App) + 'static>,
@@ -52,7 +50,6 @@ impl EnumVariantDropdown {
             labels,
             should_do_title_case: true,
             tab_index: None,
-            disabled: false,
             aria_label: None,
             aria_description: None,
             on_change: Rc::new(on_change),
@@ -66,11 +63,6 @@ impl EnumVariantDropdown {
 
     pub fn tab_index(mut self, tab_index: isize) -> Self {
         self.tab_index = Some(tab_index);
-        self
-    }
-
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
         self
     }
 
@@ -128,7 +120,6 @@ impl RenderOnce for EnumVariantDropdown {
         .when_some(self.aria_description, |this, description| {
             this.aria_description(description)
         })
-        .disabled(self.disabled)
         .when_some(self.tab_index, |elem, tab_index| elem.tab_index(tab_index))
         .trigger_size(ButtonSize::Medium)
         .style(DropdownStyle::Outlined)

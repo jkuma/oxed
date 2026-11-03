@@ -9,7 +9,6 @@ mod extension_store_test;
 use anyhow::{Context as _, Result, anyhow, bail};
 use async_compression::futures::bufread::GzipDecoder;
 use async_tar::Archive;
-use client::{Client, proto};
 use cloud_api_types::{ExtensionMetadata, ExtensionProvides, GetExtensionsResponse};
 use collections::{BTreeMap, BTreeSet, FxHashSet, HashMap, HashSet, btree_map};
 pub use extension::ExtensionManifest;
@@ -43,6 +42,7 @@ use node_runtime::NodeRuntime;
 use project::{ContextProviderWithTasks, Project};
 use release_channel::ReleaseChannel;
 use remote::{ConnectionState, RemoteClient, RemoteClientEvent};
+use rpc::proto;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use settings::{SemanticTokenRules, Settings, SettingsStore};
@@ -319,7 +319,7 @@ actions!(
 pub fn init(
     extension_host_proxy: Arc<ExtensionHostProxy>,
     fs: Arc<dyn Fs>,
-    client: Arc<Client>,
+    http_client: Arc<HttpClientWithUrl>,
     node_runtime: NodeRuntime,
     cx: &mut App,
 ) {
@@ -329,8 +329,8 @@ pub fn init(
             None,
             extension_host_proxy,
             fs,
-            client.http_client(),
-            client.http_client(),
+            http_client.clone(),
+            http_client,
             node_runtime,
             cx,
         )

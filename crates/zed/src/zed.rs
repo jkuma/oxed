@@ -4559,7 +4559,6 @@ mod tests {
             let app_state = AppState::test(cx);
 
             theme_settings::init(theme::LoadThemes::JustBase, cx);
-            client::init(&app_state.client, cx);
             workspace::init(app_state.clone(), cx);
             onboarding::init(cx);
             app_state
@@ -4956,7 +4955,6 @@ mod tests {
                 "buffer_search",
                 "call_hierarchy",
                 "cli",
-                "client",
                 "collab",
                 "command_palette",
                 "debugger",
@@ -5192,7 +5190,6 @@ mod tests {
 
             gpui_tokio::init(cx);
             AppState::set_global(app_state.clone(), cx);
-            client::Client::set_global(app_state.client.clone(), cx);
             theme_settings::init(theme::LoadThemes::JustBase, cx);
             workspace::init(app_state.clone(), cx);
             release_channel::init(Version::new(0, 0, 0), cx);
@@ -5203,10 +5200,6 @@ mod tests {
             project_panel::init(cx);
             outline_panel::init(cx);
             image_viewer::init(cx);
-            project::debugger::breakpoint_store::BreakpointStore::init(
-                &app_state.client.clone().into(),
-            );
-            project::debugger::dap_store::DapStore::init(&app_state.client.clone().into(), cx);
             initialize_workspace(app_state.clone(), cx);
             search::init(cx);
             lsp_locations::init(cx);

@@ -9,7 +9,6 @@ use crate::{
     load_plugin_queries, remote_sync_retry_delay,
 };
 use async_trait::async_trait;
-use client::{AnyProtoClient, TypedEnvelope, proto};
 use collections::{BTreeMap, HashMap};
 use extension::{
     BuildTaskTemplate, CodeLabel, Command, Completion, DebugAdapterBinary, DebugRequest,
@@ -24,6 +23,7 @@ use language_extension::LspAccess;
 use lsp::LanguageServerName;
 use node_runtime::NodeRuntime;
 use remote::{ConnectionState, RemoteClient, RemoteClientEvent, RemoteConnectionOptions};
+use rpc::{AnyProtoClient, TypedEnvelope, proto};
 use serde_json::json;
 use settings::SettingsStore;
 use std::{

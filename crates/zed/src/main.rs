@@ -17,7 +17,6 @@ const _: () = assert!(
 use anyhow::{Context as _, Result};
 use clap::Parser;
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{Client, ProxySettings, UserStore, parse_zed_link};
 use collections::HashMap;
 use db::kvp::KeyValueStore;
 use editor::Editor;
@@ -28,6 +27,7 @@ use git::GitHostingProviderRegistry;
 use git_ui::clone::clone_and_open;
 use gpui::{App, AppContext, Application, AsyncApp, QuitMode, Task, TaskExt, UpdateGlobal as _};
 use gpui_platform;
+use http_client::HttpClientWithUrl;
 
 use gpui_tokio::Tokio;
 use language::LanguageRegistry;
@@ -43,7 +43,7 @@ use project::{project_settings::ProjectSettings, trusted_worktrees};
 use recent_projects::{RemoteSettings, open_remote_project};
 use release_channel::{AppCommitSha, AppVersion, ReleaseChannel};
 use session::{AppSession, Session};
-use settings::{Settings, SettingsStore, watch_config_file};
+use settings::{RegisterSetting, Settings, SettingsStore, watch_config_file};
 use std::{
     cell::RefCell,
     env,
@@ -410,8 +410,12 @@ fn main() {
         extension::init(cx);
         let extension_host_proxy = ExtensionHostProxy::global(cx);
 
-        let client = Client::production(cx);
-        cx.set_http_client(client.http_client());
+        let http_client = Arc::new(HttpClientWithUrl::new_url(
+            cx.http_client(),
+            EXTENSIONS_SERVER_URL,
+            cx.http_client().proxy().cloned(),
+        ));
+        cx.set_http_client(http_client.clone());
         let mut languages = LanguageRegistry::new(cx.background_executor().clone());
         languages.set_language_server_download_dir(paths::languages_dir().clone());
         let languages = Arc::new(languages);
@@ -442,10 +446,9 @@ fn main() {
         .detach();
         ui::on_new_scrollbars::<SettingsStore>(cx);
 
-        let node_runtime = NodeRuntime::new(client.http_client(), Some(shell_env_loaded_rx), rx);
+        let node_runtime = NodeRuntime::new(http_client.clone(), Some(shell_env_loaded_rx), rx);
 
         languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
-        let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new(|_| WorkspaceStore::default());
 
         language_extension::init(
@@ -467,11 +470,7 @@ fn main() {
             languages.clone(),
         );
 
-        Client::set_global(client.clone(), cx);
-
         zed::init(cx);
-        project::Project::init(&client, cx);
-        client::init(&client, cx);
         feature_flags::FeatureFlagStore::init(cx);
 
         let session = cx.foreground_executor().block_on(session);
@@ -480,8 +479,7 @@ fn main() {
 
         let app_state = Arc::new(AppState {
             languages,
-            client: client.clone(),
-            user_store,
+            http_client,
             fs: fs.clone(),
             build_window_options,
             workspace_store,
@@ -494,7 +492,7 @@ fn main() {
         extension_host::init(
             extension_host_proxy.clone(),
             app_state.fs.clone(),
-            app_state.client.clone(),
+            app_state.http_client.clone(),
             app_state.node_runtime.clone(),
             cx,
         );
@@ -565,8 +563,6 @@ fn main() {
         which_key::init(cx);
 
         cx.observe_global::<SettingsStore>({
-            let http = app_state.client.http_client();
-            let client = app_state.client.clone();
             move |cx| {
                 for &mut window in cx.windows().iter_mut() {
                     let background_appearance = cx.theme().window_background_appearance();
@@ -588,14 +584,6 @@ fn main() {
                         }
                     },
                 );
-
-                let new_host = &client::ClientSettings::get_global(cx).server_url;
-                if &http.base_url() != new_host {
-                    http.set_base_url(new_host);
-                    if client.status().borrow().is_connected() {
-                        client.reconnect(&cx.to_async());
-                    }
-                }
             }
         })
         .detach();
@@ -623,7 +611,7 @@ fn main() {
         let urls: Vec<_> = args
             .paths_or_urls
             .iter()
-            .map(|arg| parse_url_arg(arg, cx))
+            .map(|arg| parse_url_arg(arg))
             .collect();
 
         // Check if any diff paths are directories to determine diff_all mode
@@ -1358,7 +1346,42 @@ struct Args {
     etw_socket: Option<PathBuf>,
 }
 
-fn parse_url_arg(arg: &str, cx: &App) -> String {
+/// Base URL of the extension registry API.
+const EXTENSIONS_SERVER_URL: &str = "https://zed.dev";
+
+#[derive(Default, RegisterSetting)]
+struct ProxySettings {
+    proxy: Option<String>,
+}
+
+impl ProxySettings {
+    fn proxy_url(&self) -> Option<url::Url> {
+        self.proxy
+            .as_deref()
+            .and_then(|input| {
+                input
+                    .parse::<url::Url>()
+                    .inspect_err(|error| log::error!("Error parsing proxy settings: {error}"))
+                    .ok()
+            })
+            .or_else(http_client::read_proxy_from_env)
+    }
+}
+
+impl Settings for ProxySettings {
+    fn from_settings(content: &settings::SettingsContent) -> Self {
+        Self {
+            proxy: content
+                .proxy
+                .as_deref()
+                .map(str::trim)
+                .filter(|proxy| !proxy.is_empty())
+                .map(ToOwned::to_owned),
+        }
+    }
+}
+
+fn parse_url_arg(arg: &str) -> String {
     match std::fs::canonicalize(Path::new(&arg)) {
         Ok(path) => format!("file://{}", path.display()),
         Err(_) => {
@@ -1366,7 +1389,6 @@ fn parse_url_arg(arg: &str, cx: &App) -> String {
                 || arg.starts_with("zed://")
                 || arg.starts_with("zed-cli://")
                 || arg.starts_with("ssh://")
-                || parse_zed_link(arg, cx).is_some()
             {
                 arg.into()
             } else {
