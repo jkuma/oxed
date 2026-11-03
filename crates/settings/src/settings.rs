@@ -2,7 +2,6 @@ mod base_keymap_setting;
 mod content_into_gpui;
 mod editable_setting_control;
 mod editorconfig_store;
-mod granted_write_path;
 mod keymap_file;
 mod settings_file;
 mod settings_store;
@@ -26,7 +25,6 @@ pub mod private {
 
 use gpui::{App, Global};
 
-use crate as settings;
 use std::env;
 use std::{borrow::Cow, fmt, str};
 use util::asset_str;
@@ -38,7 +36,6 @@ pub use editable_setting_control::*;
 pub use editorconfig_store::{
     Editorconfig, EditorconfigEvent, EditorconfigProperties, EditorconfigStore,
 };
-pub use granted_write_path::GrantedWritePath;
 pub use keymap_file::{
     KeyBindingValidator, KeyBindingValidatorRegistration, KeybindSource, KeybindUpdateOperation,
     KeybindUpdateTarget, KeymapFile, KeymapFileLoadResult,
@@ -54,22 +51,6 @@ pub use settings_store::{
 pub use vscode_import::{VsCodeSettings, VsCodeSettingsSource};
 
 pub use keymap_file::ActionSequence;
-
-#[derive(Clone, Debug, Default, RegisterSetting)]
-pub struct CopilotSettings {
-    pub enterprise_uri: Option<String>,
-}
-
-impl Settings for CopilotSettings {
-    fn from_settings(content: &SettingsContent) -> Self {
-        Self {
-            enterprise_uri: content
-                .copilot
-                .as_ref()
-                .and_then(|copilot| copilot.enterprise_uri.clone()),
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActiveSettingsProfileName(pub String);

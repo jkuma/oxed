@@ -1396,53 +1396,6 @@ impl SettingsStore {
             }
             merged.merge_from_option(self.server_settings.as_deref());
 
-            // Merge `disable_ai` from all project/local settings into the global value.
-            // Since `SaturatingBool` uses OR logic, if any project has `disable_ai: true`,
-            // the global value will be true. This allows project-level `disable_ai` to
-            // affect the global setting used by UI elements without file context.
-            for local_settings in self.local_settings.values() {
-                merged
-                    .project
-                    .disable_ai
-                    .merge_from(&local_settings.project.disable_ai);
-            }
-
-            self.merged_settings = Rc::new(merged);
-
-            for setting_value in self.setting_values.values_mut() {
-                let value = setting_value.from_settings(&self.merged_settings);
-                setting_value.set_global_value(value);
-            }
-        } else {
-            // When only a local path changed, we still need to recompute the global
-            // `disable_ai` value since it depends on all local settings.
-            let mut merged = (*self.merged_settings).clone();
-            // Reset disable_ai to compute fresh from base settings
-            merged.project.disable_ai = self.default_settings.project.disable_ai;
-            if let Some(global) = &self.global_settings {
-                merged
-                    .project
-                    .disable_ai
-                    .merge_from(&global.project.disable_ai);
-            }
-            if let Some(user) = &self.user_settings {
-                merged
-                    .project
-                    .disable_ai
-                    .merge_from(&user.content.project.disable_ai);
-            }
-            if let Some(server) = &self.server_settings {
-                merged
-                    .project
-                    .disable_ai
-                    .merge_from(&server.project.disable_ai);
-            }
-            for local_settings in self.local_settings.values() {
-                merged
-                    .project
-                    .disable_ai
-                    .merge_from(&local_settings.project.disable_ai);
-            }
             self.merged_settings = Rc::new(merged);
 
             for setting_value in self.setting_values.values_mut() {
@@ -3224,51 +3177,6 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[gpui::test]
-    fn test_agent_profile_tool_schema(cx: &mut App) {
-        SettingsStore::test(cx);
-
-        let schema = SettingsStore::json_schema(&SettingsJsonSchemaParams {
-            language_names: &[],
-            font_names: &[],
-            theme_names: &[],
-            icon_theme_names: &[],
-            lsp_adapter_names: &[],
-            action_names: &[],
-            action_documentation: &HashMap::default(),
-            deprecations: &HashMap::default(),
-            deprecation_messages: &HashMap::default(),
-        });
-        let tools = schema
-            .pointer("/$defs/AgentProfileContent/properties/tools")
-            .expect("agent profile tools schema should exist");
-        let properties = tools
-            .get("properties")
-            .and_then(Value::as_object)
-            .expect("agent profile tools should have named properties");
-        let boolean_schema = serde_json::json!({ "type": "boolean" });
-        for tool_schema in properties.values() {
-            assert_eq!(tool_schema, &boolean_schema);
-        }
-        assert_eq!(tools.get("additionalProperties"), Some(&Value::Bool(false)));
-
-        let defaults: Value = crate::parse_json_with_comments(default_settings().as_ref())
-            .expect("default settings should parse");
-        for profile in ["write", "ask"] {
-            let path = format!("/agent/profiles/{profile}/tools");
-            let default_tools = defaults
-                .pointer(&path)
-                .and_then(Value::as_object)
-                .expect("built-in profile should have tools");
-            for tool_name in default_tools.keys() {
-                assert!(
-                    properties.contains_key(tool_name),
-                    "{profile} tool {tool_name} should be suggested in the schema"
-                );
-            }
-        }
     }
 
     #[gpui::test]

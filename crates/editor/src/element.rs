@@ -39,7 +39,6 @@ use crate::{
 };
 use buffer_diff::{DiffHunkStatus, DiffHunkStatusKind};
 use collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use feature_flags::{DiffReviewFeatureFlag, FeatureFlagAppExt as _};
 use git::{Oid, blame::BlameEntry, commit::ParsedCommitMessage};
 use gpui::{
     Action, Along, AnyElement, App, AppContext, AvailableSpace, Axis as ScrollbarAxis, BorderStyle,
@@ -655,12 +654,6 @@ impl EditorElement {
         register_action(editor, window, Editor::expand_all_diff_hunks);
         register_action(editor, window, Editor::collapse_all_diff_hunks);
         register_action(editor, window, Editor::toggle_all_diff_hunks);
-        register_action(editor, window, Editor::toggle_review_comments_expanded);
-        register_action(editor, window, Editor::submit_diff_review_comment_action);
-        register_action(editor, window, Editor::edit_review_comment);
-        register_action(editor, window, Editor::delete_review_comment);
-        register_action(editor, window, Editor::confirm_edit_review_comment_action);
-        register_action(editor, window, Editor::cancel_edit_review_comment_action);
         register_action(editor, window, Editor::go_to_previous_change);
         register_action(editor, window, Editor::go_to_next_change);
         register_action(editor, window, Editor::go_to_prev_reference);
@@ -2620,49 +2613,6 @@ impl EditorElement {
                 })
                 .collect_vec()
         })
-    }
-
-    fn should_render_diff_review_button(
-        &self,
-        range: Range<DisplayRow>,
-        row_infos: &[RowInfo],
-        snapshot: &EditorSnapshot,
-        cx: &App,
-    ) -> Option<(DisplayRow, Option<u32>)> {
-        if !cx.has_flag::<DiffReviewFeatureFlag>() {
-            return None;
-        }
-
-        let show_diff_review_button = self.editor.read(cx).show_diff_review_button();
-        if !show_diff_review_button {
-            return None;
-        }
-
-        let indicator = self.editor.read(cx).gutter_diff_review_indicator.0?;
-        if !indicator.is_active {
-            return None;
-        }
-
-        let display_row = indicator
-            .start
-            .to_display_point(&snapshot.display_snapshot)
-            .row();
-        let row_index = (display_row.0.saturating_sub(range.start.0)) as usize;
-
-        let row_info = row_infos.get(row_index);
-        if row_info.is_some_and(|row_info| row_info.expand_info.is_some()) {
-            return None;
-        }
-
-        let buffer_id = row_info.and_then(|info| info.buffer_id)?;
-
-        let editor = self.editor.read(cx);
-        if editor.is_buffer_folded(buffer_id, cx) {
-            return None;
-        }
-
-        let buffer_row = row_info.and_then(|info| info.buffer_row);
-        Some((display_row, buffer_row))
     }
 
     fn layout_run_indicators(
@@ -5562,10 +5512,6 @@ impl EditorElement {
 
             for test_indicator in layout.test_indicators.iter_mut() {
                 test_indicator.paint(window, cx);
-            }
-
-            if let Some(diff_review_button) = layout.diff_review_button.as_mut() {
-                diff_review_button.paint(window, cx);
             }
         });
     }
@@ -8766,8 +8712,6 @@ impl Element for EditorElement {
                         hollow_background: colors.editor_diff_hunk_deleted_hollow_background,
                         hollow_border: colors.editor_diff_hunk_deleted_hollow_border,
                     };
-                    let drag_highlight_color = colors.editor_active_line_background;
-                    let drag_border_color = colors.border_focused;
 
                     for (ix, row_info) in row_infos.iter().enumerate() {
                         let Some(diff_status) = row_info.diff_status else {
@@ -8809,24 +8753,6 @@ impl Element for EditorElement {
                         highlighted_rows
                             .entry(base_display_point.row())
                             .or_insert(background);
-                    }
-
-                    // Add diff review drag selection highlight to text area
-                    if let Some(drag_state) = &self.editor.read(cx).diff_review_drag_state {
-                        let range = drag_state.row_range(&snapshot.display_snapshot);
-                        let start_row = range.start().0;
-                        let end_row = range.end().0;
-                        let drag_highlight = LineHighlight {
-                            background: solid_background(drag_highlight_color),
-                            border: Some(drag_border_color),
-                            include_gutter: true,
-                            type_id: None,
-                        };
-                        for row_num in start_row..=end_row {
-                            highlighted_rows
-                                .entry(DisplayRow(row_num))
-                                .or_insert(drag_highlight);
-                        }
                     }
 
                     let highlighted_gutter_ranges =
@@ -9657,52 +9583,6 @@ impl Element for EditorElement {
                         );
                     }
 
-                    let git_gutter_width = Self::gutter_strip_width(line_height, cx)
-                        + gutter_dimensions
-                            .git_blame_entries_width
-                            .unwrap_or_default();
-                    let available_width = gutter_dimensions.left_padding - git_gutter_width;
-
-                    let max_line_number_length = self
-                        .editor
-                        .read(cx)
-                        .buffer()
-                        .read(cx)
-                        .snapshot(cx)
-                        .widest_line_number()
-                        .ilog10()
-                        + 1;
-
-                    let diff_review_button = self
-                        .should_render_diff_review_button(
-                            start_row..end_row,
-                            &row_infos,
-                            &snapshot,
-                            cx,
-                        )
-                        .map(|(display_row, buffer_row)| {
-                            let is_wide = max_line_number_length
-                                >= EditorSettings::get_global(cx).gutter.min_line_number_digits
-                                    as u32
-                                && buffer_row.is_some_and(|row| {
-                                    (row + 1).ilog10() + 1 == max_line_number_length
-                                })
-                                || gutter_dimensions.right_padding == px(0.);
-
-                            let button_width = if is_wide {
-                                available_width - px(6.)
-                            } else {
-                                available_width + em_width - px(6.)
-                            };
-
-                            let button = self.editor.update(cx, |editor, cx| {
-                                editor
-                                    .render_diff_review_button(display_row, button_width, cx)
-                                    .into_any_element()
-                            });
-                            gutter.prepaint_button(button, display_row, window, cx)
-                        });
-
                     self.layout_signature_help(
                         &hitbox,
                         content_origin,
@@ -9953,7 +9833,6 @@ impl Element for EditorElement {
                         test_indicators,
                         bookmarks,
                         breakpoints,
-                        diff_review_button,
                         crease_toggles,
                         crease_trailers,
                         tab_invisible,
@@ -10169,7 +10048,6 @@ pub struct EditorLayout {
     test_indicators: Vec<AnyElement>,
     bookmarks: Vec<AnyElement>,
     breakpoints: Vec<AnyElement>,
-    diff_review_button: Option<AnyElement>,
     crease_toggles: Vec<Option<AnyElement>>,
     expand_toggles: Vec<Option<(AnyElement, gpui::Point<Pixels>)>>,
     diff_hunk_controls: Vec<AnyElement>,

@@ -97,14 +97,13 @@ pub use element::{
     CursorLayout, EditorElement, HighlightedRange, HighlightedRangeLine, PointForPosition,
     file_status_label_color, render_breadcrumb_text,
 };
+pub(crate) use git::DisplayDiffHunk;
+use git::InlineBlamePopover;
 pub use git::blame::{BlameRenderer, GitBlame};
 pub use git::{
     DefaultDiffHunkRenderer, DiffHunkRenderer, HiddenDiffHunkRenderer,
     HiddenUnstagedDiffHunkRenderer, render_diff_hunk_controls, set_blame_renderer,
 };
-pub(crate) use git::{DiffHunkKey, StoredReviewComment};
-use git::{DiffReviewDragState, DiffReviewOverlay, InlineBlamePopover};
-pub(crate) use git::{DisplayDiffHunk, PhantomDiffReviewIndicator};
 pub use hover_popover::hover_markdown_style;
 pub use inlays::Inlay;
 pub use inline_input::InlineInputState;
@@ -155,9 +154,9 @@ use gpui::{
     EventEmitter, FocusHandle, FocusOutEvent, Focusable, FontId, FontStyle, FontWeight, Global,
     HighlightStyle, Hsla, IsZero, KeyContext, Modifiers, MouseButton, MouseDownEvent,
     MouseMoveEvent, PaintQuad, ParentElement, Pixels, PressureStage, Render, ScrollHandle,
-    SharedString, SharedUri, Size, Styled, Subscription, Task, TextRun, TextStyle,
-    TextStyleRefinement, UTF16Selection, UnderlineStyle, UniformListScrollHandle, WeakEntity,
-    WeakFocusHandle, Window, div, point, prelude::*, px, relative, size,
+    SharedString, Size, Styled, Subscription, Task, TextRun, TextStyle, TextStyleRefinement,
+    UTF16Selection, UnderlineStyle, UniformListScrollHandle, WeakEntity, WeakFocusHandle, Window,
+    div, point, prelude::*, px, relative, size,
 };
 use hover_links::{HoverLink, HoveredLinkState, find_file};
 use hover_popover::{HoverState, hide_hover};
@@ -173,7 +172,7 @@ use language::{
     WordsQuery,
     language_settings::{
         self, AllLanguageSettings, LanguageSettings, LspInsertMode, RewrapBehavior, SoftWrapIndent,
-        WordsCompletionMode, all_language_settings,
+        WordsCompletionMode,
     },
     point_to_lsp, text_diff_with_options,
 };
@@ -246,7 +245,7 @@ use theme::{
 };
 use theme_settings::{ThemeSettings, observe_buffer_font_size_adjustment};
 use ui::{
-    Avatar, ContextMenu, Disclosure, IconButtonShape, Indicator, KeyBinding, Tooltip, prelude::*,
+    ContextMenu, Disclosure, IconButtonShape, Indicator, KeyBinding, Tooltip, prelude::*,
     scrollbars::ScrollbarAutoHide, tooltip_container, utils::WithRemSize,
 };
 use ui_input::ErasedEditor;
@@ -1010,7 +1009,6 @@ pub struct Editor {
     show_runnables: Option<bool>,
     show_bookmarks: Option<bool>,
     show_breakpoints: Option<bool>,
-    show_diff_review_button: bool,
     show_wrap_guides: Option<bool>,
     show_indent_guides: Option<bool>,
     buffers_with_disabled_indent_guides: HashSet<BufferId>,
@@ -1125,17 +1123,6 @@ pub struct Editor {
     bookmarks_tab_subscription: Option<Subscription>,
     breakpoint_store: Option<Entity<BreakpointStore>>,
     gutter_hover_button: (Option<GutterHoverButton>, Option<Task<()>>),
-    pub(crate) gutter_diff_review_indicator: (Option<PhantomDiffReviewIndicator>, Option<Task<()>>),
-    pub(crate) diff_review_drag_state: Option<DiffReviewDragState>,
-    /// Active diff review overlays. Multiple overlays can be open simultaneously
-    /// when hunks have comments stored.
-    pub(crate) diff_review_overlays: Vec<DiffReviewOverlay>,
-    /// Stored review comments grouped by hunk.
-    /// Uses a Vec instead of HashMap because DiffHunkKey contains an Anchor
-    /// which doesn't implement Hash/Eq in a way suitable for HashMap keys.
-    stored_review_comments: Vec<(DiffHunkKey, Vec<StoredReviewComment>)>,
-    /// Counter for generating unique comment IDs.
-    next_review_comment_id: usize,
     hovered_diff_hunk_row: Option<DisplayRow>,
     pull_diagnostics_task: Task<()>,
     in_project_search: bool,
@@ -2387,7 +2374,6 @@ impl Editor {
             show_runnables: None,
             show_bookmarks: None,
             show_breakpoints: None,
-            show_diff_review_button: false,
             show_wrap_guides: None,
             show_indent_guides,
             buffers_with_disabled_indent_guides: HashSet::default(),
@@ -2488,11 +2474,6 @@ impl Editor {
             bookmarks_tab_subscription: None,
             breakpoint_store,
             gutter_hover_button: (None, None),
-            gutter_diff_review_indicator: (None, None),
-            diff_review_drag_state: None,
-            diff_review_overlays: Vec::new(),
-            stored_review_comments: Vec::new(),
-            next_review_comment_id: 0,
             hovered_diff_hunk_row: None,
             _subscriptions: (!is_minimap)
                 .then(|| {
@@ -3516,14 +3497,6 @@ impl Editor {
         dismissed |= self.hide_context_menu(window, cx).is_some();
         dismissed |= self.mouse_context_menu.take().is_some();
         dismissed |= self.snippet_stack.pop().is_some();
-        if self.diff_review_drag_state.is_some() {
-            self.cancel_diff_review_drag(cx);
-            dismissed = true;
-        }
-        if !self.diff_review_overlays.is_empty() {
-            self.dismiss_all_diff_review_overlays(cx);
-            dismissed = true;
-        }
 
         if self.mode.is_full() && self.has_active_diagnostic_group() {
             self.dismiss_diagnostics(cx);
@@ -9969,8 +9942,6 @@ impl Editor {
                 self.refresh_matching_bracket_highlights(&snapshot, cx);
                 self.refresh_outline_symbols_at_cursor(cx);
                 self.refresh_sticky_headers(&snapshot, cx);
-                // Clean up orphaned review comments after edits
-                self.cleanup_orphaned_review_comments(cx);
 
                 if let Some(buffer) = edited_buffer {
                     if buffer.read(cx).file().is_none() {
@@ -10678,15 +10649,6 @@ impl Editor {
             .and_then(|e| e.to_str())
             .map(|a| a.to_string()));
 
-        let edit_predictions_provider = all_language_settings(file, cx).edit_predictions.provider;
-        let copilot_enabled = edit_predictions_provider
-            == language::language_settings::EditPredictionProvider::Copilot;
-        let copilot_enabled_for_language = self
-            .buffer
-            .read(cx)
-            .language_settings(cx)
-            .show_edit_predictions;
-
         let project = project.read(cx);
         let event_type = reported_event.event_type();
 
@@ -10695,18 +10657,12 @@ impl Editor {
                 event_type,
                 type = if auto_saved {"autosave"} else {"manual"},
                 file_extension,
-                copilot_enabled,
-                copilot_enabled_for_language,
-                edit_predictions_provider,
                 is_via_ssh = project.is_via_remote_server(),
             );
         } else {
             telemetry::event!(
                 event_type,
                 file_extension,
-                copilot_enabled,
-                copilot_enabled_for_language,
-                edit_predictions_provider,
                 is_via_ssh = project.is_via_remote_server(),
             );
         };
@@ -12442,11 +12398,6 @@ impl Deref for EditorSnapshot {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EditorEvent {
-    /// Emitted when the stored review comments change (added, removed, or updated).
-    ReviewCommentsChanged {
-        /// The new total count of review comments.
-        total_count: usize,
-    },
     InputIgnored {
         text: Arc<str>,
     },

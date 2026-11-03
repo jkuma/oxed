@@ -2733,7 +2733,6 @@ dependencies = [
  "dap",
  "db",
  "emojis",
- "feature_flags",
  "file_icons",
  "fs",
  "futures",
@@ -5555,7 +5554,6 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "shellexpand",
  "smallvec",
  "streaming-iterator",
  "strsim",
@@ -5565,7 +5563,6 @@ dependencies = [
  "theme",
  "theme_settings",
  "toml 0.9.8",
- "tracing",
  "tree-sitter",
  "tree-sitter-c",
  "tree-sitter-elixir",
@@ -5637,27 +5634,6 @@ dependencies = [
  "tracing",
  "util",
  "ztracing",
-]
-
-[[package]]
-name = "language_model_core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-lock",
- "cloud_llm_client",
- "collections",
- "futures",
- "gpui_shared_string",
- "http",
- "log",
- "partial-json-fixer",
- "pretty_assertions",
- "schemars",
- "serde",
- "serde_json",
- "strum",
- "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -7620,12 +7596,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "partial-json-fixer"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35ffd90b3f3b6477db7478016b9efb1b7e9d38eafd095f0542fe0ec2ea884a13"
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8361,7 +8331,6 @@ name = "platform_title_bar"
 version = "0.1.0"
 dependencies = [
  "gpui",
- "project",
  "settings",
  "smallvec",
  "theme",
@@ -10360,7 +10329,6 @@ dependencies = [
  "collections",
  "derive_more",
  "gpui",
- "language_model_core",
  "log",
  "schemars",
  "serde",
@@ -11687,12 +11655,10 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 name = "title_bar"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arrayvec",
  "client",
  "git_ui_core",
  "gpui",
- "icons",
  "platform_title_bar",
  "project",
  "recent_projects",

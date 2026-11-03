@@ -67,7 +67,6 @@ members = [
     "crates/language_core",
     "crates/language_detection",
     "crates/language_extension",
-    "crates/language_model_core",
     "crates/language_onboarding",
     "crates/language_selector",
     "crates/language_tools",
@@ -250,7 +249,6 @@ language = { path = "crates/language" }
 language_core = { path = "crates/language_core" }
 language_detection = { path = "crates/language_detection" }
 language_extension = { path = "crates/language_extension" }
-language_model_core = { path = "crates/language_model_core" }
 language_onboarding = { path = "crates/language_onboarding" }
 language_selector = { path = "crates/language_selector" }
 language_tools = { path = "crates/language_tools" }

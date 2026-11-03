@@ -114,7 +114,7 @@ use rpc::{
 };
 use search::{SearchInputKind, SearchQuery, SearchResult};
 use search_history::SearchHistory;
-use settings::{InvalidSettingsError, RegisterSetting, Settings, SettingsLocation, SettingsStore};
+use settings::{InvalidSettingsError, Settings, SettingsLocation, SettingsStore};
 use snippet::Snippet;
 pub use snippet_provider;
 use snippet_provider::SnippetProvider;
@@ -1202,40 +1202,6 @@ pub enum PulledDiagnostics {
         result_id: Option<SharedString>,
         diagnostics: Vec<lsp::Diagnostic>,
     },
-}
-
-/// Whether to disable all AI features in Zed.
-///
-/// Default: false
-#[derive(Copy, Clone, Debug, RegisterSetting)]
-pub struct DisableAiSettings {
-    pub disable_ai: bool,
-}
-
-impl settings::Settings for DisableAiSettings {
-    fn from_settings(content: &settings::SettingsContent) -> Self {
-        Self {
-            disable_ai: content.project.disable_ai.unwrap().0,
-        }
-    }
-}
-
-impl DisableAiSettings {
-    /// Returns whether AI is disabled for the given file.
-    ///
-    /// This checks the project-level settings for the file's worktree,
-    /// allowing `disable_ai` to be configured per-project in `.oxed/settings.json`.
-    pub fn is_ai_disabled_for_buffer(buffer: Option<&Entity<Buffer>>, cx: &App) -> bool {
-        Self::is_ai_disabled_for_file(buffer.and_then(|buffer| buffer.read(cx).file()), cx)
-    }
-
-    pub fn is_ai_disabled_for_file(file: Option<&Arc<dyn language::File>>, cx: &App) -> bool {
-        let location = file.map(|f| settings::SettingsLocation {
-            worktree_id: f.worktree_id(cx),
-            path: f.path().as_ref(),
-        });
-        Self::get(location, cx).disable_ai
-    }
 }
 
 impl Project {

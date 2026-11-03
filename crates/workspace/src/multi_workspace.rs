@@ -9,13 +9,19 @@ use gpui::{
 use project::Project;
 pub use project::ProjectGroupKey;
 use remote::RemoteConnectionOptions;
-pub use settings::SidebarSide;
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use ui::prelude::*;
 use util::ResultExt;
 use util::path_list::PathList;
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum SidebarSide {
+    #[default]
+    Left,
+    Right,
+}
 
 const SIDEBAR_RESIZE_HANDLE_SIZE: Pixels = px(6.0);
 

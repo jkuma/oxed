@@ -323,11 +323,6 @@ impl ProjectDiff {
         self.diff.read(cx).calculate_changed_lines(cx)
     }
 
-    /// Returns the total count of review comments across all hunks/files.
-    pub fn total_review_comment_count(&self, cx: &App) -> usize {
-        self.diff.read(cx).total_review_comment_count()
-    }
-
     /// Returns the splittable editor of the currently-shown diff view.
     pub fn editor(&self, cx: &App) -> Entity<SplittableEditor> {
         self.diff.read(cx).editor().clone()

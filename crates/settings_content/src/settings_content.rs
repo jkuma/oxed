@@ -1,10 +1,8 @@
 mod action;
-mod agent;
 mod editor;
 mod extension;
 mod fallible_options;
 mod language;
-mod language_model;
 pub mod merge_from;
 mod project;
 mod serde_helper;
@@ -14,13 +12,11 @@ mod title_bar;
 mod workspace;
 
 pub use action::{ActionName, ActionWithArguments, CommandAliasTarget};
-pub use agent::*;
 use anyhow::Context;
 pub use editor::*;
 pub use extension::*;
 pub use fallible_options::*;
 pub use language::*;
-pub use language_model::*;
 pub use merge_from::MergeFrom as MergeFromTrait;
 pub use project::*;
 use serde::de::DeserializeOwned;
@@ -206,9 +202,6 @@ pub struct SettingsContent {
 
     pub preview_tabs: Option<PreviewTabsSettingsContent>,
 
-    pub agent: Option<AgentSettingsContent>,
-    pub agent_servers: Option<AllAgentServersSettings>,
-
     /// Configuration of audio in Zed.
     pub audio: Option<AudioSettingsContent>,
 
@@ -257,10 +250,6 @@ pub struct SettingsContent {
     pub log: Option<HashMap<String, String>>,
 
     pub line_indicator_format: Option<LineIndicatorFormat>,
-
-    pub language_models: Option<AllLanguageModelSettingsContent>,
-
-    pub copilot: Option<CopilotSettingsContent>,
 
     pub outline_panel: Option<OutlinePanelSettingsContent>,
 
@@ -386,11 +375,11 @@ impl SettingsContent {
 fallible_options::flattened_deserialize!(SettingsContent {
     sections: { project, theme, extension, workspace, editor, remote },
     options: {
-        call_hierarchy, command_palette, file_finder, git_panel, tabs, tab_bar, tab_switcher, status_bar, preview_tabs, agent,
-        agent_servers, audio, base_keymap, collaboration_panel, debugger, diagnostics,
+        call_hierarchy, command_palette, file_finder, git_panel, tabs, tab_bar, tab_switcher, status_bar, preview_tabs,
+        audio, base_keymap, collaboration_panel, debugger, diagnostics,
         git,
         global_lsp_settings, image_viewer, markdown_preview, repl, hide_mouse,
-        journal, log, line_indicator_format, language_models, copilot, outline_panel, project_panel,
+        journal, log, line_indicator_format, outline_panel, project_panel,
         node, proxy, reduce_motion, server_url, credentials_url, session, telemetry, terminal,
         title_bar, calls, which_key, modeline_lines, feature_flags,
         instrumentation,
@@ -1486,31 +1475,6 @@ impl<T: std::hash::Hash + Eq> From<Vec<T>> for ExtendingSet<T> {
 impl<T: Clone + std::hash::Hash + Eq> merge_from::MergeFrom for ExtendingSet<T> {
     fn merge_from(&mut self, other: &Self) {
         self.0.extend(other.0.iter().cloned());
-    }
-}
-
-// A SaturatingBool in the settings can only ever be set to true,
-// later attempts to set it to false will be ignored.
-//
-// Used by `disable_ai`.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct SaturatingBool(pub bool);
-
-impl From<bool> for SaturatingBool {
-    fn from(value: bool) -> Self {
-        SaturatingBool(value)
-    }
-}
-
-impl From<SaturatingBool> for bool {
-    fn from(value: SaturatingBool) -> bool {
-        value.0
-    }
-}
-
-impl merge_from::MergeFrom for SaturatingBool {
-    fn merge_from(&mut self, other: &Self) {
-        self.0 |= other.0
     }
 }
 

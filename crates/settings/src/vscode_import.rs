@@ -4,11 +4,10 @@ use collections::HashMap;
 use fs::Fs;
 use gpui::Rgba;
 use paths::{cursor_settings_file_paths, vscode_settings_file_paths};
-use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::{
     num::{NonZeroU32, NonZeroUsize},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 
@@ -181,8 +180,6 @@ impl VsCodeSettings {
 
     pub fn settings_content(&self) -> SettingsContent {
         SettingsContent {
-            agent: self.agent_settings_content(),
-            agent_servers: None,
             audio: None,
             base_keymap: Some(BaseKeymapContent::VSCode),
             calls: None,
@@ -192,7 +189,6 @@ impl VsCodeSettings {
                 .map(|history| CommandPaletteSettingsContent {
                     use_command_history: Some(history > 0),
                 }),
-            copilot: None,
             credentials_url: None,
             debugger: None,
             diagnostics: None,
@@ -210,7 +206,6 @@ impl VsCodeSettings {
             image_viewer: None,
             markdown_preview: None,
             journal: None,
-            language_models: None,
             line_indicator_format: None,
             log: None,
             node: self.node_binary_settings(),
@@ -243,15 +238,6 @@ impl VsCodeSettings {
             feature_flags: None,
             instrumentation: None,
         }
-    }
-
-    fn agent_settings_content(&self) -> Option<AgentSettingsContent> {
-        let enabled = self.read_bool("chat.agent.enabled");
-        skip_default(AgentSettingsContent {
-            enabled: enabled,
-            button: enabled,
-            ..Default::default()
-        })
     }
 
     fn editor_settings_content(&self) -> EditorSettingsContent {
@@ -530,7 +516,6 @@ impl VsCodeSettings {
     fn project_settings_content(&self) -> ProjectSettingsContent {
         ProjectSettingsContent {
             all_languages: AllLanguageSettingsContent {
-                edit_predictions: self.edit_predictions_settings_content(),
                 defaults: self.default_language_settings_content(),
                 languages: Default::default(),
                 file_types: self.file_types(),
@@ -539,11 +524,8 @@ impl VsCodeSettings {
             lsp: Default::default(),
             terminal: None,
             dap: Default::default(),
-            context_servers: self.context_servers(),
-            context_server_timeout: None,
             load_direnv: None,
             git_hosting_providers: None,
-            disable_ai: None,
         }
     }
 
@@ -572,7 +554,6 @@ impl VsCodeSettings {
                 ..Default::default()
             }),
             debuggers: None,
-            edit_predictions_disabled_in: None,
             enable_language_server: None,
             ensure_final_newline_on_save: self.read_bool("files.insertFinalNewline"),
             line_ending: self.read_enum("files.eol", |s| match s {
@@ -624,7 +605,6 @@ impl VsCodeSettings {
             show_completion_documentation: None,
             colorize_brackets: self.read_bool("editor.bracketPairColorization.enabled"),
             show_completions_on_input: self.read_bool("editor.suggestOnTriggerCharacters"),
-            show_edit_predictions: self.read_bool("editor.inlineSuggest.enabled"),
             show_whitespaces: self.read_enum("editor.renderWhitespace", |s| {
                 Some(match s {
                     "boundary" => ShowWhitespaceSetting::Boundary,
@@ -681,26 +661,6 @@ impl VsCodeSettings {
         skip_default(FileTypeMap(associations))
     }
 
-    fn edit_predictions_settings_content(&self) -> Option<EditPredictionSettingsContent> {
-        let mut disabled_globs = self
-            .read_value("cursor.general.globalCursorIgnoreList")?
-            .as_array()?
-            .iter()
-            .filter_map(Value::as_str)
-            .filter(|glob| !glob.is_empty() && *glob != SplicingVec::REST)
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        if disabled_globs.is_empty() {
-            return None;
-        }
-        disabled_globs.push(SplicingVec::REST.to_owned());
-
-        Some(EditPredictionSettingsContent {
-            disabled_globs: Some(SplicingVec::from(disabled_globs)),
-            ..EditPredictionSettingsContent::default()
-        })
-    }
-
     fn outline_panel_settings_content(&self) -> Option<OutlinePanelSettingsContent> {
         skip_default(OutlinePanelSettingsContent {
             file_icons: self.read_bool("outline.icons"),
@@ -737,38 +697,6 @@ impl VsCodeSettings {
             }),
             ..Default::default()
         })
-    }
-
-    fn context_servers(&self) -> HashMap<Arc<str>, ContextServerSettingsContent> {
-        #[derive(Deserialize)]
-        struct VsCodeContextServerCommand {
-            command: PathBuf,
-            args: Option<Vec<String>>,
-            env: Option<HashMap<String, String>>,
-            // note: we don't support envFile and type
-        }
-        let Some(mcp) = self.read_value("mcp").and_then(|v| v.as_object()) else {
-            return Default::default();
-        };
-        mcp.iter()
-            .filter_map(|(k, v)| {
-                Some((
-                    k.clone().into(),
-                    ContextServerSettingsContent::Stdio {
-                        enabled: true,
-                        remote: false,
-                        command: serde_json::from_value::<VsCodeContextServerCommand>(v.clone())
-                            .ok()
-                            .map(|cmd| ContextServerCommand {
-                                path: cmd.command,
-                                args: cmd.args.unwrap_or_default(),
-                                env: cmd.env,
-                                timeout: None,
-                            })?,
-                    },
-                ))
-            })
-            .collect()
     }
 
     fn item_settings_content(&self) -> Option<ItemSettingsContent> {
@@ -1029,10 +957,6 @@ impl VsCodeSettings {
             buffer_font_weight: self.read_f32("editor.fontWeight").map(FontWeightContent),
             buffer_line_height: None,
             buffer_font_features: None,
-            agent_ui_font_family: None,
-            agent_ui_font_size: None,
-            agent_buffer_font_family: None,
-            agent_buffer_font_size: None,
             git_commit_buffer_font_size: None,
             mermaid_font_family: None,
             theme: None,
@@ -1243,88 +1167,6 @@ mod tests {
             .unwrap()
             .settings_content()
             .reduce_motion
-    }
-
-    #[test]
-    fn test_import_disabled_globs_extends_inherited_patterns() -> Result<()> {
-        for (ignore_list, expected_imported, expected_merged) in [
-            (
-                serde_json::json!(["**/build/**", "**/cache/**"]),
-                serde_json::json!(["**/build/**", "**/cache/**", "..."]),
-                serde_json::json!(["**/build/**", "**/cache/**", "**/inherited/**"]),
-            ),
-            (
-                serde_json::json!(["**/build/**", "", false, null, 1, {}, []]),
-                serde_json::json!(["**/build/**", "..."]),
-                serde_json::json!(["**/build/**", "**/inherited/**"]),
-            ),
-            (
-                serde_json::json!(["...", "**/build/**", false]),
-                serde_json::json!(["**/build/**", "..."]),
-                serde_json::json!(["**/build/**", "**/inherited/**"]),
-            ),
-            (
-                serde_json::json!(["**/inherited/**", "**/build/**"]),
-                serde_json::json!(["**/inherited/**", "**/build/**", "..."]),
-                serde_json::json!(["**/inherited/**", "**/build/**"]),
-            ),
-        ] {
-            let content = serde_json::json!({
-                "cursor.general.globalCursorIgnoreList": ignore_list,
-            });
-            let imported =
-                VsCodeSettings::from_str(&content.to_string(), VsCodeSettingsSource::Cursor)?
-                    .settings_content();
-            let imported = imported
-                .project
-                .all_languages
-                .edit_predictions
-                .context("imported edit prediction settings")?;
-            assert_eq!(
-                serde_json::to_value(&imported.disabled_globs)?,
-                expected_imported
-            );
-
-            let mut inherited = EditPredictionSettingsContent {
-                disabled_globs: Some(SplicingVec::from(vec!["**/inherited/**".to_string()])),
-                ..Default::default()
-            };
-            inherited.merge_from(&imported);
-            assert_eq!(
-                serde_json::to_value(&inherited.disabled_globs)?,
-                expected_merged
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_import_disabled_globs_omits_empty_results() -> Result<()> {
-        let inherited = AllLanguageSettingsContent {
-            edit_predictions: Some(EditPredictionSettingsContent {
-                disabled_globs: Some(SplicingVec::from(vec!["**/inherited/**".to_string()])),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        for content in [
-            r#"{"cursor.general.globalCursorIgnoreList": "**/build/**"}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": ["..."]}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": [""]}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": ["...", "", false, null]}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": []}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": [false, null, 1, {}, []]}"#,
-            r#"{"cursor.general.globalCursorIgnoreList": null}"#,
-            r#"{}"#,
-        ] {
-            let imported =
-                VsCodeSettings::from_str(content, VsCodeSettingsSource::Cursor)?.settings_content();
-            assert_eq!(imported.project.all_languages.edit_predictions, None);
-            let mut unchanged = inherited.clone();
-            unchanged.merge_from(&imported.project.all_languages);
-            assert_eq!(unchanged.edit_predictions, inherited.edit_predictions);
-        }
-        Ok(())
     }
 
     #[test]

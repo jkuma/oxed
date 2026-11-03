@@ -4,9 +4,8 @@ use super::*;
 use client::proto;
 use fs::{FakeFs, Fs};
 use gpui::{TestAppContext, VisualTestContext};
-use project::DisableAiSettings;
 use serde_json::json;
-use settings::{Settings, SettingsStore};
+use settings::SettingsStore;
 use util::path;
 
 fn init_test(cx: &mut TestAppContext) {
@@ -14,7 +13,6 @@ fn init_test(cx: &mut TestAppContext) {
         let settings_store = SettingsStore::test(cx);
         cx.set_global(settings_store);
         theme_settings::init(theme::LoadThemes::JustBase, cx);
-        DisableAiSettings::register(cx);
     });
 }
 

@@ -43,7 +43,7 @@ use onboarding::multibuffer_hint::MultibufferHint;
 pub use open_listener::*;
 use outline_panel::OutlinePanel;
 use paths::local_settings_file_relative_path;
-use project::{DirectoryLister, DisableAiSettings};
+use project::DirectoryLister;
 use project_panel::ProjectPanel;
 use quick_action_bar::QuickActionBar;
 use recent_projects::open_remote_project;
@@ -1021,14 +1021,10 @@ fn register_actions(
                     update_settings_file(fs.clone(), cx, move |settings, _| {
                         settings.theme.ui_font_size = None;
                         settings.theme.buffer_font_size = None;
-                        settings.theme.agent_ui_font_size = None;
-                        settings.theme.agent_buffer_font_size = None;
                     });
                 } else {
                     theme_settings::reset_ui_font_size(cx);
                     theme_settings::reset_buffer_font_size(cx);
-                    theme_settings::reset_agent_ui_font_size(cx);
-                    theme_settings::reset_agent_buffer_font_size(cx);
                 }
             }
         })
@@ -1771,20 +1767,11 @@ pub fn handle_keymap_file_changes(
     let (base_keymap_tx, mut base_keymap_rx) = mpsc::unbounded();
     let (keyboard_layout_tx, mut keyboard_layout_rx) = mpsc::unbounded();
     let mut old_base_keymap = *BaseKeymap::get_global(cx);
-    let mut old_disable_ai = DisableAiSettings::get_global(cx).disable_ai;
 
     cx.observe_global::<SettingsStore>(move |cx| {
         let new_base_keymap = *BaseKeymap::get_global(cx);
-        let new_disable_ai = DisableAiSettings::get_global(cx).disable_ai;
-
-        if new_disable_ai != old_disable_ai {
-            reload_menus(cx);
-        }
-
-        if new_base_keymap != old_base_keymap || new_disable_ai != old_disable_ai {
+        if new_base_keymap != old_base_keymap {
             old_base_keymap = new_base_keymap;
-            old_disable_ai = new_disable_ai;
-
             base_keymap_tx.unbounded_send(()).unwrap();
         }
     })
@@ -1957,7 +1944,7 @@ fn reload_keymaps(cx: &mut App, mut user_key_bindings: Vec<KeyBinding>) {
     for key_binding in &mut user_key_bindings {
         key_binding.set_meta(KeybindSource::User.meta());
     }
-    cx.bind_keys(filter_disabled_ai_bindings(user_key_bindings, cx));
+    cx.bind_keys(user_key_bindings);
     reload_menus(cx);
     // On Windows, this is set in the `update_jump_list` method of the `HistoryManager`.
     #[cfg(not(target_os = "windows"))]
@@ -1975,16 +1962,12 @@ pub fn load_default_keymap(cx: &mut App) {
         return;
     }
 
-    cx.bind_keys(filter_disabled_ai_bindings(
+    cx.bind_keys(
         KeymapFile::load_asset(DEFAULT_KEYMAP_PATH, Some(KeybindSource::Default), cx).unwrap(),
-        cx,
-    ));
+    );
 
     if let Some(asset_path) = base_keymap.asset_path() {
-        cx.bind_keys(filter_disabled_ai_bindings(
-            KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap(),
-            cx,
-        ));
+        cx.bind_keys(KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap());
     }
 
     cx.bind_keys(
@@ -1995,37 +1978,6 @@ pub fn load_default_keymap(cx: &mut App) {
         )
         .unwrap(),
     );
-}
-
-/// Namespaces of actions that are part of an AI feature. When the user opts out
-/// of AI via the `disable_ai` setting, bindings to these actions are dropped so
-/// that lower-precedence editor defaults (e.g. `editor::NewlineBelow` for
-/// `ctrl-enter`) can fire instead of being shadowed by an action whose handler
-/// silently no-ops.
-const AI_ACTION_NAMESPACES: &[&str] = &[
-    "acp::",
-    "agent::",
-    "assistant::",
-    "edit_prediction::",
-    "inline_assistant::",
-    "zeta::",
-];
-
-fn is_ai_keybinding(binding: &KeyBinding) -> bool {
-    let name = binding.action().name();
-    AI_ACTION_NAMESPACES
-        .iter()
-        .any(|namespace| name.starts_with(namespace))
-}
-
-fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if !DisableAiSettings::get_global(cx).disable_ai {
-        return bindings;
-    }
-    bindings
-        .into_iter()
-        .filter(|binding| !is_ai_keybinding(binding))
-        .collect()
 }
 
 /// Populates a freshly opened window according to the `on_new_window` setting.
@@ -2423,7 +2375,7 @@ mod tests {
     use project::{Project, ProjectPath};
     use semver::Version;
     use serde_json::json;
-    use settings::{SaturatingBool, SettingsStore, SplicingVec, watch_config_file};
+    use settings::{SettingsStore, SplicingVec, watch_config_file};
     use std::{
         path::{Path, PathBuf},
         sync::Arc,
@@ -5510,28 +5462,6 @@ mod tests {
             new_content_str.contains("UNIQUEVALUE"),
             "BUG FOUND: Project settings were overwritten when opening via command - original custom content was lost"
         );
-    }
-
-    #[gpui::test]
-    async fn test_disable_ai_crash(cx: &mut gpui::TestAppContext) {
-        let app_state = init_test(cx);
-        cx.update(init);
-        let project = Project::test(app_state.fs.clone(), [], cx).await;
-        let _window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
-
-        cx.run_until_parked();
-
-        cx.update(|cx| {
-            SettingsStore::update_global(cx, |settings_store, cx| {
-                settings_store.update_user_settings(cx, |settings| {
-                    settings.project.disable_ai = Some(SaturatingBool(true));
-                });
-            });
-        });
-
-        cx.run_until_parked();
-
-        // If this panics, the test has failed
     }
 
     #[gpui::test]
