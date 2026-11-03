@@ -4,7 +4,6 @@ members = [
     "crates/activity_indicator",
     "crates/askpass",
     "crates/assets",
-    "crates/auto_update",
     "crates/bench_metrics",
     "crates/breadcrumbs",
     "crates/buffer_diff",
@@ -25,7 +24,6 @@ members = [
     "crates/db",
     "crates/dev_container",
     "crates/diagnostics",
-    "crates/edit_prediction_types",
     "crates/editor",
     "crates/encoding_selector",
     "crates/env_var",
@@ -190,7 +188,6 @@ activity_indicator = { path = "crates/activity_indicator" }
 askpass = { path = "crates/askpass" }
 assets = { path = "crates/assets" }
 bench_metrics = { path = "crates/bench_metrics" }
-auto_update = { path = "crates/auto_update" }
 breadcrumbs = { path = "crates/breadcrumbs" }
 buffer_diff = { path = "crates/buffer_diff" }
 call_hierarchy = { path = "crates/call_hierarchy" }
@@ -211,7 +208,6 @@ db = { path = "crates/db" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
 dev_container = { path = "crates/dev_container" }
 diagnostics = { path = "crates/diagnostics" }
-edit_prediction_types = { path = "crates/edit_prediction_types" }
 editor = { path = "crates/editor" }
 encoding_selector = { path = "crates/encoding_selector" }
 env_var = { path = "crates/env_var" }

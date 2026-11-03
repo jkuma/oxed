@@ -59,7 +59,6 @@ name = "activity_indicator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "auto_update",
  "editor",
  "extension_host",
  "fs",
@@ -744,35 +743,6 @@ dependencies = [
  "serde",
  "serde_json",
  "topological-sort",
-]
-
-[[package]]
-name = "auto_update"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "client",
- "clock",
- "ctor",
- "db",
- "futures",
- "futures-lite",
- "gpui",
- "http_client",
- "log",
- "parking_lot",
- "paths",
- "release_channel",
- "semver",
- "serde",
- "serde_json",
- "settings",
- "smol",
- "tempfile",
- "util",
- "which",
- "workspace",
- "zlog",
 ]
 
 [[package]]
@@ -2746,17 +2716,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b31a881d38439026e3d5dd938ab20328d36e23caca8fd5981c42e4b677f5842"
 
 [[package]]
-name = "edit_prediction_types"
-version = "0.1.0"
-dependencies = [
- "client",
- "gpui",
- "icons",
- "language",
- "text",
-]
-
-[[package]]
 name = "editor"
 version = "0.1.0"
 dependencies = [
@@ -2773,7 +2732,6 @@ dependencies = [
  "ctor",
  "dap",
  "db",
- "edit_prediction_types",
  "emojis",
  "feature_flags",
  "file_icons",
@@ -9579,7 +9537,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "askpass",
- "auto_update",
  "editor",
  "futures",
  "gpui",
@@ -11333,7 +11290,6 @@ dependencies = [
  "sha2",
  "shellexpand",
  "util",
- "zed_actions",
 ]
 
 [[package]]

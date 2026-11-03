@@ -24,7 +24,6 @@
     "bindings": {
       // In VS Code `ctrl-k z` is Zen Mode; the word wrap toggle moves to `alt-z`.
       "ctrl-k z": "workspace::ToggleCenteredLayout",
-      "ctrl-i": "assistant::InlineAssist", // Inline Chat
       "shift-alt-h": "call_hierarchy::ShowIncomingCalls",
     },
   },
@@ -33,43 +32,6 @@
     "use_key_equivalents": true,
     "bindings": {
       "ctrl-enter": "editor::NewlineBelow", // Insert Line Below (Inline Chat lives on `ctrl-i`)
-    },
-  },
-  {
-    "context": "Terminal",
-    "use_key_equivalents": true,
-    "bindings": {
-      "ctrl-enter": null,
-    },
-  },
-  {
-    "context": "Workspace",
-    "use_key_equivalents": true,
-    "bindings": {
-      "f5": "debugger::Start", // Start Debugging
-      "ctrl-alt-i": "agent::ToggleFocus", // Open Chat
-    },
-  },
-  {
-    "context": "Workspace && debugger_running",
-    "use_key_equivalents": true,
-    "bindings": {
-      "f5": null,
-    },
-  },
-  {
-    "context": "Workspace && debugger_stopped",
-    "use_key_equivalents": true,
-    "bindings": {
-      "f5": "debugger::Continue",
-    },
-  },
-  {
-    "context": "Workspace && debugger_session",
-    "use_key_equivalents": true,
-    "bindings": {
-      "f10": "debugger::StepOver",
-      "f11": "debugger::StepInto",
     },
   },
   {

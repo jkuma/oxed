@@ -11,6 +11,7 @@ mod vscode_format;
 use anyhow::Context as _;
 use collections::{HashMap, HashSet, hash_map};
 use gpui::SharedString;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -30,7 +31,17 @@ pub use util::shell::{Shell, ShellKind};
 pub use util::shell_builder::ShellBuilder;
 pub use vscode_debug_format::VsCodeDebugTaskFile;
 pub use vscode_format::VsCodeTaskFile;
-pub use zed_actions::RevealTarget;
+
+/// Where to spawn the task in the UI.
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RevealTarget {
+    /// In the central pane group, "main" editor area.
+    Center,
+    /// In the terminal dock, "regular" terminal items' place.
+    #[default]
+    Dock,
+}
 
 /// Task identifier, unique within the application.
 /// Based on it, task reruns and terminal tabs are managed.

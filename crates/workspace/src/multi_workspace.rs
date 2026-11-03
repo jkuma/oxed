@@ -16,7 +16,6 @@ use std::rc::Rc;
 use ui::prelude::*;
 use util::ResultExt;
 use util::path_list::PathList;
-use zed_actions::agents_sidebar::ToggleThreadSwitcher;
 
 const SIDEBAR_RESIZE_HANDLE_SIZE: Pixels = px(6.0);
 
@@ -2044,13 +2043,6 @@ impl Render for MultiWorkspace {
                     .on_action(cx.listener(
                         |this: &mut Self, _: &FocusWorkspaceSidebar, window, cx| {
                             this.focus_sidebar(window, cx);
-                        },
-                    ))
-                    .on_action(cx.listener(
-                        |this: &mut Self, action: &ToggleThreadSwitcher, window, cx| {
-                            if let Some(sidebar) = &this.sidebar {
-                                sidebar.toggle_thread_switcher(action.select_last, window, cx);
-                            }
                         },
                     ))
                     .on_action(cx.listener(|this: &mut Self, _: &NextProject, window, cx| {

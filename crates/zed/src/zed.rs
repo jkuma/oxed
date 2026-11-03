@@ -9,7 +9,6 @@ pub use app_menus::*;
 use assets::Assets;
 
 use breadcrumbs::Breadcrumbs;
-use client::zed_urls;
 use collections::VecDeque;
 use command_palette_hooks::CommandPaletteFilter;
 use editor::{Editor, MultiBuffer};
@@ -43,14 +42,8 @@ use migrator::migrate_keymap;
 use onboarding::multibuffer_hint::MultibufferHint;
 pub use open_listener::*;
 use outline_panel::OutlinePanel;
-use paths::{
-    local_debug_file_relative_path, local_settings_file_relative_path,
-    local_tasks_file_relative_path,
-};
-use project::{
-    DirectoryLister, DisableAiSettings, ProjectItem,
-    project_settings::{SettingsObserver, SettingsObserverEvent},
-};
+use paths::local_settings_file_relative_path;
+use project::{DirectoryLister, DisableAiSettings};
 use project_panel::ProjectPanel;
 use quick_action_bar::QuickActionBar;
 use recent_projects::open_remote_project;
@@ -60,8 +53,7 @@ use search::project_search::ProjectSearchBar;
 use settings::{
     BaseKeymap, DEFAULT_KEYMAP_PATH, DefaultOpenBehavior, InvalidSettingsError, KeybindSource,
     KeymapFile, KeymapFileLoadResult, MigrationStatus, SPECIFIC_OVERRIDES_KEYMAP_PATH, Settings,
-    SettingsFile, SettingsStore, initial_local_debug_tasks_content,
-    initial_project_settings_content, initial_tasks_content, update_settings_file,
+    SettingsFile, SettingsStore, initial_project_settings_content, update_settings_file,
 };
 #[cfg(debug_assertions)]
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
@@ -89,14 +81,9 @@ use workspace::{
 };
 use workspace::{CloseProject, CloseWindow, with_active_or_new_workspace};
 use workspace::{Pane, notifications::DetachAndPromptErr};
-use zed_actions::{
-    About, GetMerch, OpenAccountSettings, OpenBrowser, OpenDocs, OpenProjectTasks,
-    OpenServerSettings, OpenSettingsFile, OpenStatusPage, OpenZedUrl, Quit,
-};
+use zed_actions::{About, OpenBrowser, OpenDocs, OpenSettingsFile, OpenZedUrl, Quit};
 
 const DOCS_URL: &str = "https://zed.dev/docs/";
-const STATUS_URL: &str = "https://status.zed.dev";
-const MERCH_URL: &str = "https://merch.zed.dev/";
 
 actions!(
     zed,
@@ -113,10 +100,6 @@ actions!(
         OpenDefaultSettings,
         /// Opens project-specific settings file.
         OpenProjectSettingsFile,
-        /// Opens the tasks panel.
-        OpenTasks,
-        /// Opens debug tasks configuration.
-        OpenDebugTasks,
         /// Shows the default semantic token rules (read-only).
         ShowDefaultSemanticTokenRules,
         /// Resets the application database.
@@ -240,31 +223,6 @@ pub fn init(cx: &mut App) {
             open_settings_file(
                 paths::settings_file(),
                 || settings::initial_user_settings_content().as_ref().into(),
-                window,
-                cx,
-            );
-        });
-    })
-    .on_action(|_: &OpenAccountSettings, cx| {
-        with_active_or_new_workspace(cx, |_, _, cx| {
-            cx.open_url(&zed_urls::account_url(cx));
-        });
-    })
-    .on_action(|_: &OpenTasks, cx| {
-        with_active_or_new_workspace(cx, |_, window, cx| {
-            open_settings_file(
-                paths::tasks_file(),
-                || settings::initial_tasks_content().as_ref().into(),
-                window,
-                cx,
-            );
-        });
-    })
-    .on_action(|_: &OpenDebugTasks, cx| {
-        with_active_or_new_workspace(cx, |_, window, cx| {
-            open_settings_file(
-                paths::debug_scenarios_file(),
-                || settings::initial_debug_tasks_content().as_ref().into(),
                 window,
                 cx,
             );
@@ -416,38 +374,10 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
 
     // AI, multi-workspace, remote development, terminal, tasks and debugger are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
-        for namespace in [
-            "agent",
-            "agents_sidebar",
-            "assistant",
-            "context_server",
-            "copilot",
-            "copilot_edit_predictions",
-            "debug_panel",
-            "debugger",
-            "edit_prediction",
-            "multi_workspace",
-            "skill_creator",
-            "task",
-            "terminal",
-            "terminal_panel",
-            "zed_predict_onboarding",
-        ] {
+        for namespace in ["debugger", "multi_workspace", "terminal"] {
             filter.hide_namespace(namespace);
         }
         filter.hide_action_types(&[
-            TypeId::of::<editor::actions::AcceptEditPrediction>(),
-            TypeId::of::<editor::actions::AcceptNextLineEditPrediction>(),
-            TypeId::of::<editor::actions::AcceptNextWordEditPrediction>(),
-            TypeId::of::<editor::actions::NextEditPrediction>(),
-            TypeId::of::<editor::actions::PreviousEditPrediction>(),
-            TypeId::of::<editor::actions::ShowEditPrediction>(),
-            TypeId::of::<editor::actions::ToggleEditPrediction>(),
-            TypeId::of::<git::GenerateCommitMessage>(),
-            TypeId::of::<zed_actions::OpenZedPredictOnboarding>(),
-            TypeId::of::<zed_actions::assistant::CreateSkillFromUrl>(),
-            TypeId::of::<zed_actions::assistant::ManageSkills>(),
-            TypeId::of::<zed_actions::assistant::OpenSkillCreator>(),
             TypeId::of::<zed_actions::OpenDevContainer>(),
             TypeId::of::<zed_actions::OpenRemote>(),
             TypeId::of::<editor::actions::DisableBreakpoint>(),
@@ -460,17 +390,12 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             TypeId::of::<workspace::OpenInTerminal>(),
             TypeId::of::<workspace::OpenTerminal>(),
             TypeId::of::<workspace::ShutdownDebugAdapters>(),
-            TypeId::of::<zed_actions::OpenProjectTasks>(),
-            TypeId::of::<zed_actions::OpenWorktreeSetupTasks>(),
-            TypeId::of::<OpenTasks>(),
-            TypeId::of::<OpenDebugTasks>(),
         ]);
     });
 
     init_cursor_hide_mode(cx);
     init_app_appearance(cx);
     init_reduce_motion(cx);
-    init_global_config_error_notifications(cx);
 
     cx.observe_new(|_multi_workspace: &mut MultiWorkspace, window, cx| {
         let Some(window) = window else {
@@ -757,12 +682,10 @@ fn register_actions(
     app_state: Arc<AppState>,
     workspace: &mut Workspace,
     _: &mut Window,
-    cx: &mut Context<Workspace>,
+    _: &mut Context<Workspace>,
 ) {
     workspace
         .register_action(|_, _: &OpenDocs, _, cx| cx.open_url(DOCS_URL))
-        .register_action(|_, _: &OpenStatusPage, _, cx| cx.open_url(STATUS_URL))
-        .register_action(|_, _: &GetMerch, _, cx| cx.open_url(MERCH_URL))
         .register_action(
             |workspace: &mut Workspace,
              _: &input_latency_ui::DumpInputLatencyHistogram,
@@ -1136,8 +1059,6 @@ fn register_actions(
             );
         })
         .register_action(open_project_settings_file)
-        .register_action(open_project_tasks_file)
-        .register_action(open_project_debug_tasks_file)
         .register_action(
             |workspace: &mut Workspace,
              _: &zed_actions::project_panel::ToggleFocus,
@@ -1202,38 +1123,6 @@ fn register_actions(
 
     #[cfg(not(target_os = "windows"))]
     workspace.register_action(install_cli);
-
-    if workspace.project().read(cx).is_via_remote_server() {
-        workspace.register_action({
-            move |workspace, _: &OpenServerSettings, window, cx| {
-                let open_server_settings = workspace
-                    .project()
-                    .update(cx, |project, cx| project.open_server_settings(cx));
-
-                cx.spawn_in(window, async move |workspace, cx| {
-                    let buffer = open_server_settings.await?;
-
-                    workspace
-                        .update_in(cx, |workspace, window, cx| {
-                            workspace.open_path(
-                                buffer
-                                    .read(cx)
-                                    .project_path(cx)
-                                    .expect("Settings file must have a location"),
-                                None,
-                                true,
-                                window,
-                                cx,
-                            )
-                        })?
-                        .await?;
-
-                    anyhow::Ok(())
-                })
-                .detach_and_log_err(cx);
-            }
-        });
-    }
 
     #[cfg(debug_assertions)]
     workspace.register_action(|workspace, _: &ShowWorkspaceError, _, cx| {
@@ -1798,46 +1687,6 @@ fn notify_settings_errors(result: settings::SettingsParseResult, is_user: bool, 
     };
 }
 
-fn init_global_config_error_notifications(cx: &mut App) {
-    cx.observe_new(|_: &mut SettingsObserver, _, cx| {
-        cx.subscribe_self::<SettingsObserverEvent>(|_, event, cx| {
-            let (result, file_kind, on_click): (_, _, fn(&mut Window, &mut App)) = match event {
-                SettingsObserverEvent::GlobalTasksUpdated(result) => {
-                    (result, "tasks", |window, cx| {
-                        window.dispatch_action(OpenTasks.boxed_clone(), cx)
-                    })
-                }
-                SettingsObserverEvent::GlobalDebugScenariosUpdated(result) => {
-                    (result, "debug scenarios", |window, cx| {
-                        window.dispatch_action(OpenDebugTasks.boxed_clone(), cx)
-                    })
-                }
-                _ => return,
-            };
-            let id = NotificationId::Named(format!("invalid-global-{file_kind}-file").into());
-            match result {
-                Ok(_) => dismiss_app_notification(&id, cx),
-                Err(error) => {
-                    let message = format!("Invalid global {file_kind} file\n{error}");
-                    show_app_notification(id, cx, move |cx| {
-                        cx.new(|cx| {
-                            MessageNotification::new(message.clone(), cx)
-                                .primary_message("Open File")
-                                .primary_icon(IconName::Settings)
-                                .primary_on_click(move |window, cx| {
-                                    on_click(window, cx);
-                                    cx.emit(DismissEvent);
-                                })
-                        })
-                    });
-                }
-            }
-        })
-        .detach();
-    })
-    .detach();
-}
-
 #[derive(Copy, Clone, Debug, settings::RegisterSetting)]
 struct CursorHideModeSetting(gpui::CursorHideMode);
 
@@ -2247,40 +2096,6 @@ fn open_project_settings_file(
         workspace,
         local_settings_file_relative_path(),
         initial_project_settings_content(),
-        window,
-        cx,
-    ) {
-        task.detach_and_log_err(cx);
-    }
-}
-
-fn open_project_tasks_file(
-    workspace: &mut Workspace,
-    _: &OpenProjectTasks,
-    window: &mut Window,
-    cx: &mut Context<Workspace>,
-) {
-    if let Some(task) = open_local_file(
-        workspace,
-        local_tasks_file_relative_path(),
-        initial_tasks_content(),
-        window,
-        cx,
-    ) {
-        task.detach_and_log_err(cx);
-    }
-}
-
-fn open_project_debug_tasks_file(
-    workspace: &mut Workspace,
-    _: &zed_actions::OpenProjectDebugTasks,
-    window: &mut Window,
-    cx: &mut Context<Workspace>,
-) {
-    if let Some(task) = open_local_file(
-        workspace,
-        local_debug_file_relative_path(),
-        initial_local_debug_tasks_content(),
         window,
         cx,
     ) {
@@ -5266,12 +5081,7 @@ mod tests {
             let expected_namespaces = vec![
                 "action",
                 "activity_indicator",
-                "agent",
-                "agents_sidebar",
                 "app_menu",
-                "assistant",
-                "assistant2",
-                "auto_update",
                 "branch_picker",
                 "branches",
                 "buffer_search",
@@ -5280,13 +5090,11 @@ mod tests {
                 "client",
                 "collab",
                 "command_palette",
-                "debug_panel",
                 "debugger",
                 "dev",
                 "diagnostics",
                 "editor",
                 "encoding_selector",
-                "feedback",
                 "file_finder",
                 "git",
                 "git_graph",
@@ -5307,7 +5115,6 @@ mod tests {
                 "markdown",
                 "menu",
                 "multi_workspace",
-                "notebook",
                 "onboarding",
                 "outline",
                 "outline_panel",
@@ -5318,7 +5125,6 @@ mod tests {
                 "project_symbols",
                 "projects",
                 "recent_projects",
-                "remote_debug",
                 "search",
                 "settings_editor",
                 "settings_profile_selector",
@@ -5328,21 +5134,18 @@ mod tests {
                 "syntax_tree_view",
                 "tab_switcher",
                 "tabular_data",
-                "task",
                 "terminal",
                 "text_finder",
                 "theme",
                 "theme_selector",
                 "toast",
                 "toolchain",
-                "vim",
                 "which_key",
                 "window",
                 "workspace",
                 "worktree_picker",
                 "zed",
                 "zed_actions",
-                "zed_predict_onboarding",
             ];
             assert_eq!(
                 all_namespaces,
@@ -5729,71 +5532,6 @@ mod tests {
         cx.run_until_parked();
 
         // If this panics, the test has failed
-    }
-
-    #[gpui::test]
-    async fn test_invalid_global_tasks_file_shows_notification_on_startup(
-        cx: &mut gpui::TestAppContext,
-    ) {
-        let app_state = init_test(cx);
-        let tasks_file_path = paths::tasks_file().as_path();
-        app_state
-            .fs
-            .create_dir(tasks_file_path.parent().unwrap())
-            .await
-            .unwrap();
-        app_state
-            .fs
-            .save(
-                tasks_file_path,
-                &r#"[{ "label": "first" }] [{ "label": "trailing garbage" }]"#.into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
-
-        let project = Project::test(app_state.fs.clone(), [], cx).await;
-        let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
-        cx.run_until_parked();
-
-        let workspace = window
-            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
-            .unwrap();
-        let notification_id = NotificationId::Named("invalid-global-tasks-file".into());
-        let shown_notifications = workspace.read_with(cx, |workspace, _| {
-            workspace
-                .notification_ids()
-                .into_iter()
-                .filter(|id| *id == notification_id)
-                .count()
-        });
-        assert_eq!(
-            shown_notifications, 1,
-            "invalid global tasks file at startup should show an app notification"
-        );
-
-        app_state
-            .fs
-            .save(
-                tasks_file_path,
-                &r#"[{ "label": "first", "command": "echo" }]"#.into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
-        cx.run_until_parked();
-
-        let shown_notifications = workspace.read_with(cx, |workspace, _| {
-            workspace
-                .notification_ids()
-                .into_iter()
-                .filter(|id| *id == notification_id)
-                .count()
-        });
-        assert_eq!(
-            shown_notifications, 0,
-            "fixing the global tasks file should dismiss the notification"
-        );
     }
 
     #[gpui::test]

@@ -59,64 +59,6 @@ pub(crate) static KEY_BINDING_VALIDATORS: LazyLock<BTreeMap<TypeId, Box<dyn KeyB
 #[serde(transparent)]
 pub struct KeymapFile(Vec<KeymapSection>);
 
-/// Actions, or action namespaces ending in `::`, of features that are not part of
-/// this application. Bindings to them are skipped instead of being reported as errors.
-const UNAVAILABLE_ACTIONS: &[&str] = &[
-    "agent::",
-    "agents_sidebar::",
-    "channel_modal::",
-    "collab_panel::",
-    "console::",
-    "debug_panel::",
-    "debugger::",
-    "inline_assistant::",
-    "new_process_modal::",
-    "repl::",
-    "skill_creator::",
-    "task::",
-    "terminal::",
-    "terminal_panel::",
-    "variable_list::",
-    "vim::",
-    "edit_prediction::",
-    "zeta::",
-    "dev::EditPredictionContextGoBack",
-    "dev::EditPredictionContextGoForward",
-    "git::ReviewDiff",
-    "onboarding::OpenAccount",
-    "onboarding::SignIn",
-    "editor::DisableBreakpoint",
-    "editor::EditLogBreakpoint",
-    "editor::EnableBreakpoint",
-    "editor::SpawnNearestTask",
-    "editor::ToggleBreakpoint",
-    "projects::OpenDevContainer",
-    "projects::OpenRemote",
-    "workspace::NewCenterTerminal",
-    "workspace::NewTerminal",
-    "workspace::OpenInTerminal",
-    "workspace::OpenTerminal",
-    "zed::OpenWorktreeSetupTasks",
-];
-
-fn is_unavailable_action(action: &Value) -> bool {
-    let name = match action {
-        Value::String(name) => name,
-        Value::Array(items) => match items.first() {
-            Some(Value::String(name)) => name,
-            _ => return false,
-        },
-        _ => return false,
-    };
-    UNAVAILABLE_ACTIONS.iter().any(|unavailable| {
-        if unavailable.ends_with("::") {
-            name.starts_with(unavailable)
-        } else {
-            name == unavailable
-        }
-    })
-}
-
 /// Keymap section which binds keystrokes to actions.
 #[derive(Debug, Deserialize, Default, Clone, JsonSchema)]
 pub struct KeymapSection {
@@ -367,9 +309,6 @@ impl KeymapFile {
 
             if let Some(unbind) = unbind {
                 for (keystrokes, action) in unbind {
-                    if is_unavailable_action(&action.0) {
-                        continue;
-                    }
                     let result = Self::load_unbinding(
                         keystrokes,
                         action,
@@ -402,9 +341,6 @@ impl KeymapFile {
 
             if let Some(bindings) = bindings {
                 for (keystrokes, action) in bindings {
-                    if is_unavailable_action(&action.0) {
-                        continue;
-                    }
                     let result = Self::load_keybinding(
                         keystrokes,
                         action,

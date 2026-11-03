@@ -1,18 +1,16 @@
 use crate::{
-    Event, ExtensionIndex, ExtensionIndexEntry, ExtensionIndexLanguageEntry,
-    ExtensionIndexThemeEntry, ExtensionManifest, ExtensionStore, GrammarManifestEntry,
-    MAX_REMOTE_SYNC_ATTEMPTS, MAX_REMOTE_SYNC_RETRY_DELAY, RELOAD_DEBOUNCE_DURATION,
-    REMOTE_SYNC_TIMEOUT, SchemaVersion,
+    ExtensionIndex, ExtensionIndexEntry, ExtensionIndexLanguageEntry, ExtensionIndexThemeEntry,
+    ExtensionManifest, ExtensionStore, GrammarManifestEntry, MAX_REMOTE_SYNC_ATTEMPTS,
+    MAX_REMOTE_SYNC_RETRY_DELAY, RELOAD_DEBOUNCE_DURATION, REMOTE_SYNC_TIMEOUT, SchemaVersion,
     headless_host::{
         ExtensionVersion, HeadlessExtensionStore, LoadedExtension, STALE_UPLOAD_TTL,
         hash_directory_contents, remove_stale_uploads,
     },
     load_plugin_queries, remote_sync_retry_delay,
 };
-use async_compression::futures::bufread::GzipEncoder;
 use async_trait::async_trait;
 use client::{AnyProtoClient, TypedEnvelope, proto};
-use collections::{BTreeMap, HashMap, HashSet};
+use collections::{BTreeMap, HashMap};
 use extension::{
     BuildTaskTemplate, CodeLabel, Command, Completion, ContextServerConfiguration,
     DebugAdapterBinary, DebugRequest, DebugScenario, DebugTaskDefinition, Extension,
@@ -20,25 +18,17 @@ use extension::{
     SlashCommandArgumentCompletion, SlashCommandOutput, StartDebuggingRequestArgumentsRequest,
     Symbol, WorktreeDelegate,
 };
-use fs::{FakeFs, Fs, RealFs, RemoveOptions};
-use futures::{AsyncReadExt, FutureExt, StreamExt, io::BufReader};
+use fs::{FakeFs, Fs, RemoveOptions};
 use gpui::{AppContext as _, BackgroundExecutor, Entity, EntityId, TaskExt, TestAppContext};
-use http_client::{FakeHttpClient, Response};
-use language::{
-    BinaryStatus, LanguageConfig, LanguageMatcher, LanguageName, LanguageRegistry, QueryFiles,
-};
+use http_client::FakeHttpClient;
+use language::{LanguageConfig, LanguageMatcher, LanguageName, LanguageRegistry, QueryFiles};
 use language_extension::LspAccess;
 use lsp::LanguageServerName;
 use node_runtime::NodeRuntime;
-use parking_lot::Mutex;
-use project::{DEFAULT_COMPLETION_CONTEXT, Project};
-use release_channel::AppVersion;
 use remote::{ConnectionState, RemoteClient, RemoteClientEvent, RemoteConnectionOptions};
-use reqwest_client::ReqwestClient;
 use serde_json::json;
 use settings::SettingsStore;
 use std::{
-    ffi::OsString,
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -48,7 +38,7 @@ use std::{
 };
 use task::{SpawnInTerminal, ZedDebugConfig};
 use theme::ThemeRegistry;
-use util::{rel_path::rel_path_buf, test::TempTree};
+use util::rel_path::rel_path_buf;
 
 #[cfg(test)]
 #[ctor::ctor(unsafe)]

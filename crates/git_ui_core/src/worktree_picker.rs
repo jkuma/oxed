@@ -25,8 +25,7 @@ use workspace::{
 use crate::notifications::show_error_toast;
 use crate::worktree_service::{RemoteBranchName, WorktreeCreateTarget, worktree_create_targets};
 use zed_actions::{
-    CreateWorktree, NewWorktreeBranchTarget, OpenWorktreeInNewWindow, OpenWorktreeSetupTasks,
-    SwitchWorktree,
+    CreateWorktree, NewWorktreeBranchTarget, OpenWorktreeInNewWindow, SwitchWorktree,
 };
 
 actions!(
@@ -251,10 +250,6 @@ impl Render for WorktreePicker {
             .on_modifiers_changed(cx.listener(Self::handle_modifiers_changed))
             .on_mouse_down_out(cx.listener(|_, _, _, cx| {
                 cx.emit(DismissEvent);
-            }))
-            .on_action(cx.listener(|_, _: &OpenWorktreeSetupTasks, _, cx| {
-                cx.emit(DismissEvent);
-                cx.propagate();
             }))
             .on_action(cx.listener(|this, _: &DeleteWorktree, window, cx| {
                 this.picker.update(cx, |picker, cx| {
@@ -1353,35 +1348,6 @@ impl PickerDelegate for WorktreePickerDelegate {
         }
     }
 
-    fn searchbar_trailer(
-        &self,
-        _window: &mut Window,
-        _cx: &mut Context<Picker<Self>>,
-    ) -> Option<AnyElement> {
-        if self.show_footer {
-            return None;
-        }
-
-        let focus_handle = self.focus_handle.clone();
-
-        Some(
-            IconButton::new("configure-worktree-tasks", IconName::Settings)
-                .icon_size(IconSize::Small)
-                .tooltip(move |_window, cx| {
-                    Tooltip::for_action_in(
-                        "Automate Worktree Setup",
-                        &OpenWorktreeSetupTasks,
-                        &focus_handle,
-                        cx,
-                    )
-                })
-                .on_click(|_, window, cx| {
-                    window.dispatch_action(OpenWorktreeSetupTasks.boxed_clone(), cx)
-                })
-                .into_any_element(),
-        )
-    }
-
     fn render_footer(&self, _: &mut Window, cx: &mut Context<Picker<Self>>) -> Option<AnyElement> {
         if !self.show_footer {
             return None;
@@ -1420,17 +1386,7 @@ impl PickerDelegate for WorktreePickerDelegate {
             .gap_0p5()
             .justify_between()
             .border_t_1()
-            .border_color(cx.theme().colors().border_variant)
-            .child(
-                Button::new("configure-worktree-tasks", "Automate Setup")
-                    .key_binding(
-                        KeyBinding::for_action_in(&OpenWorktreeSetupTasks, &focus_handle, cx)
-                            .map(|kb| kb.size(rems_from_px(12_f32))),
-                    )
-                    .on_click(|_, window, cx| {
-                        window.dispatch_action(OpenWorktreeSetupTasks.boxed_clone(), cx)
-                    }),
-            );
+            .border_color(cx.theme().colors().border_variant);
 
         if is_creating {
             Some(

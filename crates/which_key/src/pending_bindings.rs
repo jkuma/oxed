@@ -320,7 +320,7 @@ impl RenderOnce for PendingBindings {
 
 #[cfg(test)]
 mod tests {
-    use gpui::{Action as _, KeyBinding, KeyContext, Keymap, Keystroke, TestAppContext};
+    use gpui::{Action as _, KeyBinding, KeyContext, Keymap, Keystroke};
     use settings::KeybindSource;
 
     use super::*;

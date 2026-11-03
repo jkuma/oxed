@@ -1700,14 +1700,14 @@ mod tests {
     use util::rel_path::rel_path;
 
     #[derive(Debug, PartialEq)]
-    struct AutoUpdateSetting {
-        auto_update: bool,
+    struct ModelineLinesSetting {
+        modeline_lines: usize,
     }
 
-    impl Settings for AutoUpdateSetting {
+    impl Settings for ModelineLinesSetting {
         fn from_settings(content: &SettingsContent) -> Self {
-            AutoUpdateSetting {
-                auto_update: content.auto_update.unwrap(),
+            ModelineLinesSetting {
+                modeline_lines: content.modeline_lines.unwrap(),
             }
         }
     }
@@ -1856,16 +1856,16 @@ mod tests {
         let root = defaults
             .as_object_mut()
             .expect("default settings must be a JSON object");
-        root.insert("dev".into(), serde_json::json!({ "auto_update": false }));
-        root.insert("stable".into(), serde_json::json!({ "auto_update": true }));
+        root.insert("dev".into(), serde_json::json!({ "modeline_lines": 1 }));
+        root.insert("stable".into(), serde_json::json!({ "modeline_lines": 2 }));
         let defaults_with_overrides = serde_json::to_string(&defaults).unwrap();
 
         let mut store = SettingsStore::new(cx, &defaults_with_overrides);
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
 
         assert_eq!(
-            store.get::<AutoUpdateSetting>(None),
-            &AutoUpdateSetting { auto_update: false },
+            store.get::<ModelineLinesSetting>(None),
+            &ModelineLinesSetting { modeline_lines: 1 },
             "dev override from default settings should apply",
         );
     }
@@ -1873,13 +1873,13 @@ mod tests {
     #[gpui::test]
     fn test_settings_store_basic(cx: &mut App) {
         let mut store = SettingsStore::new(cx, &default_settings());
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
         store.register_setting::<ItemSettings>();
         store.register_setting::<DefaultLanguageSettings>();
 
         assert_eq!(
-            store.get::<AutoUpdateSetting>(None),
-            &AutoUpdateSetting { auto_update: false }
+            store.get::<ModelineLinesSetting>(None),
+            &ModelineLinesSetting { modeline_lines: 5 }
         );
         assert_eq!(
             store.get::<ItemSettings>(None).close_position,
@@ -1889,7 +1889,7 @@ mod tests {
         store
             .set_user_settings(
                 r#"{
-                    "auto_update": false,
+                    "modeline_lines": 3,
                     "tabs": {
                       "close_position": "left"
                     }
@@ -1899,8 +1899,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            store.get::<AutoUpdateSetting>(None),
-            &AutoUpdateSetting { auto_update: false }
+            store.get::<ModelineLinesSetting>(None),
+            &ModelineLinesSetting { modeline_lines: 3 }
         );
         assert_eq!(
             store.get::<ItemSettings>(None).close_position,
@@ -1931,7 +1931,7 @@ mod tests {
                 WorktreeId::from_usize(1),
                 LocalSettingsPath::InWorktree(rel_path("root2").into()),
                 LocalSettingsKind::Settings,
-                Some(r#"{ "tab_size": 9, "auto_update": true}"#),
+                Some(r#"{ "tab_size": 9, "modeline_lines": 9}"#),
                 cx,
             )
             .unwrap();
@@ -1967,11 +1967,11 @@ mod tests {
             }
         );
         assert_eq!(
-            store.get::<AutoUpdateSetting>(Some(SettingsLocation {
+            store.get::<ModelineLinesSetting>(Some(SettingsLocation {
                 worktree_id: WorktreeId::from_usize(1),
                 path: rel_path("root2/something")
             })),
-            &AutoUpdateSetting { auto_update: false }
+            &ModelineLinesSetting { modeline_lines: 3 }
         );
     }
 
@@ -1979,13 +1979,13 @@ mod tests {
     fn test_setting_store_assign_json_before_register(cx: &mut App) {
         let mut store = SettingsStore::new(cx, &test_settings());
         store
-            .set_user_settings(r#"{ "auto_update": false }"#, cx)
+            .set_user_settings(r#"{ "modeline_lines": 3 }"#, cx)
             .unwrap();
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
 
         assert_eq!(
-            store.get::<AutoUpdateSetting>(None),
-            &AutoUpdateSetting { auto_update: false }
+            store.get::<ModelineLinesSetting>(None),
+            &ModelineLinesSetting { modeline_lines: 3 }
         );
     }
 
@@ -2126,8 +2126,8 @@ mod tests {
         check_settings_update(
             &mut store,
             r#"{ "one": 1, "two": 2 }"#.to_owned(),
-            |settings| settings.auto_update = Some(true),
-            r#"{ "auto_update": true, "one": 1, "two": 2 }"#.to_owned(),
+            |settings| settings.modeline_lines = Some(3),
+            r#"{ "modeline_lines": 3, "one": 1, "two": 2 }"#.to_owned(),
             cx,
         );
 
@@ -2189,21 +2189,21 @@ mod tests {
     #[gpui::test]
     fn test_edits_for_update_preserves_unknown_keys(cx: &mut App) {
         let mut store = SettingsStore::new(cx, &test_settings());
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
 
         let old_json = r#"{
             "some_unknown_key": "should_be_preserved",
-            "auto_update": false
+            "modeline_lines": 3
         }"#
         .unindent();
 
         check_settings_update(
             &mut store,
             old_json,
-            |settings| settings.auto_update = Some(true),
+            |settings| settings.modeline_lines = Some(7),
             r#"{
             "some_unknown_key": "should_be_preserved",
-            "auto_update": true
+            "modeline_lines": 7
         }"#
             .unindent(),
             cx,
@@ -2224,7 +2224,7 @@ mod tests {
         let mut store = SettingsStore::new(cx, &test_settings());
         store.register_setting::<DefaultLanguageSettings>();
         store.register_setting::<ItemSettings>();
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
         store.register_setting::<ThemeSettings>();
 
         // create settings that werent present
@@ -2885,7 +2885,7 @@ mod tests {
     fn test_get_value_for_field_local_worktrees_dont_interfere(cx: &mut App) {
         let mut store = SettingsStore::new(cx, &test_settings());
         store.register_setting::<DefaultLanguageSettings>();
-        store.register_setting::<AutoUpdateSetting>();
+        store.register_setting::<ModelineLinesSetting>();
 
         let local_1 = (WorktreeId::from_usize(0), RelPath::empty_arc());
 
@@ -3441,7 +3441,7 @@ mod tests {
         let user_schema_str = serde_json::to_string(&user_schema).unwrap();
         let project_schema_str = serde_json::to_string(&project_schema).unwrap();
 
-        assert!(user_schema_str.contains("\"auto_update\""));
-        assert!(!project_schema_str.contains("\"auto_update\""));
+        assert!(user_schema_str.contains("\"modeline_lines\""));
+        assert!(!project_schema_str.contains("\"modeline_lines\""));
     }
 }
