@@ -4,10 +4,9 @@ use crate::capability_granter::CapabilityGranter;
 use crate::{ExtensionManifest, ExtensionSettings};
 use anyhow::{Context as _, Result, anyhow, bail};
 use async_trait::async_trait;
-use dap::{DebugRequest, StartDebuggingRequestArgumentsRequest};
 use extension::{
-    CodeLabel, Command, Completion, DebugAdapterBinary, DebugTaskDefinition, ExtensionCapability,
-    ExtensionHostProxy, Symbol, WorktreeDelegate,
+    CodeLabel, Command, Completion, ExtensionCapability, ExtensionHostProxy, Symbol,
+    WorktreeDelegate,
 };
 use fs::Fs;
 use futures::future::LocalBoxFuture;
@@ -34,7 +33,6 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::Duration,
 };
-use task::{DebugScenario, SpawnInTerminal, TaskTemplate, ZedDebugConfig};
 use util::paths::SanitizedPath;
 use wasmtime::{
     CacheStore, Engine, Store,
@@ -304,100 +302,6 @@ impl extension::Extension for WasmExtension {
                     .into_iter()
                     .map(|label| label.map(Into::into))
                     .collect())
-            }
-            .boxed()
-        })
-        .await?
-    }
-
-    async fn get_dap_binary(
-        &self,
-        dap_name: Arc<str>,
-        config: DebugTaskDefinition,
-        user_installed_path: Option<PathBuf>,
-        worktree: Arc<dyn WorktreeDelegate>,
-    ) -> Result<DebugAdapterBinary> {
-        self.call(|extension, store| {
-            async move {
-                let resource = store.data_mut().table.push(worktree)?;
-                let dap_binary = extension
-                    .call_get_dap_binary(store, dap_name, config, user_installed_path, resource)
-                    .await?
-                    .map_err(|err| store.data().extension_error(err))?;
-                let dap_binary = dap_binary.try_into()?;
-                Ok(dap_binary)
-            }
-            .boxed()
-        })
-        .await?
-    }
-    async fn dap_request_kind(
-        &self,
-        dap_name: Arc<str>,
-        config: serde_json::Value,
-    ) -> Result<StartDebuggingRequestArgumentsRequest> {
-        self.call(|extension, store| {
-            async move {
-                let kind = extension
-                    .call_dap_request_kind(store, dap_name, config)
-                    .await?
-                    .map_err(|err| store.data().extension_error(err))?;
-                Ok(kind.into())
-            }
-            .boxed()
-        })
-        .await?
-    }
-
-    async fn dap_config_to_scenario(&self, config: ZedDebugConfig) -> Result<DebugScenario> {
-        self.call(|extension, store| {
-            async move {
-                let kind = extension
-                    .call_dap_config_to_scenario(store, config)
-                    .await?
-                    .map_err(|err| store.data().extension_error(err))?;
-                Ok(kind)
-            }
-            .boxed()
-        })
-        .await?
-    }
-
-    async fn dap_locator_create_scenario(
-        &self,
-        locator_name: String,
-        build_config_template: TaskTemplate,
-        resolved_label: String,
-        debug_adapter_name: String,
-    ) -> Result<Option<DebugScenario>> {
-        self.call(|extension, store| {
-            async move {
-                extension
-                    .call_dap_locator_create_scenario(
-                        store,
-                        locator_name,
-                        build_config_template,
-                        resolved_label,
-                        debug_adapter_name,
-                    )
-                    .await
-            }
-            .boxed()
-        })
-        .await?
-        .map_err(anyhow::Error::from)
-    }
-    async fn run_dap_locator(
-        &self,
-        locator_name: String,
-        config: SpawnInTerminal,
-    ) -> Result<DebugRequest> {
-        self.call(|extension, store| {
-            async move {
-                extension
-                    .call_run_dap_locator(store, locator_name, config)
-                    .await?
-                    .map_err(|err| store.data().extension_error(err))
             }
             .boxed()
         })

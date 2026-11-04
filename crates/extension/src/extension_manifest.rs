@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -14,8 +13,7 @@ use lsp::LanguageServerName;
 use path::PathExt as _;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use util::paths::PathStyle;
-use util::rel_path::{RelPath, RelPathBuf};
+use util::rel_path::RelPathBuf;
 
 use crate::ExtensionCapability;
 
@@ -114,10 +112,6 @@ pub struct ExtensionManifest {
     pub snippets: Option<ExtensionSnippets>,
     #[serde(default)]
     pub capabilities: Vec<ExtensionCapability>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub debug_adapters: BTreeMap<Arc<str>, DebugAdapterManifestEntry>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub debug_locators: BTreeMap<Arc<str>, DebugLocatorManifestEntry>,
 }
 
 impl ExtensionManifest {
@@ -148,10 +142,6 @@ impl ExtensionManifest {
             provides.insert(ExtensionProvides::Snippets);
         }
 
-        if !self.debug_adapters.is_empty() {
-            provides.insert(ExtensionProvides::DebugAdapters);
-        }
-
         provides
     }
 
@@ -174,21 +164,6 @@ impl ExtensionManifest {
         }
 
         Ok(())
-    }
-}
-
-pub fn build_debug_adapter_schema_path(
-    adapter_name: &Arc<str>,
-    meta: &DebugAdapterManifestEntry,
-) -> anyhow::Result<RelPathBuf> {
-    match &meta.schema_path {
-        Some(path) => Ok(path.clone()),
-        None => RelPath::new(
-            &Path::new("debug_adapter_schemas")
-                .join(Path::new(adapter_name.as_ref()).with_extension("json")),
-            PathStyle::local(),
-        )
-        .map(Cow::into_owned),
     }
 }
 
@@ -258,14 +233,6 @@ impl LanguageServerManifestEntry {
         self.opt_in_languages.contains(language)
     }
 }
-
-#[derive(Clone, Default, PartialEq, Eq, Debug, Deserialize, Serialize)]
-pub struct DebugAdapterManifestEntry {
-    pub schema_path: Option<RelPathBuf>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
-pub struct DebugLocatorManifestEntry {}
 
 impl ExtensionManifest {
     pub async fn load(fs: Arc<dyn Fs>, extension_dir: &Path) -> Result<Self> {
@@ -464,15 +431,12 @@ fn manifest_from_old_manifest(
         language_servers: Default::default(),
         snippets: None,
         capabilities: Vec::new(),
-        debug_adapters: Default::default(),
-        debug_locators: Default::default(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
-    use util::rel_path::rel_path_buf;
 
     use crate::ProcessExecCapability;
 
@@ -495,29 +459,7 @@ mod tests {
             language_servers: BTreeMap::default(),
             snippets: None,
             capabilities: vec![],
-            debug_adapters: Default::default(),
-            debug_locators: Default::default(),
         }
-    }
-
-    #[test]
-    fn test_build_adapter_schema_path_with_schema_path() {
-        let adapter_name = Arc::from("my_adapter");
-        let entry = DebugAdapterManifestEntry {
-            schema_path: Some(rel_path_buf("foo/bar")),
-        };
-
-        let path = build_debug_adapter_schema_path(&adapter_name, &entry).unwrap();
-        assert_eq!(path, rel_path_buf("foo/bar"));
-    }
-
-    #[test]
-    fn test_build_adapter_schema_path_without_schema_path() {
-        let adapter_name = Arc::from("my_adapter");
-        let entry = DebugAdapterManifestEntry::default();
-
-        let path = build_debug_adapter_schema_path(&adapter_name, &entry).unwrap();
-        assert_eq!(path, rel_path_buf("debug_adapter_schemas/my_adapter.json"));
     }
 
     #[test]
@@ -629,22 +571,6 @@ mod tests {
         );
         assert!(opt_in_server.is_opt_in_for(&julia));
         assert!(!opt_in_server.is_opt_in_for(&markdown));
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_deserialize_manifest_with_windows_separators() {
-        use indoc::indoc;
-
-        let content = indoc! {r#"
-            id = "test-manifest"
-            name = "Test Manifest"
-            version = "0.0.1"
-            schema_version = 0
-            languages = ["foo\\bar"]
-        "#};
-        let manifest: ExtensionManifest = toml::from_str(&content).expect("manifest should parse");
-        assert_eq!(manifest.languages, vec![rel_path_buf("foo/bar")]);
     }
 }
 

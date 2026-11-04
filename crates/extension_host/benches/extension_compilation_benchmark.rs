@@ -142,8 +142,6 @@ fn manifest() -> ExtensionManifest {
                 args: vec!["hello!".into()],
             },
         )],
-        debug_adapters: Default::default(),
-        debug_locators: Default::default(),
     }
 }
 

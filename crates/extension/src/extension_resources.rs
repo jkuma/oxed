@@ -159,38 +159,6 @@ pub async fn copy_extension_resources(
         .await?;
     }
 
-    if !manifest.debug_adapters.is_empty() {
-        futures::future::try_join_all(manifest.debug_adapters.iter().map(
-            |(debug_adapter, entry)| {
-                let fs = fs.clone();
-                let debug_adapter = debug_adapter.clone();
-                async move {
-                    let schema_path =
-                        crate::build_debug_adapter_schema_path(&debug_adapter, &entry)?;
-                    let parent = schema_path.parent().with_context(|| {
-                        format!("invalid empty schema path for {debug_adapter}")
-                    })?;
-                    let schema_path = schema_path.as_std_path();
-                    let source_path = extension_path.join(schema_path);
-                    let output_path = output_dir.join(schema_path);
-                    create_dir(fs.as_ref(), &output_dir.join(parent)).await?;
-                    copy_recursive(
-                        fs.as_ref(),
-                        &source_path,
-                        &output_path,
-                        CopyOptions {
-                            overwrite: true,
-                            ignore_if_exists: false,
-                        },
-                    )
-                    .await
-                    .with_context(|| format!("copying {source_path:?} to {output_path:?}"))
-                }
-            },
-        ))
-        .await?;
-    }
-
     if let Some(snippets) = manifest.snippets.as_ref() {
         futures::future::try_join_all(snippets.paths().map(|snippets_path| {
             let fs = fs.clone();

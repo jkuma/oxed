@@ -108,8 +108,6 @@ mod tests {
             language_servers: BTreeMap::default(),
             snippets: None,
             capabilities: vec![],
-            debug_adapters: Default::default(),
-            debug_locators: Default::default(),
         }
     }
 

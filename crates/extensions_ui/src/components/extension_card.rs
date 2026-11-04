@@ -436,8 +436,6 @@ impl Component for ExtensionCard {
                 language_servers: Default::default(),
                 snippets: None,
                 capabilities: Vec::new(),
-                debug_adapters: Default::default(),
-                debug_locators: Default::default(),
             })
         }
 

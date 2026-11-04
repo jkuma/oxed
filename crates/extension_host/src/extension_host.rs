@@ -13,9 +13,8 @@ use collections::{BTreeMap, BTreeSet, FxHashSet, HashSet, btree_map};
 pub use extension::ExtensionManifest;
 use extension::extension_builder::{CompileExtensionOptions, ExtensionBuilder};
 use extension::{
-    ExtensionDebugAdapterProviderProxy, ExtensionEvents, ExtensionGrammarProxy, ExtensionHostProxy,
-    ExtensionLanguageProxy, ExtensionLanguageServerProxy, ExtensionSnippetProxy,
-    ExtensionThemeProxy,
+    ExtensionEvents, ExtensionGrammarProxy, ExtensionHostProxy, ExtensionLanguageProxy,
+    ExtensionLanguageServerProxy, ExtensionSnippetProxy, ExtensionThemeProxy,
 };
 use fs::{Fs, RemoveOptions, RenameOptions};
 use futures::future::join_all;
@@ -1264,13 +1263,6 @@ impl ExtensionStore {
                     ));
                 }
             }
-
-            for adapter in extension.manifest.debug_adapters.keys() {
-                self.proxy.unregister_debug_adapter(adapter.clone());
-            }
-            for locator in extension.manifest.debug_locators.keys() {
-                self.proxy.unregister_debug_locator(locator.clone());
-            }
         }
 
         self.wasm_extensions
@@ -1534,28 +1526,6 @@ impl ExtensionStore {
                                 language.clone(),
                             );
                         }
-                    }
-
-                    for (debug_adapter, meta) in &manifest.debug_adapters {
-                        let mut path = root_dir.clone();
-                        path.push(Path::new(manifest.id.as_ref()));
-                        if let Some(schema_path) = &meta.schema_path {
-                            path.push(schema_path);
-                        } else {
-                            path.push("debug_adapter_schemas");
-                            path.push(Path::new(debug_adapter.as_ref()).with_extension("json"));
-                        }
-
-                        this.proxy.register_debug_adapter(
-                            extension.clone(),
-                            debug_adapter.clone(),
-                            &path,
-                        );
-                    }
-
-                    for debug_adapter in manifest.debug_locators.keys() {
-                        this.proxy
-                            .register_debug_locator(extension.clone(), debug_adapter.clone());
                     }
                 }
 

@@ -1,11 +1,9 @@
-mod dap;
 mod lsp;
 
 use std::{ops::Range, path::PathBuf};
 
 use util::redact::should_redact;
 
-pub use dap::*;
 pub use lsp::*;
 
 /// A list of environment variables.
