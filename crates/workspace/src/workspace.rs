@@ -82,10 +82,6 @@ use project::{
     trusted_worktrees::{TrustedWorktrees, TrustedWorktreesEvent},
 };
 use release_channel::ReleaseChannel;
-use rpc::{
-    ErrorExt,
-    proto::{ErrorCode, PanelId},
-};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use session::AppSession;
@@ -972,25 +968,23 @@ impl ProjectItemRegistry {
                         }
                         Err(e) => {
                             log::warn!("Failed to open a project item: {e:#}");
-                            if e.error_code() == ErrorCode::Internal {
-                                if let Some(abs_path) =
-                                    entry_abs_path.as_deref().filter(|_| is_file)
-                                {
-                                    if let Some(broken_project_item_view) =
-                                        cx.update(|window, cx| {
-                                            T::for_broken_project_item(
-                                                abs_path, &e, window, cx,
-                                            )
-                                        })?
-                                    {
-                                        let build_workspace_item = Box::new(
-                                            move |_: &mut Pane, _: &mut Window, cx: &mut Context<Pane>| {
-                                                cx.new(|_| broken_project_item_view).boxed_clone()
-                                            },
+                            if let Some(abs_path) =
+                                entry_abs_path.as_deref().filter(|_| is_file)
+                            {
+                                if let Some(broken_project_item_view) =
+                                    cx.update(|window, cx| {
+                                        T::for_broken_project_item(
+                                            abs_path, &e, window, cx,
                                         )
-                                        as Box<_>;
-                                        return Ok((None, build_workspace_item));
-                                    }
+                                    })?
+                                {
+                                    let build_workspace_item = Box::new(
+                                        move |_: &mut Pane, _: &mut Window, cx: &mut Context<Pane>| {
+                                            cx.new(|_| broken_project_item_view).boxed_clone()
+                                        },
+                                    )
+                                    as Box<_>;
+                                    return Ok((None, build_workspace_item));
                                 }
                             }
                             Err(e)
@@ -4136,32 +4130,6 @@ impl Workspace {
         } else {
             log::error!("Could not find a focus target when switching focus to the center panes",);
         }
-    }
-
-    pub fn activate_panel_for_proto_id(
-        &mut self,
-        panel_id: PanelId,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Option<Arc<dyn PanelHandle>> {
-        let mut panel = None;
-        for dock in self.all_docks() {
-            if let Some(panel_index) = dock.read(cx).panel_index_for_proto_id(panel_id) {
-                panel = dock.update(cx, |dock, cx| {
-                    dock.activate_panel(panel_index, window, cx);
-                    dock.set_open(true, window, cx);
-                    dock.active_panel().cloned()
-                });
-                break;
-            }
-        }
-
-        if panel.is_some() {
-            cx.notify();
-            self.serialize_workspace(window, cx);
-        }
-
-        panel
     }
 
     /// Focus or unfocus the given panel type, depending on the given callback.

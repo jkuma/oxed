@@ -53,7 +53,6 @@ parking_lot.workspace = true
 postage = { workspace = true, features = ["futures-traits", "logging", "blocking"] }
 rand = { workspace = true, optional = true }
 regex.workspace = true
-rpc.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true

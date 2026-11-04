@@ -3,9 +3,8 @@ use anyhow::Context as _;
 use gpui::{App, AsyncApp, Entity, Task, WeakEntity};
 use language::{Buffer, ServerHealth};
 use lsp::{LanguageServer, LanguageServerId, LanguageServerName};
-use rpc::proto;
 
-use crate::{LspStore, LspStoreEvent, Project, ProjectPath, lsp_store};
+use crate::{LanguageServerUpdate, LspStore, LspStoreEvent, Project, ProjectPath, lsp_store};
 
 pub const RUST_ANALYZER_NAME: LanguageServerName = LanguageServerName::new_static("rust-analyzer");
 pub const CARGO_DIAGNOSTICS_SOURCE_NAME: &str = "rustc";
@@ -39,40 +38,23 @@ pub fn register_notifications(lsp_store: WeakEntity<LspStore>, language_server: 
                 let log_message = message.as_ref().map(|message| {
                     format!("Language server {name} (id {server_id}) status update: {message}")
                 });
-                let status = match &params.health {
-                    ServerHealth::Ok => {
-                        if let Some(log_message) = log_message {
-                            log::info!("{log_message}");
-                        }
-                        proto::ServerHealth::Ok
+                if let Some(log_message) = log_message {
+                    match params.health {
+                        ServerHealth::Ok => log::info!("{log_message}"),
+                        ServerHealth::Warning => log::warn!("{log_message}"),
+                        ServerHealth::Error => log::error!("{log_message}"),
                     }
-                    ServerHealth::Warning => {
-                        if let Some(log_message) = log_message {
-                            log::warn!("{log_message}");
-                        }
-                        proto::ServerHealth::Warning
-                    }
-                    ServerHealth::Error => {
-                        if let Some(log_message) = log_message {
-                            log::error!("{log_message}");
-                        }
-                        proto::ServerHealth::Error
-                    }
-                };
+                }
 
                 lsp_store
                     .update(cx, |_, cx| {
                         cx.emit(LspStoreEvent::LanguageServerUpdate {
                             language_server_id: server_id,
                             name: Some(name.clone()),
-                            message: proto::update_language_server::Variant::StatusUpdate(
-                                proto::StatusUpdate {
-                                    message,
-                                    status: Some(proto::status_update::Status::Health(
-                                        status as i32,
-                                    )),
-                                },
-                            ),
+                            message: LanguageServerUpdate::Health {
+                                health: params.health,
+                                message,
+                            },
                         });
                     })
                     .ok();

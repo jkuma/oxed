@@ -36,7 +36,6 @@ smallvec.workspace = true
 theme.workspace = true
 theme_settings.workspace = true
 rayon.workspace = true
-rpc.workspace = true
 ui.workspace = true
 util.workspace = true
 worktree.workspace = true

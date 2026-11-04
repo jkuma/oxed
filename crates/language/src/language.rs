@@ -16,15 +16,12 @@ pub mod language_settings;
 mod manifest;
 pub mod modeline;
 mod outline;
-pub mod proto;
 mod syntax_map;
 mod text_diff;
 mod toolchain;
 
 #[cfg(test)]
 pub mod buffer_tests;
-#[cfg(test)]
-mod proto_diagnostics_tests;
 
 pub use crate::language_settings::{AutoIndentMode, IndentGuideSettings};
 use anyhow::{Context as _, Result};

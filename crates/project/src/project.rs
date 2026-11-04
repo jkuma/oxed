@@ -42,7 +42,6 @@ pub use worktree_store::WorktreePaths;
 use anyhow::{Context as _, Result, anyhow};
 use buffer_store::{BufferStore, BufferStoreEvent};
 use clock::ReplicaId;
-use rpc::proto;
 
 use collections::{BTreeSet, HashMap, HashSet, IndexSet};
 use debounced_delay::DebouncedDelay;
@@ -65,7 +64,7 @@ use language::{
 };
 use lsp::{
     CodeActionKind, CompletionContext, CompletionItemKind, DocumentHighlightKind, InsertTextMode,
-    LanguageServerBinary, LanguageServerId, LanguageServerName, LanguageServerSelector,
+    LanguageServerId, LanguageServerName, LanguageServerSelector,
 };
 use lsp_command::*;
 use lsp_store::{CompletionDocumentation, LspFormatTarget, OpenLspBufferHandle};
@@ -83,11 +82,10 @@ use snippet_provider::SnippetProvider;
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    ffi::OsString,
     future::Future,
     ops::Range,
     path::{Path, PathBuf},
-    str::{self, FromStr},
+    str,
     sync::Arc,
     time::Duration,
 };
@@ -114,7 +112,7 @@ pub use lsp_command::{CallHierarchyItem, IncomingCall, OutgoingCall};
 pub use lsp_store::{
     DiagnosticSummary, InvalidationStrategy, LanguageServerLogType, LanguageServerProgress,
     LanguageServerPromptRequest, LanguageServerShowDocumentRequest, LanguageServerStatus,
-    LanguageServerToQuery, LspStore, LspStoreEvent, ProgressToken,
+    LanguageServerToQuery, LanguageServerUpdate, LspStore, LspStoreEvent, ProgressToken,
     SERVER_PROGRESS_THROTTLE_TIMEOUT,
 };
 #[cfg(any(test, feature = "test-support"))]
@@ -148,13 +146,6 @@ pub trait ProjectItem: 'static {
     fn entry_id(&self, cx: &App) -> Option<ProjectEntryId>;
     fn project_path(&self, cx: &App) -> Option<ProjectPath>;
     fn is_dirty(&self) -> bool;
-}
-
-#[derive(Clone)]
-pub enum OpenedBufferEvent {
-    Disconnected,
-    Ok(BufferId),
-    Err(BufferId, Arc<anyhow::Error>),
 }
 
 /// Semantics-aware entity that is relevant to one or more [`Worktree`] with the files.
@@ -215,15 +206,6 @@ impl Drop for RemotelyCreatedModelGuard {
         }
     }
 }
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct ProjectId(pub u64);
-
-impl ProjectId {
-    pub fn to_proto(self) -> u64 {
-        self.0
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     LanguageServerAdded(LanguageServerId, LanguageServerName, Option<WorktreeId>),
@@ -321,20 +303,6 @@ impl ProjectPath {
         ProjectPath {
             worktree_id: value.worktree_id(cx),
             path: value.path().clone(),
-        }
-    }
-
-    pub fn from_proto(p: proto::ProjectPath) -> Option<Self> {
-        Some(Self {
-            worktree_id: WorktreeId::from_proto(p.worktree_id),
-            path: RelPath::from_unix_str(&p.path).log_err()?.into(),
-        })
-    }
-
-    pub fn to_proto(&self) -> proto::ProjectPath {
-        proto::ProjectPath {
-            worktree_id: self.worktree_id.to_proto(),
-            path: self.path.as_ref().as_unix_str().to_owned(),
         }
     }
 
@@ -2101,58 +2069,18 @@ impl Project {
             LspStoreEvent::LanguageServerUpdate {
                 language_server_id,
                 name,
-                message,
-            } => match message {
-                proto::update_language_server::Variant::MetadataUpdated(update) => {
-                    self.lsp_store.update(cx, |lsp_store, _| {
-                        if let Some(capabilities) = update.capabilities.as_ref() {
-                            lsp_store.insert_synced_server_capabilities(
-                                *language_server_id,
-                                capabilities,
-                            );
-                        }
-
-                        if let Some(language_server_status) = lsp_store
-                            .language_server_statuses
-                            .get_mut(language_server_id)
-                        {
-                            if let Some(binary) = &update.binary {
-                                language_server_status.binary = Some(LanguageServerBinary {
-                                    path: PathBuf::from(&binary.path),
-                                    arguments: binary
-                                        .arguments
-                                        .iter()
-                                        .map(OsString::from)
-                                        .collect(),
-                                    env: None,
-                                });
-                            }
-
-                            language_server_status.configuration = update
-                                .configuration
-                                .as_ref()
-                                .and_then(|config_str| serde_json::from_str(config_str).ok());
-
-                            language_server_status.workspace_folders = update
-                                .workspace_folders
-                                .iter()
-                                .filter_map(|uri_str| lsp::Uri::from_str(uri_str).ok())
-                                .collect();
-                        }
-                    });
-                }
-                proto::update_language_server::Variant::RegisteredForBuffer(update) => {
-                    if let Some(buffer_id) = BufferId::new(update.buffer_id).ok() {
-                        cx.emit(Event::LanguageServerBufferRegistered {
-                            buffer_id,
-                            server_id: *language_server_id,
-                            buffer_abs_path: PathBuf::from(&update.buffer_abs_path),
-                            name: name.clone(),
-                        });
-                    }
-                }
-                _ => (),
-            },
+                message:
+                    LanguageServerUpdate::RegisteredForBuffer {
+                        buffer_id,
+                        buffer_abs_path,
+                    },
+            } => cx.emit(Event::LanguageServerBufferRegistered {
+                buffer_id: *buffer_id,
+                server_id: *language_server_id,
+                buffer_abs_path: buffer_abs_path.clone(),
+                name: name.clone(),
+            }),
+            LspStoreEvent::LanguageServerUpdate { .. } => {}
             LspStoreEvent::Notification(message) => cx.emit(Event::Toast {
                 notification_id: "lsp".into(),
                 message: message.clone(),

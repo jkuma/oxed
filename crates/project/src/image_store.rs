@@ -12,7 +12,6 @@ use gpui::{
 pub use image::ImageFormat;
 use image::{ExtendedColorType, GenericImageView, ImageReader};
 use language::{DiskState, File};
-use rpc::ErrorExt as _;
 use std::future::Future;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
@@ -426,7 +425,7 @@ impl ImageStore {
         cx.background_spawn(async move {
             Self::wait_for_loading_image(loading_watch)
                 .await
-                .map_err(|e| e.cloned())
+                .map_err(|error| anyhow::anyhow!("{error:#}"))
         })
     }
 

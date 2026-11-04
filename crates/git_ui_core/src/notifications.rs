@@ -2,7 +2,6 @@ use editor::Editor;
 use gpui::{App, Context, Entity, SharedString};
 use language::Buffer;
 use notifications::status_toast::StatusToast;
-use proto::RpcError;
 use ui::prelude::*;
 use vte::ansi::{Handler, Processor, StdSyncHandler};
 use workspace::Workspace;
@@ -74,7 +73,7 @@ pub fn show_error_toast(
     cx: &mut App,
 ) {
     let action = action.into();
-    let message = format_git_error_toast_message(&e);
+    let message = e.to_string().trim().to_string();
     if message
         .matches(git::repository::REMOTE_CANCELLED_BY_USER)
         .next()
@@ -106,20 +105,6 @@ pub fn show_error_toast(
     }
 }
 
-fn rpc_error_raw_message_from_chain(error: &anyhow::Error) -> Option<&str> {
-    error
-        .chain()
-        .find_map(|cause| cause.downcast_ref::<RpcError>().map(RpcError::raw_message))
-}
-
-fn format_git_error_toast_message(error: &anyhow::Error) -> String {
-    if let Some(message) = rpc_error_raw_message_from_chain(error) {
-        message.trim().to_string()
-    } else {
-        error.to_string().trim().to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,46 +121,5 @@ mod tests {
         for (input, expected) in cases {
             assert_eq!(strip_ansi_text(input.as_bytes()), expected);
         }
-    }
-
-    #[test]
-    fn test_format_git_error_toast_message_prefers_raw_rpc_message() {
-        let rpc_error = RpcError::from_proto(
-            &proto::Error {
-                message:
-                    "Your local changes to the following files would be overwritten by merge\n"
-                        .to_string(),
-                code: proto::ErrorCode::Internal as i32,
-                tags: Default::default(),
-            },
-            "Pull",
-        );
-
-        let message = format_git_error_toast_message(&rpc_error);
-        assert_eq!(
-            message,
-            "Your local changes to the following files would be overwritten by merge"
-        );
-    }
-
-    #[test]
-    fn test_format_git_error_toast_message_prefers_raw_rpc_message_when_wrapped() {
-        let rpc_error = RpcError::from_proto(
-            &proto::Error {
-                message:
-                    "Your local changes to the following files would be overwritten by merge\n"
-                        .to_string(),
-                code: proto::ErrorCode::Internal as i32,
-                tags: Default::default(),
-            },
-            "Pull",
-        );
-        let wrapped = rpc_error.context("sending pull request");
-
-        let message = format_git_error_toast_message(&wrapped);
-        assert_eq!(
-            message,
-            "Your local changes to the following files would be overwritten by merge"
-        );
     }
 }

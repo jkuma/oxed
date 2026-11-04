@@ -199,7 +199,6 @@ use project::{
 };
 use rand::seq::SliceRandom;
 use regex::Regex;
-use rpc::{ErrorCode, ErrorExt};
 use scroll::{Autoscroll, ScrollAnchor, ScrollManager, SharedScrollAnchor};
 use selections_collection::{MutableSelectionsCollection, SelectionsCollection};
 use serde::{Deserialize, Serialize};
@@ -2652,13 +2651,7 @@ impl Editor {
             "Failed to create buffer",
             window,
             cx,
-            |e, _, _| match e.error_code() {
-                ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
-                e.error_tag("required").unwrap_or("the latest version")
-            )),
-                _ => None,
-            },
+            |_, _, _| None,
         );
     }
 
@@ -2737,15 +2730,7 @@ impl Editor {
             })?;
             anyhow::Ok(())
         })
-        .detach_and_prompt_err("Failed to create buffer", window, cx, |e, _, _| {
-            match e.error_code() {
-                ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
-                e.error_tag("required").unwrap_or("the latest version")
-            )),
-                _ => None,
-            }
-        });
+        .detach_and_prompt_err("Failed to create buffer", window, cx, |_, _, _| None);
     }
 
     pub fn buffer(&self) -> &Entity<MultiBuffer> {

@@ -70,7 +70,6 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand.workspace = true
 regex.workspace = true
-rpc.workspace = true
 rope.workspace = true
 schemars.workspace = true
 serde.workspace = true

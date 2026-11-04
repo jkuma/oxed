@@ -5,7 +5,6 @@ mod color_extractor;
 mod dynamic_registration;
 mod git_store;
 mod image_store;
-mod lsp_command;
 mod lsp_store;
 mod manifest_tree;
 mod project_search;

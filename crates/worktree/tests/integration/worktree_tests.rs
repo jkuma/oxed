@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use postage::stream::Stream;
 use pretty_assertions::assert_eq;
 use rand::prelude::*;
-use worktree::{Entry, EntryKind, Event, PathChange, Worktree, WorktreeModelHandle};
+use worktree::{EntryKind, Event, PathChange, Worktree, WorktreeModelHandle};
 
 use serde_json::json;
 use settings::{LocalSettingsKind, LocalSettingsPath, SettingsStore, SplicingVec, WorktreeId};
@@ -3118,22 +3118,6 @@ async fn test_create_directory_during_initial_scan(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    let snapshot1 = tree.update(cx, |tree, cx| {
-        let tree = tree.as_local_mut().unwrap();
-        let snapshot = Arc::new(Mutex::new(tree.snapshot()));
-        tree.observe_updates(0, cx, {
-            let snapshot = snapshot.clone();
-            let settings = tree.settings();
-            move |update| {
-                snapshot
-                    .lock()
-                    .apply_remote_update(update, &settings.file_scan_inclusions);
-                async { true }
-            }
-        });
-        snapshot
-    });
-
     let entry = tree
         .update(cx, |tree, cx| {
             tree.as_local_mut()
@@ -3153,12 +3137,6 @@ async fn test_create_directory_during_initial_scan(cx: &mut TestAppContext) {
             EntryKind::Dir
         );
     });
-
-    let snapshot2 = tree.update(cx, |tree, _| tree.as_local().unwrap().snapshot());
-    assert_eq!(
-        snapshot1.lock().entries(true, 0).collect::<Vec<_>>(),
-        snapshot2.entries(true, 0).collect::<Vec<_>>()
-    );
 }
 
 #[gpui::test]
@@ -3517,19 +3495,7 @@ async fn test_random_worktree_operations_during_initial_scan(
     .await
     .unwrap();
 
-    let mut snapshots = vec![worktree.read_with(cx, |tree, _| tree.as_local().unwrap().snapshot())];
-    let updates = Arc::new(Mutex::new(Vec::new()));
-    worktree.update(cx, |tree, cx| {
-        check_worktree_change_events(tree, cx);
-
-        tree.as_local_mut().unwrap().observe_updates(0, cx, {
-            let updates = updates.clone();
-            move |update| {
-                updates.lock().push(update);
-                async { true }
-            }
-        });
-    });
+    worktree.update(cx, |tree, cx| check_worktree_change_events(tree, cx));
 
     for _ in 0..operations {
         worktree
@@ -3541,10 +3507,6 @@ async fn test_random_worktree_operations_during_initial_scan(
         worktree.read_with(cx, |tree, _| {
             tree.as_local().unwrap().snapshot().check_invariants(true)
         });
-
-        if rng.random_bool(0.6) {
-            snapshots.push(worktree.read_with(cx, |tree, _| tree.as_local().unwrap().snapshot()));
-        }
     }
 
     worktree
@@ -3553,30 +3515,9 @@ async fn test_random_worktree_operations_during_initial_scan(
 
     cx.executor().run_until_parked();
 
-    let final_snapshot = worktree.read_with(cx, |tree, _| {
-        let tree = tree.as_local().unwrap();
-        let snapshot = tree.snapshot();
-        snapshot.check_invariants(true);
-        snapshot
+    worktree.read_with(cx, |tree, _| {
+        tree.as_local().unwrap().snapshot().check_invariants(true)
     });
-
-    let settings = worktree.read_with(cx, |tree, _| tree.as_local().unwrap().settings());
-
-    for (i, snapshot) in snapshots.into_iter().enumerate().rev() {
-        let mut updated_snapshot = snapshot.clone();
-        for update in updates.lock().iter() {
-            if update.scan_id >= updated_snapshot.scan_id() as u64 {
-                updated_snapshot
-                    .apply_remote_update(update.clone(), &settings.file_scan_inclusions);
-            }
-        }
-
-        assert_eq!(
-            updated_snapshot.entries(true, 0).collect::<Vec<_>>(),
-            final_snapshot.entries(true, 0).collect::<Vec<_>>(),
-            "wrong updates after snapshot {i}: {updates:#?}",
-        );
-    }
 }
 
 #[gpui::test(iterations = 100)]
@@ -3609,25 +3550,13 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
     .await
     .unwrap();
 
-    let updates = Arc::new(Mutex::new(Vec::new()));
-    worktree.update(cx, |tree, cx| {
-        check_worktree_change_events(tree, cx);
-
-        tree.as_local_mut().unwrap().observe_updates(0, cx, {
-            let updates = updates.clone();
-            move |update| {
-                updates.lock().push(update);
-                async { true }
-            }
-        });
-    });
+    worktree.update(cx, |tree, cx| check_worktree_change_events(tree, cx));
 
     worktree
         .update(cx, |tree, _| tree.as_local_mut().unwrap().scan_complete())
         .await;
 
     fs.as_fake().pause_events();
-    let mut snapshots = Vec::new();
     let mut mutations_len = operations;
     while mutations_len > 1 {
         if rng.random_bool(0.2) {
@@ -3660,11 +3589,6 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
         }
 
         cx.executor().run_until_parked();
-        if rng.random_bool(0.2) {
-            log::info!("storing snapshot {}", snapshots.len());
-            let snapshot = worktree.read_with(cx, |tree, _| tree.as_local().unwrap().snapshot());
-            snapshots.push(snapshot);
-        }
     }
 
     log::info!("quiescing");
@@ -3710,36 +3634,6 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
             snapshot.entries_without_ids(true),
             new_snapshot.entries_without_ids(true)
         );
-    }
-
-    let settings = worktree.read_with(cx, |tree, _| tree.as_local().unwrap().settings());
-
-    for (i, mut prev_snapshot) in snapshots.into_iter().enumerate().rev() {
-        for update in updates.lock().iter() {
-            if update.scan_id >= prev_snapshot.scan_id() as u64 {
-                prev_snapshot.apply_remote_update(update.clone(), &settings.file_scan_inclusions);
-            }
-        }
-
-        assert_eq!(
-            prev_snapshot
-                .entries(true, 0)
-                .map(ignore_pending_dir)
-                .collect::<Vec<_>>(),
-            snapshot
-                .entries(true, 0)
-                .map(ignore_pending_dir)
-                .collect::<Vec<_>>(),
-            "wrong updates after snapshot {i}: {updates:#?}",
-        );
-    }
-
-    fn ignore_pending_dir(entry: &Entry) -> Entry {
-        let mut entry = entry.clone();
-        if entry.kind.is_dir() {
-            entry.kind = EntryKind::Dir
-        }
-        entry
     }
 }
 

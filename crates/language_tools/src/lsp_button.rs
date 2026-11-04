@@ -15,10 +15,9 @@ use language::{BinaryStatus, BufferId, ServerHealth};
 use lsp::{LanguageServerId, LanguageServerName, LanguageServerSelector};
 use path::PathStyle;
 use project::{
-    LspStore, LspStoreEvent, Worktree, lsp_store::log_store::GlobalLogStore,
+    LanguageServerUpdate, LspStore, LspStoreEvent, Worktree, lsp_store::log_store::GlobalLogStore,
     project_settings::ProjectSettings, trusted_worktrees::TrustedWorktrees,
 };
-use rpc::proto;
 use settings::{Settings as _, SettingsStore};
 use ui::{
     ContextMenu, ContextMenuEntry, Indicator, PopoverMenu, PopoverMenuHandle, Tooltip, prelude::*,
@@ -960,75 +959,52 @@ impl LspButton {
         // TODO `LspStore` is global and reports status from all language servers, even from the other windows.
         match e {
             LspStoreEvent::LanguageServerUpdate {
-                language_server_id,
-                name,
-                message: proto::update_language_server::Variant::StatusUpdate(status_update),
-            } => match &status_update.status {
-                Some(proto::status_update::Status::Binary(binary_status)) => {
-                    let Some(name) = name.as_ref() else {
-                        return;
-                    };
-                    if let Some(binary_status) =
-                        proto::ServerBinaryStatus::try_from(*binary_status).ok()
-                    {
-                        let binary_status = match binary_status {
-                            proto::ServerBinaryStatus::None => BinaryStatus::None,
-                            proto::ServerBinaryStatus::CheckingForUpdate => {
-                                BinaryStatus::CheckingForUpdate
-                            }
-                            proto::ServerBinaryStatus::Downloading => BinaryStatus::Downloading,
-                            proto::ServerBinaryStatus::Starting => BinaryStatus::Starting,
-                            proto::ServerBinaryStatus::Stopping => BinaryStatus::Stopping,
-                            proto::ServerBinaryStatus::Stopped => BinaryStatus::Stopped,
-                            proto::ServerBinaryStatus::Failed => {
-                                let Some(error) = status_update.message.clone() else {
-                                    return;
-                                };
-                                BinaryStatus::Failed { error }
-                            }
-                        };
-                        self.server_state.update(cx, |state, _| {
-                            state.language_servers.update_binary_status(
-                                binary_status,
-                                status_update.message.as_deref(),
-                                name.clone(),
-                            );
-                        });
-                        updated = true;
-                    };
-                }
-                Some(proto::status_update::Status::Health(health_status)) => {
-                    if let Some(health) = proto::ServerHealth::try_from(*health_status).ok() {
-                        let health = match health {
-                            proto::ServerHealth::Ok => ServerHealth::Ok,
-                            proto::ServerHealth::Warning => ServerHealth::Warning,
-                            proto::ServerHealth::Error => ServerHealth::Error,
-                        };
-                        self.server_state.update(cx, |state, _| {
-                            state.language_servers.update_server_health(
-                                *language_server_id,
-                                health,
-                                status_update.message.as_deref(),
-                                name.clone(),
-                            );
-                        });
-                        updated = true;
-                    }
-                }
-                None => {}
-            },
+                name: Some(name),
+                message: LanguageServerUpdate::BinaryStatus(binary_status),
+                ..
+            } => {
+                let message = match binary_status {
+                    BinaryStatus::Failed { error } => Some(error.clone()),
+                    _ => None,
+                };
+                self.server_state.update(cx, |state, _| {
+                    state.language_servers.update_binary_status(
+                        binary_status.clone(),
+                        message.as_deref(),
+                        name.clone(),
+                    );
+                });
+                updated = true;
+            }
             LspStoreEvent::LanguageServerUpdate {
                 language_server_id,
                 name,
-                message: proto::update_language_server::Variant::RegisteredForBuffer(update),
-                ..
+                message: LanguageServerUpdate::Health { health, message },
+            } => {
+                self.server_state.update(cx, |state, _| {
+                    state.language_servers.update_server_health(
+                        *language_server_id,
+                        *health,
+                        message.as_deref(),
+                        name.clone(),
+                    );
+                });
+                updated = true;
+            }
+            LspStoreEvent::LanguageServerUpdate {
+                language_server_id,
+                name,
+                message:
+                    LanguageServerUpdate::RegisteredForBuffer {
+                        buffer_abs_path, ..
+                    },
             } => {
                 self.server_state.update(cx, |state, cx| {
                     let Ok(worktree) = state.workspace.update(cx, |workspace, cx| {
                         workspace
                             .project()
                             .read(cx)
-                            .find_worktree(Path::new(&update.buffer_abs_path), cx)
+                            .find_worktree(buffer_abs_path, cx)
                             .map(|(worktree, _)| worktree.downgrade())
                     }) else {
                         return;
@@ -1036,7 +1012,7 @@ impl LspButton {
                     let entry = state
                         .language_servers
                         .servers_per_buffer_abs_path
-                        .entry(PathBuf::from(&update.buffer_abs_path))
+                        .entry(buffer_abs_path.clone())
                         .or_insert_with(|| ServersForPath {
                             servers: HashMap::default(),
                             worktree: worktree.clone(),

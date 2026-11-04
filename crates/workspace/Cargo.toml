@@ -47,7 +47,6 @@ node_runtime.workspace = true
 parking_lot.workspace = true
 project.workspace = true
 release_channel.workspace = true
-rpc.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

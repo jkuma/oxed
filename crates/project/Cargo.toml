@@ -21,7 +21,6 @@ path = "tests/integration/project_tests.rs"
 test-support = [
     "buffer_diff/test-support",
     "language/test-support",
-    "rpc/test-support",
     "settings/test-support",
     "snippet_provider/test-support",
     "text/test-support",
@@ -69,7 +68,6 @@ prettier.workspace = true
 rand.workspace = true
 regex.workspace = true
 release_channel.workspace = true
-rpc.workspace = true
 schemars.workspace = true
 semver.workspace = true
 serde.workspace = true
@@ -105,7 +103,6 @@ lsp = { workspace = true, features = ["test-support"] }
 prettier = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true
 project = {workspace = true, features = ["test-support"]}
-rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
 snippet_provider = { workspace = true, features = ["test-support"] }
 unindent.workspace = true

@@ -15,7 +15,6 @@ use gpui::{
     App, AppContext as _, Context, Entity, EntityId, EventEmitter, Global, Task, WeakEntity,
 };
 use postage::{prelude::Stream as _, watch};
-use rpc::ErrorExt;
 use util::{
     path_list::PathList,
     paths::{PathStyle, SanitizedPath},
@@ -668,7 +667,7 @@ impl WorktreeStore {
             }
         }
         let task = self.loading_worktrees.get(&abs_path).unwrap().clone();
-        cx.background_spawn(async move { task.await.map_err(|error| (*error).cloned()) })
+        cx.background_spawn(async move { task.await.map_err(|error| anyhow!("{error:#}")) })
     }
 
     fn create_local_worktree(

@@ -40,7 +40,6 @@ use project::{
 };
 use project_panel_settings::ProjectPanelSettings;
 use rayon::slice::ParallelSliceMut;
-use rpc::{ErrorCode, ErrorExt};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use settings::{
@@ -707,7 +706,6 @@ impl ProjectPanel {
     ) -> Entity<Self> {
         let project = workspace.project().clone();
         let git_store = project.read(cx).git_store().clone();
-        let path_style = project.read(cx).path_style(cx);
         let project_panel = cx.new(|cx| {
             let focus_handle = cx.focus_handle();
             cx.on_focus(&focus_handle, window, Self::focus_in).detach();
@@ -928,50 +926,51 @@ impl ProjectPanel {
                     allow_preview,
                 } => {
                     if let Some(worktree) = project.read(cx).worktree_for_entry(entry_id, cx)
-                        && let Some(entry) = worktree.read(cx).entry_for_id(entry_id) {
-                            let file_path = entry.path.clone();
-                            let worktree_id = worktree.read(cx).id();
-                            let entry_id = entry.id;
+                        && let Some(entry) = worktree.read(cx).entry_for_id(entry_id)
+                    {
+                        let path = entry.path.clone();
+                        let worktree_id = worktree.read(cx).id();
+                        let entry_id = entry.id;
 
-                            workspace
-                                .open_path_preview(
-                                    ProjectPath {
-                                        worktree_id,
-                                        path: file_path.clone(),
-                                    },
-                                    None,
-                                    focus_opened_item,
-                                    allow_preview,
-                                    true,
-                                    window, cx,
-                                )
-                                .detach_and_prompt_err("Failed to open file", window, cx, move |e, _, _| {
-                                    match e.error_code() {
-                                        ErrorCode::UnsharedItem => Some(format!(
-                                            "{} is not shared by the host. This could be because it has been marked as `private`",
-                                            file_path.display(path_style)
-                                        )),
-                                        // See note in worktree.rs where this error originates. Returning Some in this case prevents
-                                        // the error popup from saying "Try Again", which is a red herring in this case
-                                        ErrorCode::Internal if e.to_string().contains("File is too large to load") => Some(e.to_string()),
-                                        _ => None,
-                                    }
-                                });
+                        workspace
+                            .open_path_preview(
+                                ProjectPath { worktree_id, path },
+                                None,
+                                focus_opened_item,
+                                allow_preview,
+                                true,
+                                window,
+                                cx,
+                            )
+                            .detach_and_prompt_err(
+                                "Failed to open file",
+                                window,
+                                cx,
+                                move |e, _, _| {
+                                    // Some suppresses the retry prompt, which cannot help for an oversized file.
+                                    e.to_string()
+                                        .contains("File is too large to load")
+                                        .then(|| e.to_string())
+                                },
+                            );
 
-                            if let Some(project_panel) = project_panel.upgrade() {
-                                // Always select and mark the entry, regardless of whether it is opened or not.
-                                project_panel.update(cx, |project_panel, _| {
-                                    let entry = SelectedEntry { worktree_id, entry_id };
-                                    project_panel.marked_entries.clear();
-                                    project_panel.marked_entries.push(entry);
-                                    project_panel.selection = Some(entry);
-                                });
-                                if !focus_opened_item {
-                                    let focus_handle = project_panel.read(cx).focus_handle.clone();
-                                    window.focus(&focus_handle, cx);
-                                }
+                        if let Some(project_panel) = project_panel.upgrade() {
+                            // Always select and mark the entry, regardless of whether it is opened or not.
+                            project_panel.update(cx, |project_panel, _| {
+                                let entry = SelectedEntry {
+                                    worktree_id,
+                                    entry_id,
+                                };
+                                project_panel.marked_entries.clear();
+                                project_panel.marked_entries.push(entry);
+                                project_panel.selection = Some(entry);
+                            });
+                            if !focus_opened_item {
+                                let focus_handle = project_panel.read(cx).focus_handle.clone();
+                                window.focus(&focus_handle, cx);
                             }
                         }
+                    }
                 }
                 &Event::SplitEntry {
                     entry_id,
@@ -979,19 +978,21 @@ impl ProjectPanel {
                     split_direction,
                 } => {
                     if let Some(worktree) = project.read(cx).worktree_for_entry(entry_id, cx)
-                        && let Some(entry) = worktree.read(cx).entry_for_id(entry_id) {
-                            workspace
-                                .split_path_preview(
-                                    ProjectPath {
-                                        worktree_id: worktree.read(cx).id(),
-                                        path: entry.path.clone(),
-                                    },
-                                    allow_preview,
-                                    split_direction,
-                                    window, cx,
-                                )
-                                .detach_and_log_err(cx);
-                        }
+                        && let Some(entry) = worktree.read(cx).entry_for_id(entry_id)
+                    {
+                        workspace
+                            .split_path_preview(
+                                ProjectPath {
+                                    worktree_id: worktree.read(cx).id(),
+                                    path: entry.path.clone(),
+                                },
+                                allow_preview,
+                                split_direction,
+                                window,
+                                cx,
+                            )
+                            .detach_and_log_err(cx);
+                    }
                 }
 
                 _ => {}

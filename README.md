@@ -29,7 +29,7 @@ Oxed does not sign in, send telemetry or check for updates. It still contacts:
 
 ## Relationship with Zed
 
-Oxed is a standalone fork: it does not follow Zed's releases. Code that Oxed does not need is being removed progressively; some core crates (`client`, `rpc`, `remote`, `terminal`, `dap`, `language_model`, ...) are still compiled but never connected or started.
+Oxed is a standalone fork: it does not follow Zed's releases. Code that Oxed does not need is removed rather than disabled.
 
 ## License
 

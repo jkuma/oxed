@@ -3,7 +3,7 @@ use crate::stash::GitStash;
 use crate::status::{
     DiffTreeType, FileStatus, GitStatus, StatusCode, TrackedStatus, TreeDiff, TreeDiffStatus,
 };
-use crate::{Oid, RunHook, SHA256_HEX_LENGTH, SHORT_SHA_LENGTH};
+use crate::{Oid, SHA256_HEX_LENGTH, SHORT_SHA_LENGTH};
 use anyhow::{Context as _, Result, anyhow, bail};
 use async_channel::Sender;
 use collections::HashMap;
@@ -13,7 +13,6 @@ use futures::future::BoxFuture;
 use futures::io::BufWriter;
 use futures::{AsyncWriteExt, FutureExt as _, select_biased};
 use gpui::{AppContext as _, AsyncApp, BackgroundExecutor, SharedString, Task};
-use parking_lot::Mutex;
 use rope::Rope;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -671,23 +670,6 @@ pub enum FetchOptions {
 }
 
 impl FetchOptions {
-    pub fn to_proto(&self) -> Option<String> {
-        match self {
-            FetchOptions::All | FetchOptions::Unshallow => None,
-            FetchOptions::Remote(remote) => Some(remote.clone().name.into()),
-        }
-    }
-
-    pub fn from_proto(remote_name: Option<String>, unshallow: bool) -> Self {
-        if unshallow {
-            return FetchOptions::Unshallow;
-        }
-        match remote_name {
-            Some(name) => FetchOptions::Remote(Remote { name: name.into() }),
-            None => FetchOptions::All,
-        }
-    }
-
     pub fn name(&self) -> SharedString {
         match self {
             Self::All => "Fetch all remotes".into(),
@@ -965,16 +947,6 @@ pub trait GitRepository: Send + Sync {
         env: Arc<HashMap<String, String>>,
     ) -> BoxFuture<'_, Result<()>>;
 
-    /// Only used to serve `proto::RunGitHook` requests from older remote clients;
-    /// new code lets `git commit` run hooks itself.
-    ///
-    /// TODO: remove together with `proto::RunGitHook` (see the deprecation note in git.proto).
-    fn run_hook(
-        &self,
-        hook: RunHook,
-        env: Arc<HashMap<String, String>>,
-    ) -> BoxFuture<'_, Result<()>>;
-
     fn commit(
         &self,
         message: SharedString,
@@ -1180,7 +1152,6 @@ pub struct RealGitRepository {
     pub working_directory: Option<PathBuf>,
     pub system_git_binary_path: Option<PathBuf>,
     pub any_git_binary_path: PathBuf,
-    any_git_binary_help_output: Arc<Mutex<Option<SharedString>>>,
     executor: BackgroundExecutor,
     is_trusted: Arc<AtomicBool>,
 }
@@ -1279,7 +1250,6 @@ impl RealGitRepository {
             system_git_binary_path,
             any_git_binary_path,
             executor,
-            any_git_binary_help_output: Arc::new(Mutex::new(None)),
             is_trusted: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -1326,21 +1296,6 @@ impl RealGitRepository {
                 Ok(())
             })
             .boxed()
-    }
-
-    async fn any_git_binary_help_output(&self) -> SharedString {
-        if let Some(output) = self.any_git_binary_help_output.lock().clone() {
-            return output;
-        }
-        let git = self.git_binary();
-        let output: SharedString = self
-            .executor
-            .spawn(async move { git.run(&["help", "-a"]).await })
-            .await
-            .unwrap_or_default()
-            .into();
-        *self.any_git_binary_help_output.lock() = Some(output.clone());
-        output
     }
 }
 
@@ -3344,57 +3299,6 @@ impl GitRepository for RealGitRepository {
             .boxed()
     }
 
-    fn run_hook(
-        &self,
-        hook: RunHook,
-        env: Arc<HashMap<String, String>>,
-    ) -> BoxFuture<'_, Result<()>> {
-        let git_binary = self.git_binary_in_worktree();
-        let git_dir = self.git_dir.clone();
-        let help_output = self.any_git_binary_help_output();
-
-        // Note: Do not spawn these commands on the background thread, as this causes some git hooks to hang.
-        async move {
-            let git_binary = git_binary?;
-            let working_directory = git_binary.working_directory.clone();
-            if !help_output
-                .await
-                .lines()
-                .any(|line| line.trim().starts_with("hook "))
-            {
-                let hook_abs_path = git_dir.join("hooks").join(hook.as_str());
-                if hook_abs_path.is_file() && git_binary.is_trusted {
-                    #[allow(clippy::disallowed_methods)]
-                    let output = new_command(&hook_abs_path)
-                        .envs(env.iter())
-                        .current_dir(&working_directory)
-                        .output()
-                        .await?;
-
-                    if !output.status.success() {
-                        return Err(GitBinaryCommandError {
-                            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-                            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-                            status: output.status,
-                        }
-                        .into());
-                    }
-                }
-
-                return Ok(());
-            }
-
-            if git_binary.is_trusted {
-                let git_binary = git_binary.envs(HashMap::clone(&env));
-                git_binary
-                    .run(&["hook", "run", "--ignore-missing", hook.as_str()])
-                    .await?;
-            }
-            Ok(())
-        }
-        .boxed()
-    }
-
     fn initial_graph_data(
         &self,
         log_source: LogSource,
@@ -4146,11 +4050,6 @@ impl RepoPath {
     pub fn from_std_path(path: &Path, path_style: PathStyle) -> Result<Self> {
         let rel_path = RelPath::new(path, path_style)?;
         Ok(Self::from_rel_path(&rel_path))
-    }
-
-    pub fn from_proto(proto: &str) -> Result<Self> {
-        let rel_path = RelPath::from_unix_str(proto)?.into();
-        Ok(Self(rel_path))
     }
 
     pub fn from_rel_path(path: &RelPath) -> RepoPath {

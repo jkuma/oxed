@@ -88,14 +88,12 @@ members = [
     "crates/project",
     "crates/project_panel",
     "crates/project_symbols",
-    "crates/proto",
     "crates/recent_projects",
     "crates/refineable",
     "crates/refineable/derive_refineable",
     "crates/release_channel",
     "crates/reqwest_client",
     "crates/rope",
-    "crates/rpc",
     "crates/scheduler",
     "crates/search",
     "crates/session",
@@ -252,13 +250,11 @@ prettier = { path = "crates/prettier" }
 project = { path = "crates/project" }
 project_panel = { path = "crates/project_panel" }
 project_symbols = { path = "crates/project_symbols" }
-proto = { path = "crates/proto" }
 recent_projects = { path = "crates/recent_projects" }
 refineable = { path = "crates/refineable" }
 release_channel = { path = "crates/release_channel" }
 reqwest_client = { path = "crates/reqwest_client" }
 rope = { path = "crates/rope" }
-rpc = { path = "crates/rpc" }
 scheduler = { path = "crates/scheduler" }
 search = { path = "crates/search" }
 session = { path = "crates/session" }
@@ -470,9 +466,6 @@ profiling = "1"
 pollster = "0.4.0"
 proptest = { version = "1.12.0", features = ["attr-macro"] }
 proptest-derive = "0.8.0"
-prost = "0.14"
-prost-build = { version = "0.14", default-features = false }
-protox = "0.9"
 pulldown-cmark = { version = "0.13.0", default-features = false }
 quick-xml = "0.41"
 quote = "1.0.9"
@@ -494,7 +487,6 @@ resvg = { version = "0.46.0", default-features = false, features = [
     "memmap-fonts",
     "raster-images",
 ] }
-rsa = { version = "0.9", default-features = false, features = ["std", "u64_digit"] }
 rust-embed = { version = "8.11", features = ["include-exclude", "compression"] }
 rustc-hash = "2.1.0"
 rustix = { version = "1.1", features = ["fs"] }
@@ -613,7 +605,6 @@ xkbcommon = { version = "0.8", default-features = false }
 yaml-rust2 = { version = "0.8", default-features = false }
 yawc = { version = "0.4", default-features = false }
 zeroize = "1.8"
-zstd = { version = "0.13", default-features = false, features = ["legacy", "arrays"] }
 
 [workspace.dependencies.windows]
 version = "0.62"

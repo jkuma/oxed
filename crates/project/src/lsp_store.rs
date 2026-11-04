@@ -73,8 +73,8 @@ use language::{
     DiagnosticSourceKind, Diff, File as _, Language, LanguageAwareStyling, LanguageName,
     LanguageRegistry, LocalFile, LspAdapter, LspAdapterDelegate, LspInstaller, ManifestDelegate,
     ManifestName, ModelineSettings, OffsetUtf16, Patch, PointUtf16, RelatedInformation,
-    RelatedLocation, TextBufferSnapshot, ToOffset, ToOffsetUtf16, ToPointUtf16, Toolchain,
-    Transaction, Unclipped,
+    RelatedLocation, ServerHealth, TextBufferSnapshot, ToOffset, ToOffsetUtf16, ToPointUtf16,
+    Toolchain, Transaction, Unclipped,
     language_settings::{
         AllLanguageSettings, FormatOnSave, Formatter, LanguageSettings, LineEndingSetting,
         all_language_settings,
@@ -95,8 +95,6 @@ use node_runtime::read_package_installed_version;
 use parking_lot::Mutex;
 use postage::{mpsc, sink::Sink, stream::Stream, watch};
 use rand::prelude::*;
-use rpc::proto;
-use rpc::{ErrorCode, ErrorExt as _};
 use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
@@ -195,15 +193,6 @@ impl ProgressToken {
             Self::String(string) => lsp::NumberOrString::String(string.to_string()),
         }
     }
-
-    fn to_proto(&self) -> proto::ProgressToken {
-        proto::ProgressToken {
-            value: Some(match self {
-                Self::Number(number) => proto::progress_token::Value::Number(*number),
-                Self::String(string) => proto::progress_token::Value::String(string.to_string()),
-            }),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,8 +210,6 @@ pub enum LspFormatTarget {
 pub struct OpenLspBufferHandle(Entity<OpenLspBuffer>);
 
 struct OpenLspBuffer(Entity<Buffer>);
-
-impl FormatTrigger {}
 
 #[derive(Clone)]
 struct UnifiedLanguageServer {
@@ -3274,12 +3261,10 @@ impl LocalLspStore {
                 cx.emit(LspStoreEvent::LanguageServerUpdate {
                     language_server_id: server.server_id(),
                     name: None,
-                    message: proto::update_language_server::Variant::RegisteredForBuffer(
-                        proto::RegisteredForBuffer {
-                            buffer_abs_path: abs_path.to_string_lossy().into_owned(),
-                            buffer_id: buffer_id.to_proto(),
-                        },
-                    ),
+                    message: LanguageServerUpdate::RegisteredForBuffer {
+                        buffer_id,
+                        buffer_abs_path: abs_path.to_path_buf(),
+                    },
                 });
             }
         }
@@ -4467,21 +4452,9 @@ enum ChunkFetch {
     Running(CacheInlayHintsTask),
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
 struct SyncedServerCapabilities {
-    #[serde(flatten)]
     server_capabilities: lsp::ServerCapabilities,
-    #[serde(
-        rename = "zedInitialServerCapabilities",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
     initial_server_capabilities: Option<lsp::ServerCapabilities>,
-    #[serde(
-        rename = "zedTextDocumentRegistrations",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
     text_document_registrations: Option<dynamic_registration::TextDocumentRegistrations>,
 }
 
@@ -4584,6 +4557,25 @@ impl BufferLspData {
     }
 }
 
+/// A change in a language server's state, as reported to the UI.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LanguageServerUpdate {
+    RegisteredForBuffer {
+        buffer_id: BufferId,
+        buffer_abs_path: PathBuf,
+    },
+    BinaryStatus(BinaryStatus),
+    Health {
+        health: ServerHealth,
+        message: Option<String>,
+    },
+    WorkStarted,
+    WorkProgressed,
+    WorkEnded,
+    DiskBasedDiagnosticsUpdating,
+    DiskBasedDiagnosticsUpdated,
+}
+
 #[derive(Debug)]
 pub enum LspStoreEvent {
     LanguageServerAdded(LanguageServerId, LanguageServerName, Option<WorktreeId>),
@@ -4593,7 +4585,7 @@ pub enum LspStoreEvent {
     LanguageServerUpdate {
         language_server_id: LanguageServerId,
         name: Option<LanguageServerName>,
-        message: proto::update_language_server::Variant,
+        message: LanguageServerUpdate,
     },
     LanguageServerLog(LanguageServerId, LanguageServerLogType, String),
     LanguageServerPrompt(LanguageServerPromptRequest),
@@ -5528,6 +5520,41 @@ impl LspStore {
             .collect()
     }
 
+    pub(crate) fn sync_server_capabilities(&mut self, server: &LanguageServer) {
+        let server_id = server.server_id();
+        let SyncedServerCapabilities {
+            server_capabilities,
+            initial_server_capabilities,
+            text_document_registrations,
+        } = self.synced_server_capabilities(server);
+        self.lsp_server_capabilities
+            .insert(server_id, server_capabilities);
+        match initial_server_capabilities {
+            Some(capabilities) => {
+                self.lsp_server_initial_capabilities
+                    .insert(server_id, capabilities);
+            }
+            None => {
+                self.lsp_server_initial_capabilities.remove(&server_id);
+            }
+        }
+        match text_document_registrations {
+            Some(registrations) => {
+                self.lsp_server_text_document_registrations
+                    .insert(server_id, registrations);
+            }
+            None => {
+                self.lsp_server_text_document_registrations
+                    .remove(&server_id);
+            }
+        }
+        if let Some(status) = self.language_server_statuses.get_mut(&server_id) {
+            status.binary = Some(server.binary().clone());
+            status.configuration = Some(server.configuration().clone());
+            status.workspace_folders = server.workspace_folders();
+        }
+    }
+
     fn synced_server_capabilities(&self, server: &LanguageServer) -> SyncedServerCapabilities {
         let (initial_server_capabilities, text_document_registrations) = self
             .as_local()
@@ -5555,75 +5582,6 @@ impl LspStore {
             server_capabilities: server.capabilities(),
             initial_server_capabilities,
             text_document_registrations,
-        }
-    }
-
-    fn serialize_synced_server_capabilities(
-        &self,
-        server: &LanguageServer,
-    ) -> serde_json::Result<String> {
-        serde_json::to_string(&self.synced_server_capabilities(server))
-    }
-
-    fn notify_server_capabilities_updated(&self, server: &LanguageServer, cx: &mut Context<Self>) {
-        let Some(capabilities) = self.serialize_synced_server_capabilities(server).log_err() else {
-            return;
-        };
-        let message =
-            proto::update_language_server::Variant::MetadataUpdated(proto::ServerMetadataUpdated {
-                capabilities: Some(capabilities),
-                binary: Some(proto::LanguageServerBinaryInfo {
-                    path: server.binary().path.to_string_lossy().into_owned(),
-                    arguments: server
-                        .binary()
-                        .arguments
-                        .iter()
-                        .map(|arg| arg.to_string_lossy().into_owned())
-                        .collect(),
-                }),
-                configuration: serde_json::to_string(server.configuration()).ok(),
-                workspace_folders: server
-                    .workspace_folders()
-                    .iter()
-                    .map(|uri| uri.to_string())
-                    .collect(),
-            });
-        cx.emit(LspStoreEvent::LanguageServerUpdate {
-            language_server_id: server.server_id(),
-            name: Some(server.name()),
-            message,
-        });
-    }
-
-    pub(crate) fn insert_synced_server_capabilities(
-        &mut self,
-        server_id: LanguageServerId,
-        capabilities_json: &str,
-    ) {
-        if let Some(capabilities) =
-            serde_json::from_str::<SyncedServerCapabilities>(capabilities_json).log_err()
-        {
-            self.lsp_server_capabilities
-                .insert(server_id, capabilities.server_capabilities);
-            match capabilities.initial_server_capabilities {
-                Some(capabilities) => {
-                    self.lsp_server_initial_capabilities
-                        .insert(server_id, capabilities);
-                }
-                None => {
-                    self.lsp_server_initial_capabilities.remove(&server_id);
-                }
-            }
-            match capabilities.text_document_registrations {
-                Some(registrations) => {
-                    self.lsp_server_text_document_registrations
-                        .insert(server_id, registrations);
-                }
-                None => {
-                    self.lsp_server_text_document_registrations
-                        .remove(&server_id);
-                }
-            }
         }
     }
 
@@ -6122,15 +6080,10 @@ impl LspStore {
                             messages_to_report.push(LspStoreEvent::LanguageServerUpdate {
                                 language_server_id,
                                 name: node.name(),
-                                message:
-                                    proto::update_language_server::Variant::RegisteredForBuffer(
-                                        proto::RegisteredForBuffer {
-                                            buffer_abs_path: abs_path
-                                                .to_string_lossy()
-                                                .into_owned(),
-                                            buffer_id: buffer_id.to_proto(),
-                                        },
-                                    ),
+                                message: LanguageServerUpdate::RegisteredForBuffer {
+                                    buffer_id,
+                                    buffer_abs_path: abs_path.to_path_buf(),
+                                },
                             });
                         }
                     }
@@ -7510,15 +7463,9 @@ impl LspStore {
             .map(|(row_range, chunk_fetch)| {
                 let task = match chunk_fetch {
                     ChunkFetch::Cached(hints) => Task::ready(Ok(hints)),
-                    ChunkFetch::Running(hints_fetch) => cx.spawn(async move |_, _| {
-                        hints_fetch.await.map_err(|e| {
-                            if e.error_code() != ErrorCode::Internal {
-                                anyhow!(e.error_code())
-                            } else {
-                                anyhow!("{e:#}")
-                            }
-                        })
-                    }),
+                    ChunkFetch::Running(hints_fetch) => {
+                        cx.spawn(async move |_, _| hints_fetch.await.map_err(|e| anyhow!("{e:#}")))
+                    }
                 };
                 (row_range, task)
             })
@@ -8947,10 +8894,8 @@ impl LspStore {
             name: self
                 .language_server_adapter_for_id(language_server_id)
                 .map(|adapter| adapter.name()),
-            message: proto::update_language_server::Variant::DiskBasedDiagnosticsUpdating(
-                Default::default(),
-            ),
-        })
+            message: LanguageServerUpdate::DiskBasedDiagnosticsUpdating,
+        });
     }
 
     pub fn disk_based_diagnostics_finished(
@@ -8970,10 +8915,8 @@ impl LspStore {
             name: self
                 .language_server_adapter_for_id(language_server_id)
                 .map(|adapter| adapter.name()),
-            message: proto::update_language_server::Variant::DiskBasedDiagnosticsUpdated(
-                Default::default(),
-            ),
-        })
+            message: LanguageServerUpdate::DiskBasedDiagnosticsUpdated,
+        });
     }
 
     // After saving a buffer using a language server that doesn't provide a disk-based progress token,
@@ -9347,7 +9290,7 @@ impl LspStore {
         cx: &mut Context<Self>,
     ) {
         if let Some(status) = self.language_server_statuses.get_mut(&language_server_id) {
-            status.pending_work.insert(token.clone(), progress.clone());
+            status.pending_work.insert(token, progress);
             cx.notify();
         }
         cx.emit(LspStoreEvent::LanguageServerUpdate {
@@ -9355,14 +9298,8 @@ impl LspStore {
             name: self
                 .language_server_adapter_for_id(language_server_id)
                 .map(|adapter| adapter.name()),
-            message: proto::update_language_server::Variant::WorkStart(proto::LspWorkStart {
-                token: Some(token.to_proto()),
-                title: progress.title,
-                message: progress.message,
-                percentage: progress.percentage.map(|p| p as u32),
-                is_cancellable: Some(progress.is_cancellable),
-            }),
-        })
+            message: LanguageServerUpdate::WorkStarted,
+        });
     }
 
     fn on_lsp_work_progress(
@@ -9374,9 +9311,9 @@ impl LspStore {
     ) {
         let mut did_update = false;
         if let Some(status) = self.language_server_statuses.get_mut(&language_server_id) {
-            match status.pending_work.entry(token.clone()) {
+            match status.pending_work.entry(token) {
                 btree_map::Entry::Vacant(entry) => {
-                    entry.insert(progress.clone());
+                    entry.insert(progress);
                     did_update = true;
                 }
                 btree_map::Entry::Occupied(mut entry) => {
@@ -9406,15 +9343,8 @@ impl LspStore {
                 name: self
                     .language_server_adapter_for_id(language_server_id)
                     .map(|adapter| adapter.name()),
-                message: proto::update_language_server::Variant::WorkProgress(
-                    proto::LspWorkProgress {
-                        token: Some(token.to_proto()),
-                        message: progress.message,
-                        percentage: progress.percentage.map(|p| p as u32),
-                        is_cancellable: Some(progress.is_cancellable),
-                    },
-                ),
-            })
+                message: LanguageServerUpdate::WorkProgressed,
+            });
         }
     }
 
@@ -9440,9 +9370,7 @@ impl LspStore {
             name: self
                 .language_server_adapter_for_id(language_server_id)
                 .map(|adapter| adapter.name()),
-            message: proto::update_language_server::Variant::WorkEnd(proto::LspWorkEnd {
-                token: Some(token.to_proto()),
-            }),
+            message: LanguageServerUpdate::WorkEnded,
         })
     }
 
@@ -10322,12 +10250,10 @@ impl LspStore {
             cx.emit(LspStoreEvent::LanguageServerUpdate {
                 language_server_id: server_id,
                 name: Some(adapter.name()),
-                message: proto::update_language_server::Variant::RegisteredForBuffer(
-                    proto::RegisteredForBuffer {
-                        buffer_abs_path: abs_path.to_string_lossy().into_owned(),
-                        buffer_id: buffer_id.to_proto(),
-                    },
-                ),
+                message: LanguageServerUpdate::RegisteredForBuffer {
+                    buffer_id,
+                    buffer_abs_path: abs_path.to_path_buf(),
+                },
             });
         }
 
@@ -11397,34 +11323,12 @@ fn subscribe_to_binary_statuses(
                         return;
                     }
 
-                    let mut message = None;
-                    let binary_status = match binary_status {
-                        BinaryStatus::None => proto::ServerBinaryStatus::None,
-                        BinaryStatus::CheckingForUpdate => {
-                            proto::ServerBinaryStatus::CheckingForUpdate
-                        }
-                        BinaryStatus::Downloading => proto::ServerBinaryStatus::Downloading,
-                        BinaryStatus::Starting => proto::ServerBinaryStatus::Starting,
-                        BinaryStatus::Stopping => proto::ServerBinaryStatus::Stopping,
-                        BinaryStatus::Stopped => proto::ServerBinaryStatus::Stopped,
-                        BinaryStatus::Failed { error } => {
-                            message = Some(error);
-                            proto::ServerBinaryStatus::Failed
-                        }
-                    };
                     cx.emit(LspStoreEvent::LanguageServerUpdate {
                         // Binary updates are about the binary that might not have any language server id at that point.
                         // Reuse `LanguageServerUpdate` for them and provide a fake id that won't be used on the receiver side.
                         language_server_id: LanguageServerId(0),
                         name: Some(server_name),
-                        message: proto::update_language_server::Variant::StatusUpdate(
-                            proto::StatusUpdate {
-                                message,
-                                status: Some(proto::status_update::Status::Binary(
-                                    binary_status as i32,
-                                )),
-                            },
-                        ),
+                        message: LanguageServerUpdate::BinaryStatus(binary_status),
                     });
                 })
                 .is_err()
@@ -12172,79 +12076,6 @@ pub enum LanguageServerLogType {
     },
 }
 
-impl LanguageServerLogType {
-    pub fn to_proto(&self) -> proto::language_server_log::LogType {
-        match self {
-            Self::Log(log_type) => {
-                use proto::log_message::LogLevel;
-                let level = match *log_type {
-                    MessageType::ERROR => LogLevel::Error,
-                    MessageType::WARNING => LogLevel::Warning,
-                    MessageType::INFO => LogLevel::Info,
-                    MessageType::LOG => LogLevel::Log,
-                    other => {
-                        log::warn!("Unknown lsp log message type: {other:?}");
-                        LogLevel::Log
-                    }
-                };
-                proto::language_server_log::LogType::Log(proto::LogMessage {
-                    level: level as i32,
-                })
-            }
-            Self::Trace { verbose_info } => {
-                proto::language_server_log::LogType::Trace(proto::TraceMessage {
-                    verbose_info: verbose_info.to_owned(),
-                })
-            }
-            Self::Rpc { received, elapsed } => {
-                let kind = if *received {
-                    proto::rpc_message::Kind::Received
-                } else {
-                    proto::rpc_message::Kind::Sent
-                };
-                let kind = kind as i32;
-                let elapsed_nanos =
-                    elapsed.map(|elapsed| u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX));
-                proto::language_server_log::LogType::Rpc(proto::RpcMessage {
-                    kind,
-                    elapsed_nanos,
-                })
-            }
-        }
-    }
-
-    pub fn from_proto(log_type: proto::language_server_log::LogType) -> Self {
-        use proto::log_message::LogLevel;
-        use proto::rpc_message;
-        match log_type {
-            proto::language_server_log::LogType::Log(message_type) => Self::Log(
-                match LogLevel::try_from(message_type.level)
-                    .ok()
-                    .unwrap_or(LogLevel::Log)
-                {
-                    LogLevel::Error => MessageType::ERROR,
-                    LogLevel::Warning => MessageType::WARNING,
-                    LogLevel::Info => MessageType::INFO,
-                    LogLevel::Log => MessageType::LOG,
-                },
-            ),
-            proto::language_server_log::LogType::Trace(trace_message) => Self::Trace {
-                verbose_info: trace_message.verbose_info,
-            },
-            proto::language_server_log::LogType::Rpc(message) => Self::Rpc {
-                received: match rpc_message::Kind::try_from(message.kind)
-                    .ok()
-                    .unwrap_or(rpc_message::Kind::Received)
-                {
-                    rpc_message::Kind::Received => true,
-                    rpc_message::Kind::Sent => false,
-                },
-                elapsed: message.elapsed_nanos.map(Duration::from_nanos),
-            },
-        }
-    }
-}
-
 pub struct WorkspaceRefreshTask {
     refresh_tx: mpsc::Sender<Option<oneshot::Sender<bool>>>,
     progress_tx: mpsc::Sender<()>,
@@ -12347,19 +12178,6 @@ impl DiagnosticSummary {
 
     pub fn is_empty(&self) -> bool {
         self.error_count == 0 && self.warning_count == 0
-    }
-
-    pub fn to_proto(
-        self,
-        language_server_id: LanguageServerId,
-        path: &RelPath,
-    ) -> proto::DiagnosticSummary {
-        proto::DiagnosticSummary {
-            path: path.as_unix_str().to_owned(),
-            language_server_id: language_server_id.0 as u64,
-            error_count: self.error_count as u32,
-            warning_count: self.warning_count as u32,
-        }
     }
 }
 
@@ -13370,68 +13188,6 @@ mod tests {
             "Get diagnostics via rust-analyzer failed: Server reset the connection"
         ));
         assert!(should_log_lsp_request_failure("something else entirely"));
-    }
-    #[test]
-    fn synced_server_capabilities_wire_format_is_compatible_with_plain_capabilities() {
-        let registrations: dynamic_registration::TextDocumentRegistrations =
-            HashMap::from_iter([(
-                "textDocument/completion".to_string(),
-                collections::IndexMap::from_iter([(
-                    "file-completion".to_string(),
-                    dynamic_registration::DynamicTextDocumentRegistration {
-                        document_selector: Some(vec![lsp::DocumentFilter {
-                            language: Some("rust".to_string()),
-                            scheme: Some("file".to_string()),
-                            pattern: None,
-                        }]),
-                        server_capabilities: lsp::ServerCapabilities {
-                            completion_provider: Some(lsp::CompletionOptions {
-                                trigger_characters: Some(vec![".".to_string()]),
-                                ..lsp::CompletionOptions::default()
-                            }),
-                            ..lsp::ServerCapabilities::default()
-                        },
-                    },
-                )]),
-            )]);
-        let server_capabilities = lsp::ServerCapabilities {
-            hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
-            ..lsp::ServerCapabilities::default()
-        };
-        let initial_server_capabilities = lsp::ServerCapabilities {
-            definition_provider: Some(lsp::OneOf::Left(true)),
-            ..lsp::ServerCapabilities::default()
-        };
-
-        let envelope = serde_json::to_string(&SyncedServerCapabilities {
-            server_capabilities: server_capabilities.clone(),
-            initial_server_capabilities: Some(initial_server_capabilities.clone()),
-            text_document_registrations: Some(registrations.clone()),
-        })
-        .unwrap();
-        let parsed_by_old_peer =
-            serde_json::from_str::<lsp::ServerCapabilities>(&envelope).unwrap();
-        assert_eq!(
-            parsed_by_old_peer, server_capabilities,
-            "peers without the extra field should parse the envelope as plain capabilities",
-        );
-        let parsed = serde_json::from_str::<SyncedServerCapabilities>(&envelope).unwrap();
-        assert_eq!(parsed.server_capabilities, server_capabilities);
-        assert_eq!(
-            parsed.initial_server_capabilities,
-            Some(initial_server_capabilities)
-        );
-        assert_eq!(parsed.text_document_registrations, Some(registrations));
-
-        let plain_capabilities = serde_json::to_string(&server_capabilities).unwrap();
-        let parsed_plain =
-            serde_json::from_str::<SyncedServerCapabilities>(&plain_capabilities).unwrap();
-        assert_eq!(
-            parsed_plain.server_capabilities, server_capabilities,
-            "payloads from peers without the extra field should parse as an envelope",
-        );
-        assert_eq!(parsed_plain.initial_server_capabilities, None);
-        assert_eq!(parsed_plain.text_document_registrations, None);
     }
 
     #[test]

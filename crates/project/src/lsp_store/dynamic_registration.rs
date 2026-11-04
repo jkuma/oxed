@@ -80,7 +80,6 @@ impl LspStore {
         registration_id: String,
         options: T,
         document_selector: Option<lsp::DocumentSelector>,
-        cx: &mut Context<Self>,
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<CapabilityRegistrationChange> {
         let server_id = server.server_id();
@@ -146,7 +145,7 @@ impl LspStore {
             server.update_capabilities(|capabilities| *capability_of(capabilities) = new_active);
         }
         if active_changed || registration_changed {
-            self.notify_server_capabilities_updated(server, cx);
+            self.sync_server_capabilities(server);
         }
         Ok(CapabilityRegistrationChange {
             active_capability_changed: active_changed,
@@ -159,7 +158,6 @@ impl LspStore {
         &mut self,
         server: &LanguageServer,
         unregistration: &lsp::Unregistration,
-        cx: &mut Context<Self>,
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<Option<CapabilityRegistrationChange>> {
         let server_id = server.server_id();
@@ -210,7 +208,7 @@ impl LspStore {
         if active_changed {
             server.update_capabilities(|capabilities| *capability_of(capabilities) = new_active);
         }
-        self.notify_server_capabilities_updated(server, cx);
+        self.sync_server_capabilities(server);
         Ok(Some(CapabilityRegistrationChange {
             active_capability_changed: active_changed,
             text_document_registration_changed: applicable_set_changed,
@@ -227,7 +225,6 @@ impl LspStore {
         method: &str,
         registration_id: String,
         options: T,
-        cx: &mut Context<Self>,
         registrations_of: impl FnOnce(&mut DynamicRegistrations) -> &mut CapabilityRegistrations<T>,
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<bool> {
@@ -262,7 +259,7 @@ impl LspStore {
         let active_changed = active != previously_active;
         if active_changed {
             server.update_capabilities(|capabilities| *capability_of(capabilities) = active);
-            self.notify_server_capabilities_updated(server, cx);
+            self.sync_server_capabilities(server);
         }
         Ok(active_changed)
     }
@@ -271,7 +268,6 @@ impl LspStore {
         &mut self,
         server: &LanguageServer,
         unregistration: &lsp::Unregistration,
-        cx: &mut Context<Self>,
         registrations_of: impl FnOnce(&mut DynamicRegistrations) -> &mut CapabilityRegistrations<T>,
         capability_of: impl FnOnce(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<Option<bool>> {
@@ -309,7 +305,7 @@ impl LspStore {
             return Ok(Some(false));
         }
         server.update_capabilities(|capabilities| *capability_of(capabilities) = restored);
-        self.notify_server_capabilities_updated(server, cx);
+        self.sync_server_capabilities(server);
         Ok(Some(true))
     }
 
@@ -397,7 +393,7 @@ impl LspStore {
                             false
                         };
                         if notify {
-                            self.notify_server_capabilities_updated(&server, cx);
+                            self.sync_server_capabilities(&server);
                         }
                     }
                 }
@@ -415,7 +411,6 @@ impl LspStore {
                         &reg.method,
                         reg.id,
                         caps,
-                        cx,
                         |registrations| &mut registrations.workspace_folders,
                         |capabilities| {
                             &mut capabilities
@@ -432,7 +427,6 @@ impl LspStore {
                         &reg.method,
                         reg.id,
                         options,
-                        cx,
                         |registrations| &mut registrations.workspace_symbol,
                         |capabilities| &mut capabilities.workspace_symbol_provider,
                     )?;
@@ -445,7 +439,6 @@ impl LspStore {
                             &reg.method,
                             reg.id,
                             caps,
-                            cx,
                             |registrations| &mut registrations.file_operations,
                             |capabilities| {
                                 &mut capabilities
@@ -466,7 +459,6 @@ impl LspStore {
                             &reg.method,
                             reg.id,
                             options,
-                            cx,
                             |registrations| &mut registrations.execute_command,
                             |capabilities| &mut capabilities.execute_command_provider,
                         )?;
@@ -482,7 +474,6 @@ impl LspStore {
                         reg.id,
                         options,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.document_range_formatting_provider,
                     )?;
                 }
@@ -500,7 +491,6 @@ impl LspStore {
                             reg.id,
                             options,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.document_on_type_formatting_provider,
                         )?;
                     }
@@ -515,7 +505,6 @@ impl LspStore {
                         reg.id,
                         options,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.document_formatting_provider,
                     )?;
                 }
@@ -529,7 +518,6 @@ impl LspStore {
                         reg.id,
                         options,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.rename_provider,
                     )?;
                 }
@@ -544,7 +532,6 @@ impl LspStore {
                             reg.id,
                             options,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.inlay_hint_provider,
                         )?
                         .applicability_may_have_changed()
@@ -563,7 +550,6 @@ impl LspStore {
                             reg.id,
                             options,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.document_symbol_provider,
                         )?
                         .applicability_may_have_changed()
@@ -585,7 +571,6 @@ impl LspStore {
                         reg.id,
                         provider,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.code_action_provider,
                     )?;
                 }
@@ -605,7 +590,6 @@ impl LspStore {
                         reg.id,
                         provider,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.call_hierarchy_provider,
                     )?;
                 }
@@ -619,7 +603,6 @@ impl LspStore {
                         reg.id,
                         options,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.definition_provider,
                     )?;
                 }
@@ -634,7 +617,6 @@ impl LspStore {
                             reg.id,
                             options,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.document_highlight_provider,
                         )?
                         .applicability_may_have_changed()
@@ -656,7 +638,6 @@ impl LspStore {
                             registration_options
                                 .text_document_registration_options
                                 .document_selector,
-                            cx,
                             |capabilities| &mut capabilities.completion_provider,
                         )?;
                         self.apply_completion_triggers(server_id, cx);
@@ -676,7 +657,6 @@ impl LspStore {
                         reg.id,
                         provider,
                         document_selector,
-                        cx,
                         |capabilities| &mut capabilities.hover_provider,
                     )?;
                 }
@@ -694,7 +674,6 @@ impl LspStore {
                             reg.id,
                             caps,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.signature_help_provider,
                         )?;
                     }
@@ -712,7 +691,7 @@ impl LspStore {
                             capabilities.text_document_sync =
                                 Some(lsp::TextDocumentSyncCapability::Options(sync_options));
                         });
-                        self.notify_server_capabilities_updated(&server, cx);
+                        self.sync_server_capabilities(&server);
                     }
                 }
                 "textDocument/didSave" => {
@@ -740,7 +719,7 @@ impl LspStore {
                             capabilities.text_document_sync =
                                 Some(lsp::TextDocumentSyncCapability::Options(sync_options));
                         });
-                        self.notify_server_capabilities_updated(&server, cx);
+                        self.sync_server_capabilities(&server);
                     }
                 }
                 "textDocument/codeLens" => {
@@ -758,7 +737,6 @@ impl LspStore {
                                 reg.id,
                                 options,
                                 document_selector,
-                                cx,
                                 |capabilities| &mut capabilities.code_lens_provider,
                             )?
                             .applicability_may_have_changed()
@@ -782,7 +760,6 @@ impl LspStore {
                             reg.id,
                             caps.clone(),
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.diagnostic_provider,
                         )?;
 
@@ -845,7 +822,6 @@ impl LspStore {
                             reg.id,
                             provider,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.color_provider,
                         )?
                         .applicability_may_have_changed()
@@ -868,7 +844,6 @@ impl LspStore {
                             reg.id,
                             provider,
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.folding_range_provider,
                         )?
                         .applicability_may_have_changed()
@@ -891,7 +866,6 @@ impl LspStore {
                                 reg.id,
                                 caps,
                                 document_selector,
-                                cx,
                                 |capabilities| &mut capabilities.document_link_provider,
                             )?
                             .applicability_may_have_changed()
@@ -914,7 +888,6 @@ impl LspStore {
                             reg.id,
                             lsp::SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(caps),
                             document_selector,
-                            cx,
                             |capabilities| &mut capabilities.semantic_tokens_provider,
                         )?
                         .ordered_capability_may_have_changed()
@@ -952,7 +925,7 @@ impl LspStore {
                         false
                     };
                     if notify {
-                        self.notify_server_capabilities_updated(&server, cx);
+                        self.sync_server_capabilities(&server);
                     }
                 }
                 "workspace/didChangeConfiguration" => {
@@ -962,7 +935,6 @@ impl LspStore {
                     self.unregister_dynamic_capability(
                         &server,
                         unreg,
-                        cx,
                         |registrations| &mut registrations.workspace_folders,
                         |capabilities| {
                             &mut capabilities
@@ -976,7 +948,6 @@ impl LspStore {
                     self.unregister_dynamic_capability(
                         &server,
                         unreg,
-                        cx,
                         |registrations| &mut registrations.workspace_symbol,
                         |capabilities| &mut capabilities.workspace_symbol_provider,
                     )?;
@@ -985,7 +956,6 @@ impl LspStore {
                     if self.unregister_dynamic_capability(
                         &server,
                         unreg,
-                        cx,
                         |registrations| &mut registrations.file_operations,
                         |capabilities| {
                             &mut capabilities
@@ -1002,7 +972,6 @@ impl LspStore {
                     self.unregister_dynamic_capability(
                         &server,
                         unreg,
-                        cx,
                         |registrations| &mut registrations.execute_command,
                         |capabilities| &mut capabilities.execute_command_provider,
                     )?;
@@ -1011,7 +980,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.document_range_formatting_provider,
                     )?;
                 }
@@ -1019,7 +987,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.document_on_type_formatting_provider,
                     )?;
                 }
@@ -1027,7 +994,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.document_formatting_provider,
                     )?;
                 }
@@ -1035,7 +1001,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.rename_provider,
                     )?;
                 }
@@ -1043,7 +1008,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.code_action_provider,
                     )?;
                 }
@@ -1051,7 +1015,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.call_hierarchy_provider,
                     )?;
                 }
@@ -1059,7 +1022,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.definition_provider,
                     )?;
                 }
@@ -1068,7 +1030,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.document_highlight_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1081,7 +1042,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.completion_provider,
                         )?
                         .is_some()
@@ -1093,7 +1053,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.hover_provider,
                     )?;
                 }
@@ -1101,7 +1060,6 @@ impl LspStore {
                     self.unregister_dynamic_text_document_capability(
                         &server,
                         unreg,
-                        cx,
                         |capabilities| &mut capabilities.signature_help_provider,
                     )?;
                 }
@@ -1110,7 +1068,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.semantic_tokens_provider,
                         )?
                         .is_some_and(
@@ -1127,7 +1084,7 @@ impl LspStore {
                         capabilities.text_document_sync =
                             Some(lsp::TextDocumentSyncCapability::Options(sync_options));
                     });
-                    self.notify_server_capabilities_updated(&server, cx);
+                    self.sync_server_capabilities(&server);
                 }
                 "textDocument/didSave" => {
                     server.update_capabilities(|capabilities| {
@@ -1136,14 +1093,13 @@ impl LspStore {
                         capabilities.text_document_sync =
                             Some(lsp::TextDocumentSyncCapability::Options(sync_options));
                     });
-                    self.notify_server_capabilities_updated(&server, cx);
+                    self.sync_server_capabilities(&server);
                 }
                 "textDocument/inlayHint" => {
                     if self
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.inlay_hint_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1156,7 +1112,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.document_symbol_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1169,7 +1124,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.code_lens_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1182,7 +1136,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.diagnostic_provider,
                         )?
                         .is_some()
@@ -1214,7 +1167,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.color_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1227,7 +1179,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.folding_range_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)
@@ -1240,7 +1191,6 @@ impl LspStore {
                         .unregister_dynamic_text_document_capability(
                             &server,
                             unreg,
-                            cx,
                             |capabilities| &mut capabilities.document_link_provider,
                         )?
                         .is_some_and(CapabilityRegistrationChange::applicability_may_have_changed)

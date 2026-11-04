@@ -7,10 +7,8 @@
 //! 2. [EncryptedPassword] cannot be converted into a [String] or any other plaintext representation.
 //! All use cases that do need such functionality (of which we have two right now) are implemented within this module.
 //!
-//! Note that this is not bulletproof.
-//! 1. [ProcessExt] is implemented for [smol::process::Command], which is a builder for smol processes.
+//! Note that this is not bulletproof: [ProcessExt] is implemented for [smol::process::Command], which is a builder for smol processes.
 //! Before the process itself is spawned the contents of [EncryptedPassword] are unencrypted in env var storage of said builder.
-//! 2. We're also sending plaintext passwords over RPC with [proto::AskPassResponse]. Go figure how great that is.
 //!
 //! Still, the goal of this module is to not have passwords laying around nilly-willy in memory.
 //! We do not claim that it is fool-proof.

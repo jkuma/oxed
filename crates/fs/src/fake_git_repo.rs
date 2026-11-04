@@ -9,7 +9,7 @@ use futures::channel::oneshot;
 use futures::future::{self, BoxFuture, join_all};
 use git::repository::GitCommitTemplate;
 use git::{
-    Oid, RunHook,
+    Oid,
     blame::Blame,
     repository::{
         AskPassDelegate, Branch, CommitData, CommitDataReader, CommitDetails, CommitOptions,
@@ -1284,14 +1284,6 @@ impl GitRepository for FakeGitRepository {
 
             Ok(())
         })
-    }
-
-    fn run_hook(
-        &self,
-        _hook: RunHook,
-        _env: Arc<HashMap<String, String>>,
-    ) -> BoxFuture<'_, Result<()>> {
-        async { Ok(()) }.boxed()
     }
 
     fn push(

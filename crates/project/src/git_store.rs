@@ -33,7 +33,7 @@ use futures::{
     stream::{FuturesOrdered, FuturesUnordered},
 };
 use git::{
-    BuildPermalinkParams, GitHostingProviderRegistry, Oid, RunHook,
+    BuildPermalinkParams, GitHostingProviderRegistry, Oid,
     blame::Blame,
     parse_git_remote_url,
     repository::{
@@ -43,11 +43,8 @@ use git::{
         LogOrder, LogSource, PushOptions, Remote, RemoteCommandOutput, RepoPath, ResetMode,
         SearchCommitArgs, Worktree as GitWorktree, delete_branch_flag, is_binary_content,
     },
-    stash::{GitStash, StashEntry},
-    status::{
-        self, DiffStat, DiffTreeType, FileStatus, GitSummary, StatusCode, TrackedStatus, TreeDiff,
-        UnmergedStatus, UnmergedStatusCode,
-    },
+    stash::GitStash,
+    status::{self, DiffStat, DiffTreeType, FileStatus, GitSummary, TreeDiff},
 };
 use gpui::{
     App, AppContext, AsyncApp, BackgroundExecutor, Context, Entity, EventEmitter, SharedString,
@@ -57,7 +54,6 @@ use language::{Anchor, Buffer, BufferEvent, Capability, Language, LanguageRegist
 use paths::{config_dir, home_dir};
 use pending_op::{PendingOp, PendingOpId, PendingOps, PendingOpsSummary};
 use postage::stream::Stream as _;
-use rpc::proto::{self};
 use serde::Deserialize;
 use settings::{GitDiffBaseSetting, Settings, SettingsLocation, SettingsStore, WorktreeId};
 use smol::future::yield_now;
@@ -416,17 +412,6 @@ impl language::File for IndexTextFile {
         self.worktree_id
     }
 
-    fn to_proto(&self, _: &App) -> rpc::proto::File {
-        rpc::proto::File {
-            worktree_id: self.worktree_id.to_proto(),
-            entry_id: None,
-            path: self.path.as_ref().as_unix_str().to_owned(),
-            mtime: None,
-            is_deleted: false,
-            is_historic: true,
-        }
-    }
-
     fn is_private(&self) -> bool {
         self.is_private
     }
@@ -466,40 +451,6 @@ pub struct StatusEntry {
     pub diff_stat: Option<DiffStat>,
     pub staged_diff_stat: Option<DiffStat>,
     pub unstaged_diff_stat: Option<DiffStat>,
-}
-
-impl StatusEntry {}
-
-impl TryFrom<proto::StatusEntry> for StatusEntry {
-    type Error = anyhow::Error;
-
-    fn try_from(value: proto::StatusEntry) -> Result<Self, Self::Error> {
-        let repo_path = RepoPath::from_proto(&value.repo_path).context("invalid repo path")?;
-        let status = status_from_proto(value.simple_status, value.status)?;
-        let diff_stat = match (value.diff_stat_added, value.diff_stat_deleted) {
-            (Some(added), Some(deleted)) => Some(DiffStat { added, deleted }),
-            _ => None,
-        };
-        let staged_diff_stat = match (value.staged_diff_stat_added, value.staged_diff_stat_deleted)
-        {
-            (Some(added), Some(deleted)) => Some(DiffStat { added, deleted }),
-            _ => None,
-        };
-        let unstaged_diff_stat = match (
-            value.unstaged_diff_stat_added,
-            value.unstaged_diff_stat_deleted,
-        ) {
-            (Some(added), Some(deleted)) => Some(DiffStat { added, deleted }),
-            _ => None,
-        };
-        Ok(Self {
-            repo_path,
-            status,
-            diff_stat,
-            staged_diff_stat,
-            unstaged_diff_stat,
-        })
-    }
 }
 
 impl sum_tree::Item for StatusEntry {
@@ -3800,16 +3751,6 @@ impl BufferGitState {
     }
 }
 
-impl RepositoryId {
-    pub fn to_proto(self) -> u64 {
-        self.0
-    }
-
-    pub fn from_proto(id: u64) -> Self {
-        RepositoryId(id)
-    }
-}
-
 impl RepositorySnapshot {
     fn empty(
         id: RepositoryId,
@@ -3991,26 +3932,6 @@ impl RepositorySnapshot {
             .to_string()
             .into()
     }
-}
-
-pub fn stash_to_proto(entry: &StashEntry) -> proto::StashEntry {
-    proto::StashEntry {
-        oid: entry.oid.as_bytes().to_vec(),
-        message: entry.message.clone(),
-        branch: entry.branch.clone(),
-        index: entry.index as u64,
-        timestamp: entry.timestamp,
-    }
-}
-
-pub fn proto_to_stash(entry: &proto::StashEntry) -> Result<StashEntry> {
-    Ok(StashEntry {
-        oid: Oid::from_bytes(&entry.oid)?,
-        message: entry.message.clone(),
-        index: entry.index as usize,
-        branch: entry.branch.clone(),
-        timestamp: entry.timestamp,
-    })
 }
 
 impl MergeDetails {
@@ -5575,27 +5496,6 @@ impl Repository {
                 }
             }
         })
-    }
-
-    // Kept for wire compatibility: older remote clients run the pre-commit hook explicitly
-    // via `proto::RunGitHook` before committing. New code lets `git commit` run hooks itself.
-    //
-    // TODO: remove together with `proto::RunGitHook` once all supported peers commit without
-    // sending it (see the deprecation note on the message in git.proto).
-    pub fn run_hook(&mut self, hook: RunHook, _cx: &mut App) -> oneshot::Receiver<Result<()>> {
-        self.send_job(
-            "run_hook",
-            Some(format!("git hook {}", hook.as_str()).into()),
-            move |git_repo, _cx| async move {
-                match git_repo {
-                    RepositoryState::Local(LocalRepositoryState {
-                        backend,
-                        environment,
-                        ..
-                    }) => backend.run_hook(hook, environment.clone()).await,
-                }
-            },
-        )
     }
 
     pub fn commit(
@@ -8537,93 +8437,4 @@ async fn compute_snapshot(
 
         this.snapshot.clone()
     })
-}
-
-fn status_from_proto(
-    simple_status: i32,
-    status: Option<proto::GitFileStatus>,
-) -> anyhow::Result<FileStatus> {
-    use proto::git_file_status::Variant;
-
-    let Some(variant) = status.and_then(|status| status.variant) else {
-        let code = proto::GitStatus::try_from(simple_status)
-            .ok()
-            .with_context(|| format!("Invalid git status code: {simple_status}"))?;
-        let result = match code {
-            proto::GitStatus::Added => TrackedStatus {
-                worktree_status: StatusCode::Added,
-                index_status: StatusCode::Unmodified,
-            }
-            .into(),
-            proto::GitStatus::Modified => TrackedStatus {
-                worktree_status: StatusCode::Modified,
-                index_status: StatusCode::Unmodified,
-            }
-            .into(),
-            proto::GitStatus::Conflict => UnmergedStatus {
-                first_head: UnmergedStatusCode::Updated,
-                second_head: UnmergedStatusCode::Updated,
-            }
-            .into(),
-            proto::GitStatus::Deleted => TrackedStatus {
-                worktree_status: StatusCode::Deleted,
-                index_status: StatusCode::Unmodified,
-            }
-            .into(),
-            _ => anyhow::bail!("Invalid code for simple status: {simple_status}"),
-        };
-        return Ok(result);
-    };
-
-    let result = match variant {
-        Variant::Untracked(_) => FileStatus::Untracked,
-        Variant::Ignored(_) => FileStatus::Ignored,
-        Variant::Unmerged(unmerged) => {
-            let [first_head, second_head] =
-                [unmerged.first_head, unmerged.second_head].map(|head| {
-                    let code = proto::GitStatus::try_from(head)
-                        .ok()
-                        .with_context(|| format!("Invalid git status code: {head}"))?;
-                    let result = match code {
-                        proto::GitStatus::Added => UnmergedStatusCode::Added,
-                        proto::GitStatus::Updated => UnmergedStatusCode::Updated,
-                        proto::GitStatus::Deleted => UnmergedStatusCode::Deleted,
-                        _ => anyhow::bail!("Invalid code for unmerged status: {code:?}"),
-                    };
-                    Ok(result)
-                });
-            let [first_head, second_head] = [first_head?, second_head?];
-            UnmergedStatus {
-                first_head,
-                second_head,
-            }
-            .into()
-        }
-        Variant::Tracked(tracked) => {
-            let [index_status, worktree_status] = [tracked.index_status, tracked.worktree_status]
-                .map(|status| {
-                    let code = proto::GitStatus::try_from(status)
-                        .ok()
-                        .with_context(|| format!("Invalid git status code: {status}"))?;
-                    let result = match code {
-                        proto::GitStatus::Modified => StatusCode::Modified,
-                        proto::GitStatus::TypeChanged => StatusCode::TypeChanged,
-                        proto::GitStatus::Added => StatusCode::Added,
-                        proto::GitStatus::Deleted => StatusCode::Deleted,
-                        proto::GitStatus::Renamed => StatusCode::Renamed,
-                        proto::GitStatus::Copied => StatusCode::Copied,
-                        proto::GitStatus::Unmodified => StatusCode::Unmodified,
-                        _ => anyhow::bail!("Invalid code for tracked status: {code:?}"),
-                    };
-                    Ok(result)
-                });
-            let [index_status, worktree_status] = [index_status?, worktree_status?];
-            TrackedStatus {
-                index_status,
-                worktree_status,
-            }
-            .into()
-        }
-    };
-    Ok(result)
 }
