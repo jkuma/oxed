@@ -860,7 +860,6 @@ pub(crate) fn observe_power(cx: &App) {
 /// time and one that doesn't. The suspend-excluding clock is read first so
 /// read latency can't make the difference negative. Every read is served from
 /// memory the kernel maps into the process, without a syscall.
-#[cfg(any(target_os = "linux", target_os = "android"))]
 fn system_suspended_time() -> Option<Duration> {
     // CLOCK_BOOTTIME is CLOCK_MONOTONIC plus time spent suspended:
     // https://man7.org/linux/man-pages/man2/clock_gettime.2.html
@@ -869,42 +868,6 @@ fn system_suspended_time() -> Option<Duration> {
     Some(total.saturating_sub(awake))
 }
 
-#[cfg(target_os = "macos")]
-fn system_suspended_time() -> Option<Duration> {
-    use std::sync::OnceLock;
-
-    // Declared here because libc deprecates its mach bindings, and these
-    // three functions don't justify a `mach2` dependency. `<mach/mach_time.h>`
-    // documents `mach_continuous_time` as "like mach_absolute_time, but
-    // advances during sleep", so both count the same ticks:
-    // https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/mach_time.h
-    #[repr(C)]
-    struct MachTimebaseInfo {
-        numer: u32,
-        denom: u32,
-    }
-    unsafe extern "C" {
-        fn mach_absolute_time() -> u64;
-        fn mach_continuous_time() -> u64;
-        fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32;
-    }
-
-    static TIMEBASE: OnceLock<Option<(u32, u32)>> = OnceLock::new();
-    let (numer, denom) = (*TIMEBASE.get_or_init(|| {
-        let mut info = MachTimebaseInfo { numer: 0, denom: 0 };
-        // SAFETY: `info` is a valid, writable mach_timebase_info.
-        let succeeded = unsafe { mach_timebase_info(&mut info) } == 0;
-        (succeeded && info.denom != 0).then_some((info.numer, info.denom))
-    }))?;
-    // SAFETY: neither function has preconditions.
-    let awake = unsafe { mach_absolute_time() };
-    // SAFETY: as above.
-    let total = unsafe { mach_continuous_time() };
-    let nanos = u128::from(total.saturating_sub(awake)) * u128::from(numer) / u128::from(denom);
-    Some(Duration::from_nanos(u64::try_from(nanos).ok()?))
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
 fn read_clock(clock: libc::clockid_t) -> Option<Duration> {
     let mut time = libc::timespec {
         tv_sec: 0,
@@ -918,36 +881,6 @@ fn read_clock(clock: libc::clockid_t) -> Option<Duration> {
         u64::try_from(time.tv_sec).ok()?,
         u32::try_from(time.tv_nsec).ok()?,
     ))
-}
-
-#[cfg(target_os = "windows")]
-fn system_suspended_time() -> Option<Duration> {
-    use windows::Win32::System::WindowsProgramming::{
-        QueryInterruptTime, QueryUnbiasedInterruptTime,
-    };
-    let mut awake = 0;
-    // SAFETY: `awake` is a valid, writable u64.
-    if !unsafe { QueryUnbiasedInterruptTime(&mut awake) }.as_bool() {
-        return None;
-    }
-    // SAFETY: no preconditions.
-    let total = unsafe { QueryInterruptTime() };
-    // Both count 100 ns units; unbiased interrupt time excludes sleep and
-    // hibernation:
-    // https://learn.microsoft.com/en-us/windows/win32/sysinfo/interrupt-time
-    Some(Duration::from_nanos(
-        total.saturating_sub(awake).saturating_mul(100),
-    ))
-}
-
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "macos",
-    target_os = "windows"
-)))]
-fn system_suspended_time() -> Option<Duration> {
-    None
 }
 
 pub(crate) fn record_power_transition(state: PowerState) {

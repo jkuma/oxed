@@ -97,7 +97,6 @@ pub trait Scheduler: Send + Sync {
     /// Returns `true` if the future completed, `false` if it timed out.
     /// The future is passed as a pinned mutable reference so the caller
     /// retains ownership and can continue polling or return it on timeout.
-    #[cfg(not(target_family = "wasm"))]
     fn block(
         &self,
         session_id: Option<SessionId>,
@@ -173,13 +172,7 @@ pub trait Scheduler: Send + Sync {
 /// This function never blocks: the returned task starts as an asynchronous
 /// rendezvous that resolves to the root task's handle once the dedicated
 /// thread has spawned it, and behaves like that handle from then on. That
-/// makes it safe to call from threads that must not block, such as the web
-/// main thread. On wasm targets the thread is a web worker and requires the
-/// `wasm-threads` cargo feature (and a shared-memory build); without it this
-/// panics. Spawning a worker is far more expensive than an OS thread —
-/// module instantiation plus a fresh function table — so on the web treat a
-/// dedicated session as a long-lived place to send work, not a per-job
-/// convenience.
+/// makes it safe to call from threads that must not block.
 ///
 /// The caller is responsible for supplying a `session_id` that's distinct from
 /// every other live session on `scheduler`. Concrete schedulers typically wrap
@@ -220,21 +213,10 @@ where
 
 fn spawn_dedicated_os_thread(session_id: SessionId, thread_body: impl FnOnce() + Send + 'static) {
     let thread_name = format!("spawn_dedicated session {:?}", session_id);
-    #[cfg(not(target_family = "wasm"))]
     std::thread::Builder::new()
         .name(thread_name)
         .spawn(thread_body)
         .expect("failed to spawn dedicated thread");
-    #[cfg(all(target_family = "wasm", feature = "wasm-threads"))]
-    wasm_thread::Builder::new()
-        .name(thread_name)
-        .spawn(thread_body)
-        .expect("failed to spawn dedicated thread");
-    #[cfg(all(target_family = "wasm", not(feature = "wasm-threads")))]
-    {
-        let _ = (thread_name, thread_body);
-        panic!("spawn_dedicated on wasm requires the scheduler crate's `wasm-threads` feature");
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

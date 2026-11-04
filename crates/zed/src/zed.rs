@@ -278,8 +278,6 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         },
     };
 
-    let use_system_window_tabs = WorkspaceSettings::get_global(cx).use_system_window_tabs;
-
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     static APP_ICON: std::sync::LazyLock<Option<std::sync::Arc<image::RgbaImage>>> =
         std::sync::LazyLock::new(|| {
@@ -322,12 +320,6 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
             width: px(360.0),
             height: px(240.0),
         }),
-        tabbing_identifier: if use_system_window_tabs {
-            Some(String::from("zed"))
-        } else {
-            None
-        },
-        use_display_p3: WorkspaceSettings::get_global(cx).use_display_p3,
         ..Default::default()
     }
 }

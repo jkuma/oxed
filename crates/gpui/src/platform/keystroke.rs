@@ -37,12 +37,6 @@ pub struct Keystroke {
 pub struct KeybindingKeystroke {
     /// The GPUI representation of the keystroke.
     inner: Keystroke,
-    /// The modifiers to display.
-    #[cfg(target_os = "windows")]
-    display_modifiers: Modifiers,
-    /// The key to display.
-    #[cfg(target_os = "windows")]
-    display_key: String,
 }
 
 /// Error type for `Keystroke::parse`. This is used instead of `anyhow::Error` so that Zed can use
@@ -80,7 +74,6 @@ impl Keystroke {
     /// This method assumes that `self` was typed and `target' is in the keymap, and checks
     /// both possibilities for self against the target.
     pub fn should_match(&self, target: &KeybindingKeystroke) -> bool {
-        #[cfg(not(target_os = "windows"))]
         if let Some(key_char) = self
             .key_char
             .as_ref()
@@ -97,25 +90,13 @@ impl Keystroke {
             }
         }
 
-        #[cfg(target_os = "windows")]
-        if let Some(key_char) = self
-            .key_char
-            .as_ref()
-            .filter(|key_char| key_char != &&self.key)
-        {
-            // On Windows, if key_char is set, then the typed keystroke produced the key_char
-            if &target.inner.key == key_char && target.inner.modifiers == Modifiers::none() {
-                return true;
-            }
-        }
-
         target.inner.modifiers == self.modifiers && target.inner.key == self.key
     }
 
     /// key syntax is:
     /// [secondary-][ctrl-][alt-][shift-][cmd-][fn-]key[->key_char]
     /// key_char syntax is only used for generating test events,
-    /// secondary means "cmd" on macOS and "ctrl" on other platforms
+    /// secondary means "ctrl"
     /// when matching a key with an key_char set will be matched without it.
     pub fn parse(source: &str) -> std::result::Result<Self, InvalidKeystrokeError> {
         let mut modifiers = Modifiers::none();
@@ -141,11 +122,7 @@ impl Keystroke {
                 continue;
             }
             if component.eq_ignore_ascii_case("secondary") {
-                if cfg!(target_os = "macos") {
-                    modifiers.platform = true;
-                } else {
-                    modifiers.control = true;
-                };
+                modifiers.control = true;
                 continue;
             }
 
@@ -264,16 +241,6 @@ impl Keystroke {
 }
 
 impl KeybindingKeystroke {
-    #[cfg(target_os = "windows")]
-    #[expect(missing_docs)]
-    pub fn new(inner: Keystroke, display_modifiers: Modifiers, display_key: String) -> Self {
-        KeybindingKeystroke {
-            inner,
-            display_modifiers,
-            display_key,
-        }
-    }
-
     /// Create a new keybinding keystroke from the given keystroke using the given keyboard mapper.
     pub fn new_with_mapper(
         inner: Keystroke,
@@ -285,20 +252,7 @@ impl KeybindingKeystroke {
 
     /// Create a new keybinding keystroke from the given keystroke, without any platform-specific mapping.
     pub fn from_keystroke(keystroke: Keystroke) -> Self {
-        #[cfg(target_os = "windows")]
-        {
-            let key = keystroke.key.clone();
-            let modifiers = keystroke.modifiers;
-            KeybindingKeystroke {
-                inner: keystroke,
-                display_modifiers: modifiers,
-                display_key: key,
-            }
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            KeybindingKeystroke { inner: keystroke }
-        }
+        KeybindingKeystroke { inner: keystroke }
     }
 
     /// Returns the GPUI representation of the keystroke.
@@ -307,66 +261,28 @@ impl KeybindingKeystroke {
     }
 
     /// Returns the modifiers.
-    ///
-    /// Platform-specific behavior:
-    /// - On macOS and Linux, this modifiers is the same as `inner.modifiers`, which is the GPUI representation of the keystroke.
-    /// - On Windows, this modifiers is the display modifiers, for example, a `ctrl-@` keystroke will have `inner.modifiers` as
-    /// `Modifiers::control()` and `display_modifiers` as `Modifiers::control_shift()`.
     pub fn modifiers(&self) -> &Modifiers {
-        #[cfg(target_os = "windows")]
-        {
-            &self.display_modifiers
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            &self.inner.modifiers
-        }
+        &self.inner.modifiers
     }
 
     /// Returns the key.
-    ///
-    /// Platform-specific behavior:
-    /// - On macOS and Linux, this key is the same as `inner.key`, which is the GPUI representation of the keystroke.
-    /// - On Windows, this key is the display key, for example, a `ctrl-@` keystroke will have `inner.key` as `@` and `display_key` as `2`.
     pub fn key(&self) -> &str {
-        #[cfg(target_os = "windows")]
-        {
-            &self.display_key
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            &self.inner.key
-        }
+        &self.inner.key
     }
 
-    /// Sets the modifiers. On Windows this modifies both `inner.modifiers` and `display_modifiers`.
+    /// Sets the modifiers.
     pub fn set_modifiers(&mut self, modifiers: Modifiers) {
         self.inner.modifiers = modifiers;
-        #[cfg(target_os = "windows")]
-        {
-            self.display_modifiers = modifiers;
-        }
     }
 
-    /// Sets the key. On Windows this modifies both `inner.key` and `display_key`.
+    /// Sets the key.
     pub fn set_key(&mut self, key: String) {
-        #[cfg(target_os = "windows")]
-        {
-            self.display_key = key.clone();
-        }
         self.inner.key = key;
     }
 
     /// Produces a representation of this key that Parse can understand.
     pub fn unparse(&self) -> String {
-        #[cfg(target_os = "windows")]
-        {
-            unparse(&self.display_modifiers, &self.display_key)
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            unparse(&self.inner.modifiers, &self.inner.key)
-        }
+        unparse(&self.inner.modifiers, &self.inner.key)
     }
 
     /// Removes the key_char
@@ -476,20 +392,9 @@ impl Modifiers {
         self.control || self.alt || self.shift || self.platform || self.function
     }
 
-    /// Whether the semantically 'secondary' modifier key is pressed.
-    ///
-    /// On macOS, this is the command key.
-    /// On Linux and Windows, this is the control key.
+    /// Whether the semantically 'secondary' modifier key, the control key, is pressed.
     pub fn secondary(&self) -> bool {
-        #[cfg(target_os = "macos")]
-        {
-            self.platform
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            self.control
-        }
+        self.control
     }
 
     /// Returns how many modifier keys are pressed.
@@ -516,20 +421,9 @@ impl Modifiers {
 
     /// A Returns [`Modifiers`] with just the secondary key pressed.
     pub fn secondary_key() -> Modifiers {
-        #[cfg(target_os = "macos")]
-        {
-            Modifiers {
-                platform: true,
-                ..Default::default()
-            }
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            Modifiers {
-                control: true,
-                ..Default::default()
-            }
+        Modifiers {
+            control: true,
+            ..Default::default()
         }
     }
 
@@ -688,34 +582,15 @@ impl<T: AsKeystroke + ?Sized> AsKeystroke for &T {
 
 fn display_modifiers(modifiers: &Modifiers, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if modifiers.control {
-        #[cfg(target_os = "macos")]
-        f.write_char('^')?;
-
-        #[cfg(not(target_os = "macos"))]
         write!(f, "ctrl-")?;
     }
     if modifiers.alt {
-        #[cfg(target_os = "macos")]
-        f.write_char('⌥')?;
-
-        #[cfg(not(target_os = "macos"))]
         write!(f, "alt-")?;
     }
     if modifiers.platform {
-        #[cfg(target_os = "macos")]
-        f.write_char('⌘')?;
-
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         f.write_char('❖')?;
-
-        #[cfg(target_os = "windows")]
-        f.write_char('⊞')?;
     }
     if modifiers.shift {
-        #[cfg(target_os = "macos")]
-        f.write_char('⇧')?;
-
-        #[cfg(not(target_os = "macos"))]
         write!(f, "shift-")?;
     }
     Ok(())
@@ -723,29 +598,6 @@ fn display_modifiers(modifiers: &Modifiers, f: &mut std::fmt::Formatter<'_>) -> 
 
 fn display_key(key: &str, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let key = match key {
-        #[cfg(target_os = "macos")]
-        "backspace" => '⌫',
-        #[cfg(target_os = "macos")]
-        "up" => '↑',
-        #[cfg(target_os = "macos")]
-        "down" => '↓',
-        #[cfg(target_os = "macos")]
-        "left" => '←',
-        #[cfg(target_os = "macos")]
-        "right" => '→',
-        #[cfg(target_os = "macos")]
-        "tab" => '⇥',
-        #[cfg(target_os = "macos")]
-        "escape" => '⎋',
-        #[cfg(target_os = "macos")]
-        "shift" => '⇧',
-        #[cfg(target_os = "macos")]
-        "control" => '⌃',
-        #[cfg(target_os = "macos")]
-        "alt" => '⌥',
-        #[cfg(target_os = "macos")]
-        "platform" => '⌘',
-
         key if key.len() == 1 => key.chars().next().unwrap().to_ascii_uppercase(),
         key => return f.write_str(key),
     };
@@ -765,14 +617,7 @@ fn unparse(modifiers: &Modifiers, key: &str) -> String {
         result.push_str("alt-");
     }
     if modifiers.platform {
-        #[cfg(target_os = "macos")]
-        result.push_str("cmd-");
-
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         result.push_str("super-");
-
-        #[cfg(target_os = "windows")]
-        result.push_str("win-");
     }
     if modifiers.shift {
         result.push_str("shift-");

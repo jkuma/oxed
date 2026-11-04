@@ -77,10 +77,7 @@ pub(crate) struct PlatformHandlers {
 /// A logind `PrepareForSleep` signal, forwarded from the D-Bus listener to
 /// the client's event loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(all(target_os = "linux", any(feature = "wayland", feature = "x11"))),
-    allow(dead_code)
-)]
+#[cfg_attr(not(any(feature = "wayland", feature = "x11")), allow(dead_code))]
 pub(crate) enum SystemPowerEvent {
     Sleep,
     Wake,
@@ -98,10 +95,7 @@ pub(crate) struct LinuxCommon {
     pub(crate) menus: Vec<OwnedMenu>,
     app_name: Option<String>,
     system_notifications: crate::linux::system_notifications::SystemNotificationState,
-    #[cfg_attr(
-        not(all(target_os = "linux", any(feature = "wayland", feature = "x11"))),
-        allow(dead_code)
-    )]
+    #[cfg_attr(not(any(feature = "wayland", feature = "x11")), allow(dead_code))]
     power_sender: Sender<SystemPowerEvent>,
     power_listener_started: bool,
     /// Runs after each foreground runnable registered by [`LinuxCommon::register_sources`].
@@ -156,7 +150,7 @@ impl LinuxCommon {
 
     pub(crate) fn start_power_listener(&mut self) {
         if !self.power_listener_started {
-            #[cfg(all(target_os = "linux", any(feature = "wayland", feature = "x11")))]
+            #[cfg(any(feature = "wayland", feature = "x11"))]
             smol::spawn({
                 let power_sender = self.power_sender.clone();
                 async move {
@@ -241,7 +235,7 @@ impl LinuxCommon {
     }
 }
 
-#[cfg(all(target_os = "linux", any(feature = "wayland", feature = "x11")))]
+#[cfg(any(feature = "wayland", feature = "x11"))]
 async fn listen_for_system_power_events(
     power_sender: Sender<SystemPowerEvent>,
 ) -> anyhow::Result<()> {

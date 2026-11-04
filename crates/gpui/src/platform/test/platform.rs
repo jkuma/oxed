@@ -37,10 +37,7 @@ pub(crate) struct TestPlatform {
     displays_changed_callback: RefCell<Option<Box<dyn FnMut()>>>,
     active_cursor: Mutex<CursorStyle>,
     current_clipboard_item: Mutex<Option<ClipboardItem>>,
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     current_primary_item: Mutex<Option<ClipboardItem>>,
-    #[cfg(target_os = "macos")]
-    current_find_pasteboard_item: Mutex<Option<ClipboardItem>>,
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) prompts: RefCell<TestPrompts>,
     screen_capture_sources: RefCell<Vec<TestScreenCaptureSource>>,
@@ -215,10 +212,7 @@ impl TestPlatform {
             active_window: Default::default(),
             expect_restart: Default::default(),
             current_clipboard_item: Mutex::new(None),
-            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             current_primary_item: Mutex::new(None),
-            #[cfg(target_os = "macos")]
-            current_find_pasteboard_item: Mutex::new(None),
             idle_sleep_prevention_count: Arc::new(AtomicUsize::new(0)),
             idle_sleep_prevention_delay: Cell::new(Duration::ZERO),
             idle_sleep_prevention_fails: Cell::new(false),
@@ -758,24 +752,12 @@ impl Platform for TestPlatform {
         *self.current_clipboard_item.lock() = Some(item);
     }
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn read_from_primary(&self) -> Option<ClipboardItem> {
         self.current_primary_item.lock().clone()
     }
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn write_to_primary(&self, item: ClipboardItem) {
         *self.current_primary_item.lock() = Some(item);
-    }
-
-    #[cfg(target_os = "macos")]
-    fn read_from_find_pasteboard(&self) -> Option<ClipboardItem> {
-        self.current_find_pasteboard_item.lock().clone()
-    }
-
-    #[cfg(target_os = "macos")]
-    fn write_to_find_pasteboard(&self, item: ClipboardItem) {
-        *self.current_find_pasteboard_item.lock() = Some(item);
     }
 
     fn write_credentials(&self, _url: &str, _username: &str, _password: &[u8]) -> Task<Result<()>> {

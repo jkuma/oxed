@@ -739,8 +739,6 @@ impl Boundary {
 mod tests {
     use super::*;
     use crate::{Font, FontFeatures, FontStyle, FontWeight, TestAppContext, TestDispatcher, font};
-    #[cfg(target_os = "macos")]
-    use crate::{TextRun, WindowTextSystem, WrapBoundary};
 
     fn build_wrapper() -> LineWrapper {
         let dispatcher = TestDispatcher::new(0);
@@ -1273,67 +1271,6 @@ mod tests {
         assert_word("\u{202F}"); // NNBSP " "
         assert_word("\u{00A0}"); // NBSP " "
         assert_word("\u{2011}"); // NBH "‑"
-    }
-
-    // For compatibility with the test macro
-    #[cfg(target_os = "macos")]
-    use crate as gpui;
-
-    // These seem to vary wildly based on the text system.
-    #[cfg(target_os = "macos")]
-    #[crate::test]
-    fn test_wrap_shaped_line(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let text_system = WindowTextSystem::new(cx.text_system().clone());
-
-            let normal = TextRun {
-                len: 0,
-                font: font("Helvetica"),
-                color: Default::default(),
-                underline: Default::default(),
-                ..Default::default()
-            };
-            let bold = TextRun {
-                len: 0,
-                font: font("Helvetica").bold(),
-                ..Default::default()
-            };
-
-            let text = "aa bbb cccc ddddd eeee".into();
-            let lines = text_system
-                .shape_text(
-                    text,
-                    px(16.),
-                    &[
-                        normal.with_len(4),
-                        bold.with_len(5),
-                        normal.with_len(6),
-                        bold.with_len(1),
-                        normal.with_len(7),
-                    ],
-                    Some(px(72.)),
-                    None,
-                )
-                .unwrap();
-
-            assert_eq!(
-                lines[0].layout.wrap_boundaries(),
-                &[
-                    WrapBoundary {
-                        run_ix: 0,
-                        glyph_ix: 7
-                    },
-                    WrapBoundary {
-                        run_ix: 0,
-                        glyph_ix: 12
-                    },
-                    WrapBoundary {
-                        run_ix: 0,
-                        glyph_ix: 18
-                    }
-                ],
-            );
-        });
     }
 
     #[test]

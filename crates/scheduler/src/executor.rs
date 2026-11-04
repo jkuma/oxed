@@ -111,7 +111,6 @@ impl LocalExecutor {
         Task(TaskState::Spawned(task))
     }
 
-    #[cfg(not(target_family = "wasm"))]
     pub fn block_on<Fut: Future>(&self, future: Fut) -> Fut::Output {
         use std::cell::Cell;
 
@@ -129,7 +128,6 @@ impl LocalExecutor {
 
     /// Block until the future completes or timeout occurs.
     /// Returns Ok(output) if completed, Err(future) if timed out.
-    #[cfg(not(target_family = "wasm"))]
     pub fn block_with_timeout<Fut: Future>(
         &self,
         timeout: Duration,
@@ -339,8 +337,8 @@ impl BackgroundExecutor {
 ///
 /// Use this when tasks rely on thread-local state being coherent across
 /// spawns, or when the per-thread setup cost of the work is high enough that
-/// it should be paid once. Creating the session costs a thread (on the web, a
-/// worker — expensive); each spawn afterwards is just a channel send.
+/// it should be paid once. Creating the session costs a thread; each spawn
+/// afterwards is just a channel send.
 ///
 /// Dropping the handle cancels the session: queued and future spawns resolve
 /// to cancelled tasks.
