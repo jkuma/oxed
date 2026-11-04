@@ -292,28 +292,9 @@ pub struct TyLspAdapter {
     fs: Arc<dyn Fs>,
 }
 
-#[cfg(target_os = "macos")]
-impl TyLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
-    const ARCH_SERVER_NAME: &str = "apple-darwin";
-}
-
-#[cfg(target_os = "linux")]
 impl TyLspAdapter {
     const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
     const ARCH_SERVER_NAME: &str = "unknown-linux-gnu";
-}
-
-#[cfg(target_os = "freebsd")]
-impl TyLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
-    const ARCH_SERVER_NAME: &str = "unknown-freebsd";
-}
-
-#[cfg(target_os = "windows")]
-impl TyLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::Zip;
-    const ARCH_SERVER_NAME: &str = "pc-windows-msvc";
 }
 
 impl TyLspAdapter {
@@ -1264,13 +1245,7 @@ impl PyLspAdapter {
     async fn ensure_venv(delegate: &dyn LspAdapterDelegate) -> Result<Arc<Path>> {
         let python_path = Self::find_base_python(delegate)
             .await
-            .with_context(|| {
-                let mut message = "Could not find Python installation for PyLSP".to_owned();
-                if cfg!(windows){
-                    message.push_str(". Install Python from the Microsoft Store, or manually from https://www.python.org/downloads/windows.")
-                }
-                message
-            })?;
+            .context("Could not find Python installation for PyLSP")?;
         let work_dir = delegate
             .language_server_download_dir(&Self::SERVER_NAME)
             .await
@@ -1297,8 +1272,6 @@ impl PyLspAdapter {
                 continue;
             };
             // Try to detect situations where `python3` exists but is not a real Python interpreter.
-            // Notably, on fresh Windows installs, `python3` is a shim that opens the Microsoft Store app
-            // when run with no arguments, and just fails otherwise.
             let Some(output) = new_command(&path)
                 .args(["-c", "print(1 + 2)"])
                 .output()
@@ -1327,11 +1300,7 @@ impl PyLspAdapter {
     }
 }
 
-const BINARY_DIR: &str = if cfg!(target_os = "windows") {
-    "Scripts"
-} else {
-    "bin"
-};
+const BINARY_DIR: &str = "bin";
 
 #[async_trait(?Send)]
 impl LspAdapter for PyLspAdapter {
@@ -1956,28 +1925,9 @@ impl RuffLspAdapter {
     }
 }
 
-#[cfg(target_os = "macos")]
-impl RuffLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
-    const ARCH_SERVER_NAME: &str = "apple-darwin";
-}
-
-#[cfg(target_os = "linux")]
 impl RuffLspAdapter {
     const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
     const ARCH_SERVER_NAME: &str = "unknown-linux-gnu";
-}
-
-#[cfg(target_os = "freebsd")]
-impl RuffLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
-    const ARCH_SERVER_NAME: &str = "unknown-freebsd";
-}
-
-#[cfg(target_os = "windows")]
-impl RuffLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::Zip;
-    const ARCH_SERVER_NAME: &str = "pc-windows-msvc";
 }
 
 impl RuffLspAdapter {
@@ -2241,22 +2191,9 @@ pub(crate) struct PyreflyLspAdapter {
     fs: Arc<dyn Fs>,
 }
 
-#[cfg(target_os = "macos")]
-impl PyreflyLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
-    const ARCH_SERVER_NAME: &str = "macos";
-}
-
-#[cfg(target_os = "linux")]
 impl PyreflyLspAdapter {
     const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
     const ARCH_SERVER_NAME: &str = "linux";
-}
-
-#[cfg(target_os = "windows")]
-impl PyreflyLspAdapter {
-    const GITHUB_ASSET_KIND: AssetKind = AssetKind::Zip;
-    const ARCH_SERVER_NAME: &str = "windows";
 }
 
 impl PyreflyLspAdapter {

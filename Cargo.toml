@@ -72,7 +72,6 @@ members = [
     "crates/mermaid_render",
     "crates/miniprofiler_ui",
     "crates/multi_buffer",
-    "crates/net",
     "crates/node_runtime",
     "crates/notifications",
     "crates/onboarding",
@@ -233,7 +232,6 @@ menu = { path = "crates/menu" }
 mermaid_render = { path = "crates/mermaid_render" }
 miniprofiler_ui = { path = "crates/miniprofiler_ui" }
 multi_buffer = { path = "crates/multi_buffer" }
-net = { path = "crates/net" }
 node_runtime = { path = "crates/node_runtime" }
 notifications = { path = "crates/notifications" }
 onboarding = { path = "crates/onboarding" }

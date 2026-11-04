@@ -38,39 +38,19 @@ impl Default for GrammarId {
 /// looks up a copy of the grammar for whichever thread asks.
 #[derive(Clone)]
 pub struct ParseableLanguage {
-    #[cfg(not(target_family = "wasm"))]
     language: tree_sitter::Language,
-    #[cfg(target_family = "wasm")]
-    resolve: std::sync::Arc<dyn Fn() -> Result<tree_sitter::Language> + Send + Sync>,
 }
 
 impl ParseableLanguage {
     /// A parseable language valid on the calling thread.
     pub fn resolve(&self) -> Result<tree_sitter::Language> {
-        #[cfg(not(target_family = "wasm"))]
-        {
-            Ok(self.language.clone())
-        }
-        #[cfg(target_family = "wasm")]
-        {
-            (self.resolve)()
-        }
+        Ok(self.language.clone())
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
 impl From<tree_sitter::Language> for ParseableLanguage {
     fn from(language: tree_sitter::Language) -> Self {
         Self { language }
-    }
-}
-
-#[cfg(target_family = "wasm")]
-impl ParseableLanguage {
-    pub fn from_resolver(
-        resolve: std::sync::Arc<dyn Fn() -> Result<tree_sitter::Language> + Send + Sync>,
-    ) -> Self {
-        Self { resolve }
     }
 }
 
@@ -82,10 +62,7 @@ impl std::fmt::Debug for ParseableLanguage {
 
 pub struct Grammar {
     id: GrammarId,
-    #[cfg(not(target_family = "wasm"))]
     pub ts_language: tree_sitter::Language,
-    #[cfg(target_family = "wasm")]
-    parseable_language: ParseableLanguage,
     pub error_query: Option<Query>,
     pub highlights_config: Option<HighlightsConfig>,
     pub brackets_config: Option<BracketsConfig>,
@@ -287,12 +264,9 @@ impl Grammar {
             override_config: None,
             redactions_config: None,
             error_query,
-            #[cfg(not(target_family = "wasm"))]
             ts_language: parseable_language
                 .resolve()
                 .expect("resolving a native parseable language cannot fail"),
-            #[cfg(target_family = "wasm")]
-            parseable_language,
             highlight_map: Default::default(),
         }
     }
@@ -302,14 +276,7 @@ impl Grammar {
     /// See [`ParseableLanguage`] for why this is a resolution rather than a
     /// field access on WebAssembly.
     pub fn parseable_language(&self) -> Result<tree_sitter::Language> {
-        #[cfg(not(target_family = "wasm"))]
-        {
-            Ok(self.ts_language.clone())
-        }
-        #[cfg(target_family = "wasm")]
-        {
-            self.parseable_language.resolve()
-        }
+        Ok(self.ts_language.clone())
     }
 
     pub fn id(&self) -> GrammarId {

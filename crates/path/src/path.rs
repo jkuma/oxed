@@ -6,16 +6,11 @@
 //!
 //! Adapted from Zed's `util::rel_path` module.
 
-#[cfg(windows)]
-use anyhow::Context;
-#[cfg(all(unix, not(target_family = "wasm")))]
 use std::os::unix::prelude::OsStrExt;
 use std::{
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
-#[cfg(windows)]
-use tendril::fmt::{Format, WTF8};
 
 use crate::path_component::{Component, Components, Prefix, PrefixExt, iter_after};
 use crate::rel_path::{RelPath, StripPrefixError};
@@ -29,28 +24,7 @@ pub fn try_from_bytes<'a, T>(bytes: &'a [u8]) -> anyhow::Result<T>
 where
     T: From<&'a Path>,
 {
-    #[cfg(target_family = "wasm")]
-    {
-        std::str::from_utf8(bytes)
-            .map(Path::new)
-            .map(Into::into)
-            .map_err(Into::into)
-    }
-    #[cfg(all(unix, not(target_family = "wasm")))]
-    {
-        Ok(T::from(Path::new(OsStr::from_bytes(bytes))))
-    }
-    #[cfg(windows)]
-    {
-        WTF8::validate(bytes)
-            .then(|| {
-                // Safety: bytes are valid WTF-8 sequence.
-                T::from(Path::new(unsafe {
-                    OsStr::from_encoded_bytes_unchecked(bytes)
-                }))
-            })
-            .with_context(|| format!("Invalid WTF-8 sequence: {bytes:?}"))
-    }
+    Ok(T::from(Path::new(OsStr::from_bytes(bytes))))
 }
 
 pub trait PathExt {
@@ -70,12 +44,6 @@ pub enum PathStyle {
 }
 
 impl PathStyle {
-    #[cfg(target_os = "windows")]
-    pub const fn local() -> Self {
-        PathStyle::Windows
-    }
-
-    #[cfg(not(target_os = "windows"))]
     pub const fn local() -> Self {
         PathStyle::Unix
     }
@@ -725,7 +693,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_local_path_style_non_utf8() {
         use std::ffi::OsStr;
@@ -749,31 +716,6 @@ mod tests {
         assert_eq!(
             PathStyle::Unix.parent(another_path),
             Some(Path::new("/home/user/repo"))
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn test_local_path_style_non_utf8() {
-        use std::ffi::OsString;
-        use std::os::windows::ffi::OsStringExt;
-
-        let wide: Vec<u16> = "C:\\invalid_"
-            .encode_utf16()
-            .chain(Some(0xD800))
-            .chain(r"\repo\file.txt".encode_utf16())
-            .collect();
-        let os_str = OsString::from_wide(&wide);
-        let path = Path::new(&os_str);
-
-        assert_eq!(
-            PathStyle::Windows.file_name(path),
-            Some(OsStr::new("file.txt"))
-        );
-        let parent = PathStyle::Windows.parent(path).unwrap();
-        assert_eq!(
-            PathStyle::Windows.file_name(parent),
-            Some(OsStr::new("repo"))
         );
     }
 }

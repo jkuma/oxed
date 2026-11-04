@@ -53,23 +53,7 @@ pub(crate) async fn get_messages(git: &GitBinary, shas: &[Oid]) -> Result<HashMa
         return Ok(HashMap::default());
     }
 
-    let output = if cfg!(windows) {
-        // Windows has a maximum invocable command length, so we chunk the input.
-        // Actual max is 32767, but we leave some room for the rest of the command as we aren't in precise control of what std might do here
-        const MAX_CMD_LENGTH: usize = 30000;
-        // 40 bytes of hash, 2 quotes and a separating space
-        const SHA_LENGTH: usize = 40 + 2 + 1;
-        const MAX_ENTRIES_PER_INVOCATION: usize = MAX_CMD_LENGTH / SHA_LENGTH;
-
-        let mut result = vec![];
-        for shas in shas.chunks(MAX_ENTRIES_PER_INVOCATION) {
-            let partial = get_messages_impl(git, shas).await?;
-            result.extend(partial);
-        }
-        result
-    } else {
-        get_messages_impl(git, shas).await?
-    };
+    let output = get_messages_impl(git, shas).await?;
 
     Ok(shas
         .iter()

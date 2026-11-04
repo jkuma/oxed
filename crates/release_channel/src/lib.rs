@@ -40,17 +40,6 @@ pub static RELEASE_CHANNEL: LazyLock<ReleaseChannel> =
         _ => panic!("invalid release channel {}", *RELEASE_CHANNEL_NAME),
     });
 
-/// The app identifier for the current release channel, Windows only.
-#[cfg(target_os = "windows")]
-pub fn app_identifier() -> &'static str {
-    match *RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Oxed-Editor-Dev",
-        ReleaseChannel::Nightly => "Oxed-Editor-Nightly",
-        ReleaseChannel::Preview => "Oxed-Editor-Preview",
-        ReleaseChannel::Stable => "Oxed-Editor-Stable",
-    }
-}
-
 /// The Git commit SHA that Zed was built at.
 #[derive(Clone, Eq, Debug, PartialEq)]
 pub struct AppCommitSha(String);
@@ -224,7 +213,6 @@ impl ReleaseChannel {
 
     /// Returns the application ID that's used by Wayland as application ID
     /// and WM_CLASS on X11.
-    /// This also has to match the bundle identifier for Zed on macOS.
     pub fn app_id(&self) -> &'static str {
         match self {
             ReleaseChannel::Dev => "dev.jkuma.Oxed-Dev",

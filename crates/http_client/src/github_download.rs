@@ -253,13 +253,8 @@ async fn stream_file_archive(
         AssetKind::TarGz => extract_tar_gz(destination_path, url, file_archive).await?,
         AssetKind::TarBz2 => extract_tar_bz2(destination_path, url, file_archive).await?,
         AssetKind::Gz => extract_gz(destination_path, url, file_archive).await?,
-        #[cfg(not(windows))]
         AssetKind::Zip => {
             util::archive::extract_seekable_zip(destination_path, file_archive).await?;
-        }
-        #[cfg(windows)]
-        AssetKind::Zip => {
-            util::archive::extract_zip(destination_path, file_archive).await?;
         }
     };
     Ok(())
@@ -330,10 +325,7 @@ impl<W: AsyncWrite + Unpin> HashingWriter<W> {
     /// everything written.
     ///
     /// Taking `self` by value guarantees the writer is dropped before this
-    /// returns. For file writers this releases the OS handle, which Windows
-    /// requires before an ancestor directory can be renamed or deleted; note
-    /// that closing alone is not enough, as `async_fs::File` holds its handle
-    /// until dropped.
+    /// returns, releasing the OS handle of file writers.
     async fn finish(mut self) -> std::io::Result<String> {
         self.writer.close().await?;
         drop(self.writer);
@@ -430,15 +422,12 @@ mod tests {
                 std::fs::read(&binary_path).unwrap(),
                 b"#!/bin/sh\necho hello\n"
             );
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mode = std::fs::metadata(&binary_path)
-                    .unwrap()
-                    .permissions()
-                    .mode();
-                assert_eq!(mode & 0o111, 0o111, "binary should be executable");
-            }
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&binary_path)
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o111, 0o111, "binary should be executable");
         });
     }
 

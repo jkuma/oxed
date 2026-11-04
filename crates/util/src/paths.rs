@@ -23,18 +23,11 @@ pub use path::PathStyle;
 ///
 /// This crate's own tests see a fixed fake path. Every other build, including
 /// builds with `test-support`, sees the real home directory.
-#[cfg(not(target_family = "wasm"))]
 pub fn home_dir() -> &'static PathBuf {
     static HOME_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     HOME_DIR.get_or_init(|| {
         if cfg!(test) {
-            if cfg!(target_os = "macos") {
-                PathBuf::from("/Users/zed")
-            } else if cfg!(target_os = "windows") {
-                PathBuf::from("C:\\Users\\zed")
-            } else {
-                PathBuf::from("/home/zed")
-            }
+            PathBuf::from("/home/zed")
         } else {
             dirs::home_dir().expect("failed to determine home directory")
         }
@@ -62,10 +55,6 @@ pub trait PathExt {
         path::try_from_bytes::<Self>(bytes)
     }
 
-    /// Converts a local path to one that can be used inside of WSL.
-    /// Returns `None` if the path cannot be converted into a WSL one (network share).
-    fn local_to_wsl(&self) -> Option<PathBuf>;
-
     /// Returns a file's "full" joined collection of extensions, in the case where a file does not
     /// just have a singular extension but instead has multiple (e.g File.tar.gz, Component.stories.tsx)
     ///
@@ -73,29 +62,19 @@ pub trait PathExt {
     fn multiple_extensions(&self) -> Option<String>;
 
     /// Try to make a shell-safe representation of the path.
-    #[cfg(not(target_family = "wasm"))]
     fn try_shell_safe(&self, shell_kind: crate::shell::ShellKind) -> anyhow::Result<String>;
 }
 
 impl<T: AsRef<Path>> PathExt for T {
     fn compact(&self) -> PathBuf {
-        #[cfg(target_family = "wasm")]
-        {
-            self.as_ref().to_path_buf()
-        }
-        #[cfg(not(target_family = "wasm"))]
-        if cfg!(any(target_os = "linux", target_os = "freebsd")) || cfg!(target_os = "macos") {
-            match self.as_ref().strip_prefix(home_dir().as_path()) {
-                Ok(relative_path) => {
-                    let mut shortened_path = PathBuf::new();
-                    shortened_path.push("~");
-                    shortened_path.push(relative_path);
-                    shortened_path
-                }
-                Err(_) => self.as_ref().to_path_buf(),
+        match self.as_ref().strip_prefix(home_dir().as_path()) {
+            Ok(relative_path) => {
+                let mut shortened_path = PathBuf::new();
+                shortened_path.push("~");
+                shortened_path.push(relative_path);
+                shortened_path
             }
-        } else {
-            self.as_ref().to_path_buf()
+            Err(_) => self.as_ref().to_path_buf(),
         }
     }
 
@@ -109,35 +88,6 @@ impl<T: AsRef<Path>> PathExt for T {
         path.extension()
             .and_then(|e| e.to_str())
             .or_else(|| path.file_stem()?.to_str())
-    }
-
-    fn local_to_wsl(&self) -> Option<PathBuf> {
-        // quite sketchy to convert this back to path at the end, but a lot of functions only accept paths
-        // todo: ideally rework them..?
-        let mut new_path = std::ffi::OsString::new();
-        for component in self.as_ref().components() {
-            match component {
-                std::path::Component::Prefix(prefix) => {
-                    let drive_letter = prefix.as_os_str().to_string_lossy().to_lowercase();
-                    let drive_letter = drive_letter.strip_suffix(':')?;
-
-                    new_path.push(format!("/mnt/{}", drive_letter));
-                }
-                std::path::Component::RootDir => {}
-                std::path::Component::CurDir => {
-                    new_path.push("/.");
-                }
-                std::path::Component::ParentDir => {
-                    new_path.push("/..");
-                }
-                std::path::Component::Normal(os_str) => {
-                    new_path.push("/");
-                    new_path.push(os_str);
-                }
-            }
-        }
-
-        Some(new_path.into())
     }
 
     fn multiple_extensions(&self) -> Option<String> {
@@ -157,7 +107,6 @@ impl<T: AsRef<Path>> PathExt for T {
         Some(parts.into_iter().join("."))
     }
 
-    #[cfg(not(target_family = "wasm"))]
     fn try_shell_safe(&self, shell_kind: crate::shell::ShellKind) -> anyhow::Result<String> {
         use anyhow::Context;
         let path_str = self
@@ -248,11 +197,7 @@ pub struct SanitizedPath(Path);
 
 impl SanitizedPath {
     pub fn new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
-        #[cfg(not(target_os = "windows"))]
         return Self::unchecked_new(path.as_ref());
-
-        #[cfg(target_os = "windows")]
-        return Self::unchecked_new(dunce::simplified(path.as_ref()));
     }
 
     pub fn unchecked_new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
@@ -262,23 +207,7 @@ impl SanitizedPath {
 
     pub fn from_arc(path: Arc<Path>) -> Arc<Self> {
         // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
-        #[cfg(not(target_os = "windows"))]
         return unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) };
-
-        #[cfg(target_os = "windows")]
-        {
-            let path = match path.to_str().and_then(|s| s.strip_prefix(r"\\?\UNC\")) {
-                Some(rest) => PathBuf::from(format!(r"\\{rest}")).into(),
-                None => path,
-            };
-            let simplified = dunce::simplified(path.as_ref());
-            if simplified == path.as_ref() {
-                // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
-                unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) }
-            } else {
-                Self::unchecked_new(simplified).into()
-            }
-        }
     }
 
     pub fn new_arc<T: AsRef<Path> + ?Sized>(path: &T) -> Arc<Self> {
@@ -1327,68 +1256,6 @@ pub fn compare_paths(
             (Some(_), None) => break Ordering::Greater,
             (None, Some(_)) => break Ordering::Less,
             (None, None) => break Ordering::Equal,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WslPath {
-    pub distro: String,
-
-    // the reason this is an OsString and not any of the path types is that it needs to
-    // represent a unix path (with '/' separators) on windows. `from_path` does this by
-    // manually constructing it from the path components of a given windows path.
-    pub path: std::ffi::OsString,
-}
-
-impl WslPath {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Option<WslPath> {
-        if cfg!(not(target_os = "windows")) {
-            return None;
-        }
-        use std::{
-            ffi::OsString,
-            path::{Component, Prefix},
-        };
-
-        let mut components = path.as_ref().components();
-        let Some(Component::Prefix(prefix)) = components.next() else {
-            return None;
-        };
-        let (server, distro) = match prefix.kind() {
-            Prefix::UNC(server, distro) => (server, distro),
-            Prefix::VerbatimUNC(server, distro) => (server, distro),
-            _ => return None,
-        };
-        let Some(Component::RootDir) = components.next() else {
-            return None;
-        };
-
-        let server_str = server.to_string_lossy();
-        if server_str == "wsl.localhost" || server_str == "wsl$" {
-            let mut result = OsString::from("");
-            for c in components {
-                use Component::*;
-                match c {
-                    Prefix(p) => unreachable!("got {p:?}, but already stripped prefix"),
-                    RootDir => unreachable!("got root dir, but already stripped root"),
-                    CurDir => continue,
-                    ParentDir => result.push("/.."),
-                    Normal(s) => {
-                        result.push("/");
-                        result.push(s);
-                    }
-                }
-            }
-            if result.is_empty() {
-                result.push("/");
-            }
-            Some(WslPath {
-                distro: distro.to_string_lossy().to_string(),
-                path: result,
-            })
-        } else {
-            None
         }
     }
 }
@@ -2682,7 +2549,6 @@ mod tests {
     }
 
     #[perf]
-    #[cfg(not(target_os = "windows"))]
     fn path_with_position_parse_posix_path_with_suffix() {
         assert_eq!(
             PathWithPosition::parse_str("foo/bar:34:in"),
@@ -2738,150 +2604,6 @@ mod tests {
     }
 
     #[perf]
-    #[cfg(target_os = "windows")]
-    fn path_with_position_parse_windows_path() {
-        assert_eq!(
-            PathWithPosition::parse_str("crates\\utils\\paths.rs"),
-            PathWithPosition {
-                path: PathBuf::from("crates\\utils\\paths.rs"),
-                row: None,
-                column: None
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\test_file.rs"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\test_file.rs"),
-                row: None,
-                column: None
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\main (1).log"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\main (1).log"),
-                row: None,
-                column: None
-            }
-        );
-    }
-
-    #[perf]
-    #[cfg(target_os = "windows")]
-    fn path_with_position_parse_windows_path_with_suffix() {
-        assert_eq!(
-            PathWithPosition::parse_str("crates\\utils\\paths.rs:101"),
-            PathWithPosition {
-                path: PathBuf::from("crates\\utils\\paths.rs"),
-                row: Some(101),
-                column: None
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs:1:20"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs"),
-                row: Some(1),
-                column: Some(20)
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\test_file.rs(1902,13)"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: Some(13)
-            }
-        );
-
-        // Trim off trailing `:`s for otherwise valid input.
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs:1902:13:"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: Some(13)
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs:1902:13:15:"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs:1902"),
-                row: Some(13),
-                column: Some(15)
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs:1902:::15:"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs:1902"),
-                row: Some(15),
-                column: None
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs(1902,13):"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: Some(13),
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("\\\\?\\C:\\Users\\someone\\test_file.rs(1902):"),
-            PathWithPosition {
-                path: PathBuf::from("\\\\?\\C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: None,
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\test_file.rs:1902:13:"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: Some(13),
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\test_file.rs(1902,13):"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: Some(13),
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("C:\\Users\\someone\\test_file.rs(1902):"),
-            PathWithPosition {
-                path: PathBuf::from("C:\\Users\\someone\\test_file.rs"),
-                row: Some(1902),
-                column: None,
-            }
-        );
-
-        assert_eq!(
-            PathWithPosition::parse_str("crates/utils/paths.rs:101"),
-            PathWithPosition {
-                path: PathBuf::from("crates\\utils\\paths.rs"),
-                row: Some(101),
-                column: None,
-            }
-        );
-    }
-
-    #[perf]
     fn test_path_compact() {
         let path: PathBuf = [
             home_dir().to_string_lossy().into_owned(),
@@ -2889,11 +2611,7 @@ mod tests {
         ]
         .iter()
         .collect();
-        if cfg!(any(target_os = "linux", target_os = "freebsd")) || cfg!(target_os = "macos") {
-            assert_eq!(path.compact().to_str(), Some("~/some_file.txt"));
-        } else {
-            assert_eq!(path.compact().to_str(), path.to_str());
-        }
+        assert_eq!(path.compact().to_str(), Some("~/some_file.txt"));
     }
 
     #[perf]
@@ -2944,43 +2662,6 @@ mod tests {
     //         "Path matcher should not match {path:?}"
     //     );
     // }
-
-    // #[perf]
-    // fn project_search() {
-    //     let path = Path::new("/Users/someonetoignore/work/zed/zed.dev/node_modules");
-    //     let path_matcher =
-    //         PathMatcher::new(&["**/node_modules/**".to_owned()], PathStyle::Unix).unwrap();
-    //     assert!(
-    //         path_matcher.is_match(path),
-    //         "Path matcher should match {path:?}"
-    //     );
-    // }
-    #[perf]
-    #[cfg(target_os = "windows")]
-    fn test_sanitized_path() {
-        let path = Path::new("C:\\Users\\someone\\test_file.rs");
-        let sanitized_path = SanitizedPath::new(path);
-        assert_eq!(
-            sanitized_path.to_string(),
-            "C:\\Users\\someone\\test_file.rs"
-        );
-
-        let path = Path::new("\\\\?\\C:\\Users\\someone\\test_file.rs");
-        let sanitized_path = SanitizedPath::new(path);
-        assert_eq!(
-            sanitized_path.to_string(),
-            "C:\\Users\\someone\\test_file.rs"
-        );
-    }
-
-    #[perf]
-    #[cfg(target_os = "windows")]
-    fn test_sanitized_path_verbatim_unc() {
-        let path: Arc<Path> = PathBuf::from("\\\\?\\UNC\\server\\share\\file.txt").into();
-        let sanitized_path = SanitizedPath::from_arc(path);
-        assert_eq!(sanitized_path.to_string(), "\\\\server\\share\\file.txt");
-    }
-
     #[perf]
     fn test_compare_numeric_segments() {
         // Helper function to create peekable iterators and test
@@ -3376,47 +3057,6 @@ mod tests {
         let base = Path::new("/a/b/c/long.app.tar.gz");
         let suffix = Path::new("app.tar.gz");
         assert_eq!(strip_path_suffix(base, suffix), None);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn test_wsl_path() {
-        use super::WslPath;
-        let path = "/a/b/c";
-        assert_eq!(WslPath::from_path(&path), None);
-
-        let path = r"\\wsl.localhost";
-        assert_eq!(WslPath::from_path(&path), None);
-
-        let path = r"\\wsl.localhost\Distro";
-        assert_eq!(
-            WslPath::from_path(&path),
-            Some(WslPath {
-                distro: "Distro".to_owned(),
-                path: "/".into(),
-            })
-        );
-
-        let path = r"\\wsl.localhost\Distro\blue";
-        assert_eq!(
-            WslPath::from_path(&path),
-            Some(WslPath {
-                distro: "Distro".to_owned(),
-                path: "/blue".into()
-            })
-        );
-
-        let path = r"\\wsl$\archlinux\tomato\.\paprika\..\aubergine.txt";
-        assert_eq!(
-            WslPath::from_path(&path),
-            Some(WslPath {
-                distro: "archlinux".to_owned(),
-                path: "/tomato/paprika/../aubergine.txt".into()
-            })
-        );
-
-        let path = r"\\windows.localhost\Distro\foo";
-        assert_eq!(WslPath::from_path(&path), None);
     }
 
     #[test]

@@ -26,10 +26,9 @@ pub enum OsWatcherKind {
 }
 
 impl OsWatcherKind {
-    /// Poll watches and native macOS/Windows watches cover their whole subtree;
-    /// native Linux (inotify) watches cover one directory.
+    /// Poll watches cover their whole subtree; native watches cover one directory.
     fn is_recursive(self) -> bool {
-        self == Self::Poll || cfg!(any(target_os = "windows", target_os = "macos"))
+        self == Self::Poll
     }
 }
 
@@ -263,7 +262,7 @@ impl Watcher for FsWatcher {
 
 /// Whether a recursive registration on a strict ancestor of `path` already covers
 /// it. Both key spellings are probed so a folded registration still matches; only
-/// poll watches and native macOS/Windows watches are recursive.
+/// poll watches are recursive.
 fn path_covered_by_recursive_registration(
     registrations: &HashMap<WatchKey, FsWatcherRegistration>,
     path: &SanitizedPath,
@@ -299,16 +298,7 @@ pub fn requires_poll_watcher(path: &Path) -> bool {
         _ => {}
     }
 
-    #[cfg(target_os = "linux")]
-    {
-        return detect_requires_poll_watcher_linux(path);
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = path;
-        false
-    }
+    return detect_requires_poll_watcher_linux(path);
 }
 
 fn register_existing_path(
@@ -353,7 +343,6 @@ fn register_existing_path(
     }))
 }
 
-#[cfg(target_os = "linux")]
 fn detect_requires_poll_watcher_linux(path: &Path) -> bool {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
@@ -406,7 +395,6 @@ fn detect_requires_poll_watcher_linux(path: &Path) -> bool {
     false
 }
 
-#[cfg(target_os = "linux")]
 fn is_virtiofs(path: &Path) -> bool {
     let Ok(mountinfo) = std::fs::read_to_string("/proc/self/mountinfo") else {
         return false;
@@ -437,7 +425,6 @@ fn is_virtiofs(path: &Path) -> bool {
     best_mount.is_some_and(|(_, fs_type)| fs_type == "virtiofs" || fs_type == "fuse.virtiofs")
 }
 
-#[cfg(target_os = "linux")]
 fn is_wsl_drvfs_path(path: &Path) -> bool {
     if std::env::var_os("WSL_DISTRO_NAME").is_none() {
         if let Ok(version) = std::fs::read_to_string("/proc/version") {
@@ -461,22 +448,6 @@ fn is_wsl_drvfs_path(path: &Path) -> bool {
         && (after_mnt.len() == 1 || after_mnt.as_bytes()[1] == b'/')
 }
 
-/// Whether the volume backing `path` does case-insensitive name lookups, used to
-/// pick exact vs. folded matching.
-#[cfg(target_os = "macos")]
-pub(crate) fn case_insensitive_path(path: &Path) -> bool {
-    use std::os::unix::ffi::OsStrExt as _;
-
-    // `pathconf(_PC_CASE_SENSITIVE)` returns 1 (sensitive), 0 (insensitive), or -1
-    // on error; default errors to insensitive (the APFS/HFS+ default).
-    let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
-        return true;
-    };
-    // SAFETY: We just initialized c_path, so it's a valid pointer
-    unsafe { libc::pathconf(c_path.as_ptr(), libc::_PC_CASE_SENSITIVE) == 0 }
-}
-
-#[cfg(target_os = "linux")]
 pub(crate) fn case_insensitive_path(_path: &Path) -> bool {
     // use std::os::unix::ffi::OsStrExt as _;
 
@@ -498,20 +469,6 @@ pub(crate) fn case_insensitive_path(_path: &Path) -> bool {
     // let buf = unsafe { buf.assume_init() };
     // buf.stx_attributes_mask & STATX_ATTR_CASEFOLD != 0
     //     && buf.stx_attributes & STATX_ATTR_CASEFOLD != 0
-    false
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn case_insensitive_path(_path: &Path) -> bool {
-    // todo(windows): Windows defaults to case in sensitive, but
-    // they can mark specific directories as case sensitive. Mainly
-    // for WSL use cases
-    true
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-pub(crate) fn case_insensitive_path(_path: &Path) -> bool {
-    // Other BSDs default to case-sensitive local filesystems.
     false
 }
 
@@ -555,16 +512,6 @@ impl WatchKey {
 
     fn folded(path: &SanitizedPath) -> Self {
         let lossy = path.as_path().to_string_lossy();
-        // macOS (APFS/HFS+) compares names normalization-insensitively (NFC vs
-        // NFD), and FSEvents can report NFD while a config/LSP supplies NFC, so
-        // normalize before folding case. Windows (NTFS) and Linux are
-        // normalization-sensitive, so there we only fold case.
-        #[cfg(target_os = "macos")]
-        let folded = {
-            use unicode_normalization::UnicodeNormalization as _;
-            lossy.chars().nfc().collect::<String>().to_lowercase()
-        };
-        #[cfg(not(target_os = "macos"))]
         let folded = lossy.to_lowercase();
         Self::Folded(folded.into())
     }
@@ -834,7 +781,7 @@ impl WatchPaths {
     }
 
     /// True if a recursive registration on a strict ancestor already covers
-    /// `path`. Only poll watches and native macOS/Windows watches are recursive.
+    /// `path`. Only poll watches are recursive.
     fn covered_by_recursive_ancestor(&self, path: &SanitizedPath, recursive: bool) -> bool {
         if !recursive {
             return false;
@@ -1609,7 +1556,6 @@ mod tests {
         assert_eq!(native_backend.watch_calls, &[first_path.to_path_buf()]);
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     #[test]
     fn removed_or_renamed_path_is_rewatched_once() {
         let dir = PathBuf::from("/Repo/Dir");
@@ -1731,20 +1677,6 @@ mod tests {
         assert_ne!(WatchKey::exact(mixed), WatchKey::exact(lower));
         // Exact and folded live in different key spaces even for the same path.
         assert_ne!(WatchKey::exact(mixed), WatchKey::folded(mixed));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn watch_key_folds_unicode_normalization_on_macos() {
-        // "Café" precomposed (NFC) vs decomposed (NFD) are different byte
-        // sequences but the same directory on a normalization-insensitive volume.
-        let nfc = Path::new("/repo/Caf\u{00e9}");
-        let nfd = Path::new("/repo/Cafe\u{0301}");
-        assert_ne!(nfc, nfd);
-        assert_eq!(
-            WatchKey::folded(SanitizedPath::new(nfc)),
-            WatchKey::folded(SanitizedPath::new(nfd)),
-        );
     }
 
     #[test]
@@ -1898,32 +1830,6 @@ mod tests {
                 "/repo/b".to_owned(),
             ]
         );
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn event_dispatches_when_reported_path_has_verbatim_prefix() {
-        // `notify` (and Windows APIs generally) can report a changed path using the
-        // verbatim `\\?\` long-path form even when the directory was registered
-        // without it.
-        let backend = Arc::new(Mutex::new(FakeWatchBackend::default()));
-        let watcher = test_os_watcher(OsWatcherKind::Native, Some(backend));
-        let fired = Arc::new(Mutex::new(Vec::new()));
-        {
-            let fired = fired.clone();
-            watcher
-                .add(
-                    Arc::<Path>::from(Path::new("C:\\repo\\src")),
-                    false,
-                    move |_| fired.lock().push(()),
-                )
-                .expect("add watch")
-                .expect("watch registered");
-        }
-
-        watcher.dispatch(Ok(modify_event("\\\\?\\C:\\repo\\src\\main.rs")));
-
-        assert_eq!(fired.lock().len(), 1);
     }
 
     #[test]

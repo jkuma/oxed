@@ -169,21 +169,13 @@ impl AbsPathBuf {
 
     #[cfg(any(test, feature = "test-support"))]
     pub fn new_test(path: &'static str) -> Self {
-        if cfg!(windows) {
-            Self::new(format!("C:{path}")).unwrap()
-        } else {
-            Self::new(path).unwrap()
-        }
+        Self::new(path).unwrap()
     }
 }
 
 #[cfg(any(test, feature = "test-support"))]
 pub fn abs_path(path: &str) -> AbsPathBuf {
-    if cfg!(windows) {
-        AbsPathBuf::new(format!("C:{path}")).unwrap()
-    } else {
-        AbsPathBuf::new(path).unwrap()
-    }
+    AbsPathBuf::new(path).unwrap()
 }
 
 impl Deref for AbsPathBuf {
@@ -269,18 +261,10 @@ mod tests {
 
     #[test]
     fn test_new_test_normalizes_rooted_paths() {
-        if cfg!(windows) {
-            assert_eq!(AbsPathBuf::new_test("/").as_str(), "C:/");
-            assert_eq!(
-                AbsPathBuf::new_test("/test/project").as_str(),
-                "C:/test/project"
-            );
-        } else {
-            assert_eq!(AbsPathBuf::new_test("/").as_str(), "/");
-            assert_eq!(
-                AbsPathBuf::new_test("/test/project").as_str(),
-                "/test/project"
-            );
-        }
+        assert_eq!(AbsPathBuf::new_test("/").as_str(), "/");
+        assert_eq!(
+            AbsPathBuf::new_test("/test/project").as_str(),
+            "/test/project"
+        );
     }
 }

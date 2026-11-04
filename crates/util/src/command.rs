@@ -1,15 +1,5 @@
 use std::ffi::OsStr;
-#[cfg(not(target_os = "macos"))]
 use std::path::Path;
-
-#[cfg(target_os = "macos")]
-mod darwin;
-
-#[cfg(target_os = "macos")]
-pub use darwin::{Child, Command, Stdio};
-
-#[cfg(target_os = "windows")]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000_u32;
 
 pub use gpui_util::new_std_command;
 
@@ -17,28 +7,16 @@ pub fn new_command(program: impl AsRef<OsStr>) -> Command {
     Command::new(program)
 }
 
-#[cfg(not(target_os = "macos"))]
 pub type Child = smol::process::Child;
 
-#[cfg(not(target_os = "macos"))]
 pub use std::process::Stdio;
 
-#[cfg(not(target_os = "macos"))]
 #[derive(Debug)]
 pub struct Command(smol::process::Command);
 
-#[cfg(not(target_os = "macos"))]
 impl Command {
     #[inline]
     pub fn new(program: impl AsRef<OsStr>) -> Self {
-        #[cfg(target_os = "windows")]
-        {
-            use smol::process::windows::CommandExt;
-            let mut cmd = smol::process::Command::new(program);
-            cmd.creation_flags(CREATE_NO_WINDOW);
-            Self(cmd)
-        }
-        #[cfg(not(target_os = "windows"))]
         Self(smol::process::Command::new(program))
     }
 

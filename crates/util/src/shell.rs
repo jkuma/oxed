@@ -1,8 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt, path::Path};
-#[cfg(windows)]
-use std::{path::PathBuf, sync::LazyLock};
 
 /// Shell configuration to open the terminal with.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema, Hash)]
@@ -69,74 +67,11 @@ pub enum ShellKind {
 }
 
 pub fn get_system_shell() -> String {
-    if cfg!(windows) {
-        get_windows_system_shell()
-    } else {
-        std::env::var("SHELL").unwrap_or("/bin/sh".to_string())
-    }
+    std::env::var("SHELL").unwrap_or("/bin/sh".to_string())
 }
 
 pub fn get_default_system_shell() -> String {
-    if cfg!(windows) {
-        get_windows_system_shell()
-    } else {
-        "/bin/sh".to_string()
-    }
-}
-
-/// Get the default system shell, preferring bash on Windows.
-pub fn get_default_system_shell_preferring_bash() -> String {
-    #[cfg(windows)]
-    {
-        get_windows_bash().unwrap_or_else(|| get_windows_system_shell())
-    }
-
-    #[cfg(not(windows))]
-    {
-        "/bin/sh".to_string()
-    }
-}
-
-#[cfg(windows)]
-pub fn get_windows_bash() -> Option<String> {
-    fn find_bash_in_installation(install_root: &Path) -> Option<PathBuf> {
-        if !install_root.join("git-bash.exe").is_file() {
-            return None;
-        }
-        let bash = install_root.join("bin").join("bash.exe");
-        bash.is_file().then_some(bash)
-    }
-
-    fn find_bash_in_git() -> Option<PathBuf> {
-        if let Some(bash) = std::env::var_os("GIT_INSTALL_ROOT")
-            .map(PathBuf::from)
-            .and_then(|path| find_bash_in_installation(&path))
-        {
-            return Some(bash);
-        }
-        let git = which::which("git").ok()?;
-        let binary_directory = git.parent()?;
-        let parent = binary_directory.parent()?;
-        find_bash_in_installation(parent).or_else(|| find_bash_in_installation(parent.parent()?))
-    }
-
-    static BASH: LazyLock<Option<String>> = LazyLock::new(|| {
-        let bash = find_bash_in_git().map(|p| p.to_string_lossy().into_owned());
-        if let Some(ref path) = bash {
-            log::info!("Found bash at {}", path);
-        }
-        bash
-    });
-
-    (*BASH).clone()
-}
-
-pub fn get_windows_system_shell() -> String {
-    #[cfg(windows)]
-    return gpui_util::get_windows_system_shell();
-
-    #[cfg(not(windows))]
-    return "cmd.exe".to_string();
+    "/bin/sh".to_string()
 }
 
 impl fmt::Display for ShellKind {
@@ -159,7 +94,7 @@ impl fmt::Display for ShellKind {
 
 impl ShellKind {
     pub fn system() -> Self {
-        Self::new(&get_system_shell(), cfg!(windows))
+        Self::new(&get_system_shell(), false)
     }
 
     /// Returns whether this shell's command chaining syntax can be parsed by brush-parser.
@@ -751,31 +686,11 @@ impl ShellKind {
             | ShellKind::Elvish => "clear",
         }
     }
-
-    #[cfg(windows)]
-    /// We do not want to escape arguments if we are using CMD as our shell.
-    /// If we do we end up with too many quotes/escaped quotes for CMD to handle.
-    pub const fn tty_escape_args(&self) -> bool {
-        match self {
-            ShellKind::Cmd => false,
-            ShellKind::Posix
-            | ShellKind::Csh
-            | ShellKind::Tcsh
-            | ShellKind::Rc
-            | ShellKind::Fish
-            | ShellKind::PowerShell
-            | ShellKind::Pwsh
-            | ShellKind::Nushell
-            | ShellKind::Xonsh
-            | ShellKind::Elvish => true,
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(unix)]
     use crate::shell_builder::ShellBuilder;
 
     // Examples
@@ -1067,7 +982,6 @@ mod tests {
         assert_eq!(shell_kind.try_quote("nul\0byte"), None);
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_quoted_arguments_survive_real_shells() {
         let arguments = [
@@ -1168,7 +1082,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_quoted_csh_commands_survive_real_shells() {
         use std::os::unix::fs::PermissionsExt as _;

@@ -197,9 +197,6 @@ impl ShellBuilder {
     }
 
     /// Builds a `smol::process::Command` with the given task command and arguments.
-    ///
-    /// Prefer this over manually constructing a command with the output of `Self::build`,
-    /// as this method handles `cmd` weirdness on windows correctly.
     pub fn build_smol_command(
         self,
         task_command: Option<String>,
@@ -209,16 +206,11 @@ impl ShellBuilder {
     }
 
     /// Builds a `std::process::Command` with the given task command and arguments.
-    ///
-    /// Prefer this over manually constructing a command with the output of `Self::build`,
-    /// as this method handles `cmd` weirdness on windows correctly.
     pub fn build_std_command(
         self,
         mut task_command: Option<String>,
         task_args: &[String],
     ) -> std::process::Command {
-        #[cfg(windows)]
-        let kind = self.kind;
         if task_args.is_empty() {
             task_command = task_command
                 .as_ref()
@@ -229,18 +221,6 @@ impl ShellBuilder {
 
         let mut child = crate::command::new_std_command(program);
 
-        #[cfg(windows)]
-        if kind == ShellKind::Cmd {
-            use std::os::windows::process::CommandExt;
-
-            for arg in args {
-                child.raw_arg(arg);
-            }
-        } else {
-            child.args(args);
-        }
-
-        #[cfg(not(windows))]
         child.args(args);
 
         child

@@ -4,8 +4,6 @@
 //! real command implementation, not GPUI's deterministic scheduler or an installed
 //! Node. Pure lookup and version parsing are covered by the crate's unit tests.
 
-#![cfg(unix)]
-
 use anyhow::Result;
 use node_runtime::{NodeDiscoveryError, SystemNode};
 use semver::Version;

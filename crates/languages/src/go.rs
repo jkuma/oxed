@@ -50,11 +50,7 @@ impl GoLspAdapter {
 static VERSION_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\d+\.\d+\.\d+").expect("Failed to create VERSION_REGEX"));
 
-const BINARY: &str = if cfg!(target_os = "windows") {
-    "gopls.exe"
-} else {
-    "gopls"
-};
+const BINARY: &str = "gopls";
 
 impl LspInstaller for GoLspAdapter {
     type BinaryVersion = Option<String>;

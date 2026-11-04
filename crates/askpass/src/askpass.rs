@@ -2,9 +2,8 @@ mod encrypted_password;
 
 pub use encrypted_password::{EncryptedPassword, IKnowWhatIAmDoingAndIHaveReadTheDocs};
 
-use net::async_net::UnixListener;
 use smol::lock::Mutex;
-#[cfg(not(target_os = "windows"))]
+use smol::net::unix::UnixListener;
 use util::fs::make_file_executable;
 
 use std::ffi::OsStr;
@@ -20,20 +19,12 @@ use futures::{
     select_biased,
 };
 use gpui::{AsyncApp, BackgroundExecutor, Task};
-#[cfg(not(target_os = "windows"))]
 use smol::fs;
 use util::{ResultExt as _, debug_panic, maybe};
 
-#[cfg(not(target_os = "windows"))]
 use util::{paths::PathExt, shell::ShellKind};
 
-/// Path to the program used for askpass
-///
-/// On Unix and remote servers, this defaults to the current executable.
-/// On Windows, this must be set to the CLI variant of zed via set_askpass_program(),
-/// because SSH_ASKPASS must point to a directly executable binary. The CLI binary
-/// handles the ZED_ASKPASS_SOCKET env var to communicate with Zed over a Unix socket
-/// without needing a wrapper script.
+/// Path to the program used for askpass; defaults to the current executable.
 static ASKPASS_PROGRAM: OnceLock<std::path::PathBuf> = OnceLock::new();
 
 #[derive(PartialEq, Eq)]
@@ -107,18 +98,14 @@ impl AskPassDelegate {
 }
 
 pub struct AskPassSession {
-    #[cfg(target_os = "windows")]
-    secret: std::sync::Arc<std::sync::Mutex<Option<EncryptedPassword>>>,
     askpass_task: PasswordProxy,
     askpass_opened_rx: Option<oneshot::Receiver<()>>,
     askpass_kill_master_rx: Option<oneshot::Receiver<()>>,
     executor: BackgroundExecutor,
 }
 
-#[cfg(not(target_os = "windows"))]
 const ASKPASS_SCRIPT_NAME: &str = "askpass.sh";
 
-#[cfg(not(target_os = "windows"))]
 const GPG_WRAPPER_SCRIPT_NAME: &str = "gpg-wrapper.sh";
 
 impl AskPassSession {
@@ -126,9 +113,6 @@ impl AskPassSession {
     /// You must retain this session until the master process exits.
     #[must_use]
     pub async fn new(executor: BackgroundExecutor, delegate: AskPassDelegate) -> Result<Self> {
-        #[cfg(target_os = "windows")]
-        let secret = std::sync::Arc::new(std::sync::Mutex::new(None));
-
         let (askpass_opened_tx, askpass_opened_rx) = oneshot::channel::<()>();
 
         let askpass_opened_tx = Arc::new(Mutex::new(Some(askpass_opened_tx)));
@@ -139,23 +123,15 @@ impl AskPassSession {
         let get_password = {
             let executor = executor.clone();
 
-            #[cfg(target_os = "windows")]
-            let askpass_secret = secret.clone();
             move |prompt| {
                 let prompt = delegate.ask_password(prompt);
                 let kill_tx = kill_tx.clone();
                 let askpass_opened_tx = askpass_opened_tx.clone();
-                #[cfg(target_os = "windows")]
-                let askpass_secret = askpass_secret.clone();
                 executor.spawn(async move {
                     if let Some(askpass_opened_tx) = askpass_opened_tx.lock().await.take() {
                         askpass_opened_tx.send(()).ok();
                     }
                     if let Some(password) = prompt.await {
-                        #[cfg(target_os = "windows")]
-                        {
-                            askpass_secret.lock().unwrap().replace(password.clone());
-                        }
                         ControlFlow::Continue(Ok(password))
                     } else {
                         if let Some(kill_tx) = kill_tx.lock().await.take() {
@@ -169,9 +145,6 @@ impl AskPassSession {
         let askpass_task = PasswordProxy::new(Box::new(get_password), executor.clone()).await?;
 
         Ok(Self {
-            #[cfg(target_os = "windows")]
-            secret,
-
             askpass_task,
             askpass_kill_master_rx: Some(askpass_kill_master_rx),
             askpass_opened_rx: Some(askpass_opened_rx),
@@ -216,15 +189,7 @@ impl AskPassSession {
         }
     }
 
-    /// This will return the password that was last set by the askpass script.
-    #[cfg(target_os = "windows")]
-    pub fn get_password(&self) -> Option<EncryptedPassword> {
-        self.secret.lock().ok()?.clone()
-    }
-
-    /// Returns the value to set as SSH_ASKPASS.
-    /// On Unix this is the path to the generated shell script.
-    /// On Windows this is the path to cli.exe directly — no script needed.
+    /// Returns the value to set as SSH_ASKPASS: the path to the generated shell script.
     pub fn script_path(&self) -> impl AsRef<OsStr> {
         self.askpass_task.script_path()
     }
@@ -232,35 +197,15 @@ impl AskPassSession {
     /// Path to a script suitable for git's `gpg.program`, routing GnuPG
     /// passphrase prompts through Zed's askpass UI. `None` if unavailable.
     pub fn gpg_wrapper_path(&self) -> Option<&std::path::Path> {
-        #[cfg(not(target_os = "windows"))]
         return self.askpass_task.gpg_wrapper_path();
-        #[cfg(target_os = "windows")]
-        return None;
-    }
-
-    /// Returns the socket path to set as ZED_ASKPASS_SOCKET.
-    ///
-    /// On Windows, SSH_ASKPASS points directly to cli.exe. SSH passes only
-    /// the prompt string as argv[1] with no mechanism for extra arguments,
-    /// so the socket path is communicated via this environment variable instead.
-    /// cli.exe must check ZED_ASKPASS_SOCKET before clap parses args.
-    #[cfg(target_os = "windows")]
-    pub fn socket_path(&self) -> impl AsRef<OsStr> {
-        self.askpass_task.socket_path()
     }
 }
 
 pub struct PasswordProxy {
     _task: Task<()>,
-    /// On Unix: path to the generated .sh askpass script (set as SSH_ASKPASS).
-    /// On Windows: path to cli.exe (set as SSH_ASKPASS directly — no script needed).
+    /// Path to the generated askpass script, set as SSH_ASKPASS.
     askpass_script_path: std::path::PathBuf,
-    #[cfg(not(target_os = "windows"))]
     gpg_wrapper_script_path: Option<std::path::PathBuf>,
-    /// On Windows only: path to the Unix socket, passed as ZED_ASKPASS_SOCKET
-    /// so cli.exe can find it without --askpass argument parsing.
-    #[cfg(target_os = "windows")]
-    askpass_socket_path: std::path::PathBuf,
 }
 
 impl PasswordProxy {
@@ -280,21 +225,14 @@ impl PasswordProxy {
 
         let askpass_program = ASKPASS_PROGRAM.get_or_init(|| current_exec);
 
-        // Unix: SSH_ASKPASS = path to generated .sh script in temp dir.
-        // Windows: SSH_ASKPASS = path to cli.exe directly. No script is written.
-        #[cfg(not(target_os = "windows"))]
         let askpass_script_path = temp_dir.path().join(ASKPASS_SCRIPT_NAME);
-        #[cfg(target_os = "windows")]
-        let askpass_script_path = askpass_program.to_path_buf();
 
         let askpass_socket_path = askpass_socket.clone();
 
         // Create a gpg wrapper script that routes GnuPG passphrase prompts through
-        // the same socket (and thus through Zed's askpass UI). This only works on
-        // Unix where we control the pinentry via loopback mode. We compute the path
+        // the same socket (and thus through Zed's askpass UI), using pinentry loopback mode. We compute the path
         // before the socket task takes ownership of `temp_dir`, and write the file
         // afterwards.
-        #[cfg(not(target_os = "windows"))]
         let (gpg_wrapper_script_path, gpg_wrapper_script) =
             match generate_gpg_wrapper_script(askpass_program, &askpass_socket_path) {
                 Ok(script) => (
@@ -345,23 +283,17 @@ impl PasswordProxy {
             .log_err();
         });
 
-        // Unix only: write the shell script and mark it executable.
-        // On Windows cli.exe is invoked directly, so no script is needed.
-        #[cfg(not(target_os = "windows"))]
-        {
-            let askpass_script = generate_askpass_script(askpass_program, &askpass_socket_path)?;
-            fs::write(&askpass_script_path, askpass_script)
-                .await
-                .with_context(|| format!("creating askpass script at {askpass_script_path:?}"))?;
-            make_file_executable(&askpass_script_path)
-                .await
-                .with_context(|| {
-                    format!("marking askpass script executable at {askpass_script_path:?}")
-                })?;
-        }
+        let askpass_script = generate_askpass_script(askpass_program, &askpass_socket_path)?;
+        fs::write(&askpass_script_path, askpass_script)
+            .await
+            .with_context(|| format!("creating askpass script at {askpass_script_path:?}"))?;
+        make_file_executable(&askpass_script_path)
+            .await
+            .with_context(|| {
+                format!("marking askpass script executable at {askpass_script_path:?}")
+            })?;
 
         // Write the gpg wrapper script (computed above) and mark it executable.
-        #[cfg(not(target_os = "windows"))]
         let gpg_wrapper_script_path =
             if let Some((path, script)) = gpg_wrapper_script_path.zip(gpg_wrapper_script) {
                 match async {
@@ -388,10 +320,7 @@ impl PasswordProxy {
         Ok(Self {
             _task,
             askpass_script_path,
-            #[cfg(not(target_os = "windows"))]
             gpg_wrapper_script_path,
-            #[cfg(target_os = "windows")]
-            askpass_socket_path,
         })
     }
 
@@ -399,12 +328,6 @@ impl PasswordProxy {
         &self.askpass_script_path
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn socket_path(&self) -> impl AsRef<OsStr> {
-        &self.askpass_socket_path
-    }
-
-    #[cfg(not(target_os = "windows"))]
     pub fn gpg_wrapper_path(&self) -> Option<&std::path::Path> {
         self.gpg_wrapper_script_path.as_deref()
     }
@@ -431,8 +354,8 @@ pub fn main_from_args(socket: &str, args: impl IntoIterator<Item = String>) {
 }
 
 fn connect_and_write_prompt(socket: &str, mut buffer: Vec<u8>) {
-    use net::UnixStream;
     use std::io::{self, Read, Write};
+    use std::os::unix::net::UnixStream;
     use std::process::exit;
 
     let mut stream = match UnixStream::connect(socket) {
@@ -443,10 +366,6 @@ fn connect_and_write_prompt(socket: &str, mut buffer: Vec<u8>) {
         }
     };
 
-    #[cfg(target_os = "windows")]
-    while buffer.last().is_some_and(|&b| b == b'\n' || b == b'\r') {
-        buffer.pop();
-    }
     if buffer.last() != Some(&b'\0') {
         buffer.push(b'\0');
     }
@@ -474,9 +393,7 @@ pub fn set_askpass_program(path: std::path::PathBuf) {
     }
 }
 
-/// Generates the Unix shell askpass script.
-/// Not used on Windows — cli.exe is invoked directly as SSH_ASKPASS.
-#[cfg(not(target_os = "windows"))]
+/// Generates the askpass shell script.
 fn generate_askpass_script(
     askpass_program: &std::path::Path,
     askpass_socket: &std::path::Path,
@@ -501,7 +418,6 @@ fn generate_askpass_script(
 }
 
 #[inline]
-#[cfg(not(target_os = "windows"))]
 fn generate_gpg_wrapper_script(
     askpass_program: &std::path::Path,
     askpass_socket: &std::path::Path,
@@ -608,7 +524,6 @@ printf '%s\n' "$passphrase" |
 
 /// Finds the real `gpg` (or `gpg2`) executable on `PATH`.
 #[inline]
-#[cfg(not(target_os = "windows"))]
 fn find_gpg_program() -> Option<std::path::PathBuf> {
     ["gpg", "gpg2"]
         .into_iter()

@@ -606,15 +606,9 @@ struct ManagedNodeRuntime {
 impl ManagedNodeRuntime {
     const VERSION: &str = "v24.22.1";
 
-    #[cfg(not(windows))]
     const NODE_PATH: &str = "bin/node";
-    #[cfg(windows)]
-    const NODE_PATH: &str = "node.exe";
 
-    #[cfg(not(windows))]
     const NPM_PATH: &str = "bin/npm";
-    #[cfg(windows)]
-    const NPM_PATH: &str = "node_modules/npm/bin/npm-cli.js";
 
     async fn install_if_needed(http: &Arc<dyn HttpClient>) -> Result<Self> {
         log::info!("Node runtime install_if_needed");
@@ -916,8 +910,7 @@ impl SystemNode {
     ///
     /// A configured basename is also looked up in `search_path`; use `./name`
     /// to select one in the current directory. Relative paths containing
-    /// separators are resolved against that directory. On Windows, lookup
-    /// honors PATHEXT, including batch-file wrappers.
+    /// separators are resolved against that directory.
     ///
     /// The caller must finish loading its login-shell environment before calling
     /// this method. The version probe inherits that environment, with PATH
@@ -1315,22 +1308,6 @@ pub fn npm_command_env(node_binary: &Path) -> HashMap<String, String> {
         }
     }
 
-    #[cfg(windows)]
-    {
-        if let Some(val) = env::var("SYSTEMROOT")
-            .context("Missing environment variable: SYSTEMROOT!")
-            .log_err()
-        {
-            command_env.insert("SYSTEMROOT".into(), val);
-        }
-        if let Some(val) = env::var("ComSpec")
-            .context("Missing environment variable: ComSpec!")
-            .log_err()
-        {
-            command_env.insert("ComSpec".into(), val);
-        }
-    }
-
     command_env
 }
 
@@ -1360,7 +1337,6 @@ mod tests {
         let filename = format!("node{}", env::consts::EXE_SUFFIX);
         let node = binary_directory.join(&filename);
         fs::write(&node, b"not executed by lookup tests")?;
-        #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&node, fs::Permissions::from_mode(0o755))?;
@@ -1867,10 +1843,7 @@ mod tests {
     }
 
     fn node_output(stdout: &str) -> Output {
-        #[cfg(unix)]
         use std::os::unix::process::ExitStatusExt;
-        #[cfg(windows)]
-        use std::os::windows::process::ExitStatusExt;
         Output {
             status: ExitStatus::from_raw(0),
             stdout: stdout.as_bytes().to_vec(),

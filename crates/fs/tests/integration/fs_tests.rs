@@ -508,21 +508,6 @@ async fn test_realfs_atomic_write_non_existing_file(executor: BackgroundExecutor
 }
 
 #[gpui::test]
-#[cfg(target_os = "windows")]
-async fn test_realfs_canonicalize(executor: BackgroundExecutor) {
-    use util::paths::SanitizedPath;
-
-    let fs = RealFs::new(None, executor);
-    let temp_dir = TempDir::new().unwrap();
-    let file = temp_dir.path().join("test (1).txt");
-    let file = SanitizedPath::new(&file);
-    std::fs::write(&file, "test").unwrap();
-
-    let canonicalized = fs.canonicalize(file.as_path()).await;
-    assert!(canonicalized.is_ok());
-}
-
-#[gpui::test]
 async fn test_rename(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
@@ -582,7 +567,6 @@ async fn test_rename(executor: BackgroundExecutor) {
 }
 
 #[gpui::test]
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 async fn test_realfs_parallel_rename_without_overwrite_preserves_losing_source(
     executor: BackgroundExecutor,
 ) {
@@ -610,7 +594,6 @@ async fn test_realfs_parallel_rename_without_overwrite_preserves_losing_source(
 }
 
 #[gpui::test]
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 async fn test_realfs_rename_ignore_if_exists_leaves_source_and_target_unchanged(
     executor: BackgroundExecutor,
 ) {
@@ -744,7 +727,6 @@ async fn assert_remove_file_unlinks_symlink(root: &Path, fs: &dyn Fs) {
 }
 
 #[gpui::test]
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 async fn test_realfs_copy_and_remove_semantics(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let executor = cx.executor();
@@ -758,12 +740,8 @@ async fn test_realfs_copy_and_remove_semantics(cx: &mut TestAppContext) {
     let fs = RealFs::new(None, executor);
     assert_copy_and_remove_semantics(root, fs.as_ref()).await;
 
-    // Creating symlinks requires elevated privileges on Windows, so like the
-    // watcher tests above, skip that part when it is not possible.
-    match make_dir_symlink(&root.join("dir"), &root.join("link")) {
-        Ok(()) => assert_remove_file_unlinks_symlink(root, fs.as_ref()).await,
-        Err(error) => eprintln!("skipping symlink removal check (cannot symlink: {error})"),
-    }
+    make_dir_symlink(&root.join("dir"), &root.join("link")).unwrap();
+    assert_remove_file_unlinks_symlink(root, fs.as_ref()).await;
 }
 
 #[gpui::test]
@@ -814,7 +792,6 @@ async fn test_fake_fs_rename_onto_itself_keeps_the_file(executor: BackgroundExec
 }
 
 #[gpui::test]
-#[cfg(unix)]
 async fn test_realfs_executable_metadata(executor: BackgroundExecutor) {
     use std::os::unix::fs::PermissionsExt as _;
 
@@ -857,7 +834,6 @@ async fn test_realfs_executable_metadata(executor: BackgroundExecutor) {
 }
 
 #[gpui::test]
-#[cfg(unix)]
 async fn test_realfs_broken_symlink_metadata(executor: BackgroundExecutor) {
     let tempdir = TempDir::new().unwrap();
     let path = tempdir.path();
@@ -877,7 +853,6 @@ async fn test_realfs_broken_symlink_metadata(executor: BackgroundExecutor) {
 }
 
 #[gpui::test]
-#[cfg(unix)]
 async fn test_realfs_symlink_loop_metadata(executor: BackgroundExecutor) {
     let tempdir = TempDir::new().unwrap();
     let path = tempdir.path();
@@ -1055,28 +1030,9 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
     assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_c.txt"))]);
 }
 
-/// Create a directory symlink (`link` -> `target`) in a cross-platform way.
-///
-/// Returns `Err` when the platform cannot create symlinks (e.g. Windows without
-/// the create-symlink privilege), so callers can skip a scenario gracefully
-/// rather than failing the whole test.
+/// Create a directory symlink (`link` -> `target`).
 fn make_dir_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(target, link)
-    }
-    #[cfg(windows)]
-    {
-        std::os::windows::fs::symlink_dir(target, link)
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = (target, link);
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "symlinks are not supported on this platform",
-        ))
-    }
+    std::os::unix::fs::symlink(target, link)
 }
 
 /// Waits up to `timeout` for `events` to deliver something that covers the
@@ -1114,10 +1070,6 @@ async fn test_realfs_watcher_diagnostics(executor: BackgroundExecutor, cx: &mut 
     let fs = RealFs::new(None, executor.clone());
     let directory = TempDir::new().unwrap();
     let root = std::fs::canonicalize(directory.path()).unwrap();
-    // Windows canonicalization adds a verbatim prefix that watcher paths omit.
-    let root = util::paths::SanitizedPath::new(&root)
-        .as_path()
-        .to_path_buf();
     let recording = fs.record_watcher_diagnostics().unwrap();
     let (mut events, watcher) = fs.watch(&root, Duration::from_millis(10)).await;
     let file = root.join("watcher-diagnostics.txt");
@@ -1166,23 +1118,8 @@ async fn test_realfs_watcher_diagnostics(executor: BackgroundExecutor, cx: &mut 
 /// some directory and then mutates the on-disk file; a correct watcher must
 /// deliver an event (or a rescan) for every scenario.
 ///
-/// This asserts the residual path-aliasing bugs that real-casing the watch root
-/// at add-time does NOT fix. The headline failure is `symlink_ancestor`:
-/// watching a path that traverses a symlinked ancestor. On macOS FSEvents
-/// reports events under the resolved real path, which no longer has the
-/// symlinked prefix the watch root was registered with, so the events are
-/// filtered out and never delivered.
-///
-/// Platform notes (the test runs everywhere but scenarios self-skip when they
-/// cannot apply):
-/// - Case scenarios require a case-insensitive filesystem (macOS/Windows
-///   default; case-sensitive Linux/APFS skip them).
-/// - Symlink scenarios require symlink creation (skipped on Windows without the
-///   privilege).
-/// - `symlink_ancestor` fails on macOS (FSEvents canonicalizes) but is expected
-///   to pass on Linux (notify reconstructs paths from the watch path you pass),
-///   which is itself a useful demonstration that this is an FSEvents-specific
-///   bug.
+/// Case scenarios require a case-insensitive file system and skip themselves
+/// otherwise.
 #[gpui::test]
 async fn test_realfs_watch_aliased_watch_paths_deliver_events(
     executor: BackgroundExecutor,

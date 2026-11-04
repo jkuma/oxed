@@ -4,7 +4,6 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, OnceLock};
 
-use util::paths::SanitizedPath;
 pub use util::paths::home_dir;
 use util::rel_path::RelPath;
 
@@ -17,8 +16,7 @@ pub const EDITORCONFIG_NAME: &str = ".editorconfig";
 /// Forks should change this to avoid colliding with Zed's user data.
 pub const APP_NAME: &str = "Oxed";
 
-/// Lowercased form of [`APP_NAME`], for use in XDG-style paths on
-/// Linux/FreeBSD and the macOS `~/.config` fallback.
+/// Lowercased form of [`APP_NAME`], for use in XDG-style paths.
 pub const APP_NAME_LOWERCASE: &str = {
     assert!(!APP_NAME.is_empty(), "APP_NAME must not be empty");
     assert!(APP_NAME.as_bytes().is_ascii(), "APP_NAME must be ASCII");
@@ -53,32 +51,11 @@ static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved data directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/Library/Application Support/Zed`.
-/// On Linux/FreeBSD, this is `$XDG_DATA_HOME/zed`.
-/// On Windows, this is `%LOCALAPPDATA%\Zed`.
 static CURRENT_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved config directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/.config/zed`.
-/// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/zed`.
-/// On Windows, this is `%APPDATA%\Zed`.
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
-
-/// Returns the relative path to the zed_server directory on the ssh host.
-pub fn remote_server_dir_relative() -> &'static RelPath {
-    static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::from_unix_str(".zed_server").unwrap());
-    *CACHED
-}
-
-// Remove this once 223 goes stable
-/// Returns the relative path to the zed_wsl_server directory on the wsl host.
-pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
-    static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::from_unix_str(".zed_wsl_server").unwrap());
-    *CACHED
-}
 
 /// Sets a custom directory for all user data, overriding the default data directory.
 /// This function must be called before any other path operations that depend on the data directory.
@@ -110,11 +87,7 @@ pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
         let canonicalized = path
             .canonicalize()
             .expect("failed to canonicalize custom data directory's path to an absolute path");
-        // On Windows, `canonicalize` produces extended-length paths prefixed
-        // with `\\?\`. Strip that prefix so downstream consumers (e.g.
-        // Node.js language servers) that receive derived paths as arguments
-        // don't choke on the verbatim syntax.
-        SanitizedPath::new(&canonicalized).as_path().to_path_buf()
+        canonicalized
     })
 }
 
@@ -123,19 +96,13 @@ pub fn config_dir() -> &'static PathBuf {
     CONFIG_DIR.get_or_init(|| {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
             custom_dir.join("config")
-        } else if cfg!(target_os = "windows") {
-            dirs::config_dir()
-                .expect("failed to determine RoamingAppData directory")
-                .join(APP_NAME)
-        } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
+        } else {
             if let Ok(flatpak_xdg_config) = std::env::var("FLATPAK_XDG_CONFIG_HOME") {
                 flatpak_xdg_config.into()
             } else {
                 dirs::config_dir().expect("failed to determine XDG_CONFIG_HOME directory")
             }
             .join(APP_NAME_LOWERCASE)
-        } else {
-            home_dir().join(".config").join(APP_NAME_LOWERCASE)
         }
     })
 }
@@ -145,23 +112,13 @@ pub fn data_dir() -> &'static PathBuf {
     CURRENT_DATA_DIR.get_or_init(|| {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
             custom_dir.clone()
-        } else if cfg!(target_os = "macos") {
-            home_dir()
-                .join("Library/Application Support")
-                .join(APP_NAME)
-        } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
+        } else {
             if let Ok(flatpak_xdg_data) = std::env::var("FLATPAK_XDG_DATA_HOME") {
                 flatpak_xdg_data.into()
             } else {
                 dirs::data_local_dir().expect("failed to determine XDG_DATA_HOME directory")
             }
             .join(APP_NAME_LOWERCASE)
-        } else if cfg!(target_os = "windows") {
-            dirs::data_local_dir()
-                .expect("failed to determine LocalAppData directory")
-                .join(APP_NAME)
-        } else {
-            config_dir().clone() // Fallback
         }
     })
 }
@@ -169,23 +126,12 @@ pub fn data_dir() -> &'static PathBuf {
 pub fn state_dir() -> &'static PathBuf {
     static STATE_DIR: OnceLock<PathBuf> = OnceLock::new();
     STATE_DIR.get_or_init(|| {
-        if cfg!(target_os = "macos") {
-            return home_dir().join(".local").join("state").join(APP_NAME);
-        }
-
-        if cfg!(any(target_os = "linux", target_os = "freebsd")) {
-            return if let Ok(flatpak_xdg_state) = std::env::var("FLATPAK_XDG_STATE_HOME") {
-                flatpak_xdg_state.into()
-            } else {
-                dirs::state_dir().expect("failed to determine XDG_STATE_HOME directory")
-            }
-            .join(APP_NAME_LOWERCASE);
+        if let Ok(flatpak_xdg_state) = std::env::var("FLATPAK_XDG_STATE_HOME") {
+            flatpak_xdg_state.into()
         } else {
-            // Windows
-            return dirs::data_local_dir()
-                .expect("failed to determine LocalAppData directory")
-                .join(APP_NAME);
+            dirs::state_dir().expect("failed to determine XDG_STATE_HOME directory")
         }
+        .join(APP_NAME_LOWERCASE)
     })
 }
 
@@ -193,28 +139,12 @@ pub fn state_dir() -> &'static PathBuf {
 pub fn temp_dir() -> &'static PathBuf {
     static TEMP_DIR: OnceLock<PathBuf> = OnceLock::new();
     TEMP_DIR.get_or_init(|| {
-        if cfg!(target_os = "macos") {
-            return dirs::cache_dir()
-                .expect("failed to determine cachesDirectory directory")
-                .join(APP_NAME);
+        if let Ok(flatpak_xdg_cache) = std::env::var("FLATPAK_XDG_CACHE_HOME") {
+            flatpak_xdg_cache.into()
+        } else {
+            dirs::cache_dir().expect("failed to determine XDG_CACHE_HOME directory")
         }
-
-        if cfg!(target_os = "windows") {
-            return dirs::cache_dir()
-                .expect("failed to determine LocalAppData directory")
-                .join(APP_NAME);
-        }
-
-        if cfg!(any(target_os = "linux", target_os = "freebsd")) {
-            return if let Ok(flatpak_xdg_cache) = std::env::var("FLATPAK_XDG_CACHE_HOME") {
-                flatpak_xdg_cache.into()
-            } else {
-                dirs::cache_dir().expect("failed to determine XDG_CACHE_HOME directory")
-            }
-            .join(APP_NAME_LOWERCASE);
-        }
-
-        home_dir().join(".cache").join(APP_NAME_LOWERCASE)
+        .join(APP_NAME_LOWERCASE)
     })
 }
 
@@ -227,13 +157,7 @@ pub fn hang_traces_dir() -> &'static PathBuf {
 /// Returns the path to the logs directory.
 pub fn logs_dir() -> &'static PathBuf {
     static LOGS_DIR: OnceLock<PathBuf> = OnceLock::new();
-    LOGS_DIR.get_or_init(|| {
-        if cfg!(target_os = "macos") {
-            home_dir().join("Library/Logs").join(APP_NAME)
-        } else {
-            data_dir().join("logs")
-        }
-    })
+    LOGS_DIR.get_or_init(|| data_dir().join("logs"))
 }
 
 /// Returns the path to the Zed server directory on this SSH host.
@@ -258,20 +182,6 @@ pub fn old_log_file() -> &'static PathBuf {
 pub fn database_dir() -> &'static PathBuf {
     static DATABASE_DIR: OnceLock<PathBuf> = OnceLock::new();
     DATABASE_DIR.get_or_init(|| data_dir().join("db"))
-}
-
-/// Returns the path to the crashes directory, if it exists for the current platform.
-pub fn crashes_dir() -> &'static Option<PathBuf> {
-    static CRASHES_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
-    CRASHES_DIR.get_or_init(|| {
-        cfg!(target_os = "macos").then_some(home_dir().join("Library/Logs/DiagnosticReports"))
-    })
-}
-
-/// Returns the path to the retired crashes directory, if it exists for the current platform.
-pub fn crashes_retired_dir() -> &'static Option<PathBuf> {
-    static CRASHES_RETIRED_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
-    CRASHES_RETIRED_DIR.get_or_init(|| crashes_dir().as_ref().map(|dir| dir.join("Retired")))
 }
 
 /// Returns the path to the `settings.json` file.
@@ -313,20 +223,6 @@ pub fn agents_file() -> &'static PathBuf {
     AGENTS_FILE.get_or_init(|| config_dir().join("AGENTS.md"))
 }
 
-/// User-facing display form of the user-global `AGENTS.md` file path —
-/// i.e. what a human should see in messages and prompts, with the
-/// platform's native path separator and home/config directory shorthand.
-///
-/// Windows doesn't recognize `~` as the home directory, so the env-var
-/// form (`%APPDATA%`) is used there instead. Note that this is the
-/// *typical* location: a user with `XDG_CONFIG_HOME` set or running in a
-/// Flatpak sandbox would see a different `agents_file()` at runtime than
-/// this displays. The display string trades that precision for
-/// readability in announcement copy.
-#[cfg(target_os = "windows")]
-pub const GLOBAL_AGENTS_FILE_DISPLAY: &str =
-    const_format::concatcp!("%APPDATA%\\", APP_NAME, "\\AGENTS.md");
-#[cfg(not(target_os = "windows"))]
 pub const GLOBAL_AGENTS_FILE_DISPLAY: &str =
     const_format::concatcp!("~/.config/", APP_NAME_LOWERCASE, "/AGENTS.md");
 
@@ -373,13 +269,7 @@ pub fn snippets_dir() -> &'static PathBuf {
 /// This is where the prompts for use with the Assistant are stored.
 pub fn prompts_dir() -> &'static PathBuf {
     static PROMPTS_DIR: OnceLock<PathBuf> = OnceLock::new();
-    PROMPTS_DIR.get_or_init(|| {
-        if cfg!(target_os = "macos") {
-            config_dir().join("prompts")
-        } else {
-            data_dir().join("prompts")
-        }
-    })
+    PROMPTS_DIR.get_or_init(|| data_dir().join("prompts"))
 }
 
 /// Returns the path to the prompt templates directory.
@@ -399,13 +289,7 @@ pub fn prompt_overrides_dir(repo_path: Option<&Path>) -> PathBuf {
 
     static PROMPT_TEMPLATES_DIR: OnceLock<PathBuf> = OnceLock::new();
     PROMPT_TEMPLATES_DIR
-        .get_or_init(|| {
-            if cfg!(target_os = "macos") {
-                config_dir().join("prompt_overrides")
-            } else {
-                data_dir().join("prompt_overrides")
-            }
-        })
+        .get_or_init(|| data_dir().join("prompt_overrides"))
         .clone()
 }
 
@@ -414,13 +298,7 @@ pub fn prompt_overrides_dir(repo_path: Option<&Path>) -> PathBuf {
 /// This is where the embeddings used to power semantic search are stored.
 pub fn embeddings_dir() -> &'static PathBuf {
     static EMBEDDINGS_DIR: OnceLock<PathBuf> = OnceLock::new();
-    EMBEDDINGS_DIR.get_or_init(|| {
-        if cfg!(target_os = "macos") {
-            config_dir().join("embeddings")
-        } else {
-            data_dir().join("embeddings")
-        }
-    })
+    EMBEDDINGS_DIR.get_or_init(|| data_dir().join("embeddings"))
 }
 
 /// Returns the path to the languages directory.
@@ -485,11 +363,7 @@ pub fn user_ssh_config_file() -> PathBuf {
 }
 
 pub fn global_ssh_config_file() -> Option<&'static Path> {
-    if cfg!(windows) {
-        None
-    } else {
-        Some(Path::new("/etc/ssh/ssh_config"))
-    }
+    Some(Path::new("/etc/ssh/ssh_config"))
 }
 
 /// Returns candidate paths for the vscode user settings file
@@ -544,26 +418,11 @@ fn cursor_user_data_paths() -> Vec<PathBuf> {
 }
 
 fn add_vscode_user_data_paths(paths: &mut Vec<PathBuf>, product_name: &str) {
-    if cfg!(target_os = "macos") {
-        paths.push(
-            home_dir()
-                .join("Library/Application Support")
-                .join(product_name),
-        );
-    } else if cfg!(target_os = "windows") {
-        if let Some(data_local_dir) = dirs::data_local_dir() {
-            paths.push(data_local_dir.join(product_name));
-        }
-        if let Some(data_dir) = dirs::data_dir() {
-            paths.push(data_dir.join(product_name));
-        }
-    } else {
-        paths.push(
-            dirs::config_dir()
-                .unwrap_or(home_dir().join(".config"))
-                .join(product_name),
-        );
-    }
+    paths.push(
+        dirs::config_dir()
+            .unwrap_or(home_dir().join(".config"))
+            .join(product_name),
+    );
 }
 
 #[cfg(any(test, feature = "test-support"))]
