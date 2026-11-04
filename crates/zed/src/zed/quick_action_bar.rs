@@ -181,7 +181,6 @@ impl Render for QuickActionBar {
                                     editor.toggle_code_actions(
                                         &ToggleCodeActions {
                                             deployed_from: Some(CodeActionSource::QuickActionBar),
-                                            quick_launch: false,
                                         },
                                         window,
                                         cx,

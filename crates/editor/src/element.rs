@@ -667,7 +667,6 @@ impl EditorElement {
         register_action(editor, window, Editor::context_menu_prev);
         register_action(editor, window, Editor::context_menu_next);
         register_action(editor, window, Editor::context_menu_last);
-        register_action(editor, window, Editor::spawn_nearest_task);
         register_action(editor, window, Editor::open_selections_in_multibuffer);
         register_action(editor, window, Editor::toggle_bookmark);
         register_action(editor, window, Editor::toggle_bookmark_with_label);
@@ -2476,69 +2475,6 @@ impl EditorElement {
                 window,
                 cx,
             )
-        })
-    }
-
-    fn layout_run_indicators(
-        &self,
-        gutter: &Gutter,
-        run_indicators: &HashSet<DisplayRow>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Vec<AnyElement> {
-        if self.split_side == Some(SplitSide::Left) {
-            return Vec::new();
-        }
-
-        self.editor.update(cx, |editor, cx| {
-            let active_task_indicator_row =
-                // TODO: add edit button on the right side of each row in the context menu
-                if let Some(crate::CodeContextMenu::CodeActions(CodeActionsMenu {
-                    deployed_from,
-                    actions,
-                    ..
-                })) = editor.context_menu.borrow().as_ref()
-                {
-                    actions
-                        .tasks()
-                        .map(|tasks| tasks.position.to_display_point(gutter.snapshot).row())
-                        .or_else(|| match deployed_from {
-                            Some(CodeActionSource::Indicator(row)) => Some(*row),
-                            _ => None,
-                        })
-                } else {
-                    None
-                };
-
-            run_indicators
-                .iter()
-                .filter_map(|display_row| {
-                    let task_status = gutter
-                        .row_infos
-                        .get((display_row.0.saturating_sub(gutter.range.start.0)) as usize)
-                        .and_then(|row_info| Some((row_info.buffer_id?, row_info.buffer_row?)))
-                        .and_then(|(buffer_id, buffer_row)| {
-                            editor.runnable_task_status(buffer_id, buffer_row)
-                        });
-
-                    gutter.layout_item(
-                        *display_row,
-                        |cx, _| {
-                            editor
-                                .render_run_indicator(
-                                    &self.style,
-                                    Some(*display_row) == active_task_indicator_row,
-                                    task_status,
-                                    *display_row,
-                                    cx,
-                                )
-                                .into_any_element()
-                        },
-                        window,
-                        cx,
-                    )
-                })
-                .collect_vec()
         })
     }
 
@@ -5306,10 +5242,6 @@ impl EditorElement {
 
             for gutter_hover_button in layout.gutter_hover_buttons.iter_mut() {
                 gutter_hover_button.paint(window, cx);
-            }
-
-            for test_indicator in layout.test_indicators.iter_mut() {
-                test_indicator.paint(window, cx);
             }
         });
     }
@@ -8691,10 +8623,6 @@ impl Element for EditorElement {
                         })
                     });
 
-                    let run_indicator_rows = self.editor.update(cx, |editor, cx| {
-                        editor.active_run_indicators(start_row..end_row, window, cx)
-                    });
-
                     let gutter = Gutter {
                         line_height,
                         range: start_row..end_row,
@@ -9310,19 +9238,11 @@ impl Element for EditorElement {
                         cx,
                     );
 
-                    let test_indicators = if gutter_settings.runnables {
-                        self.layout_run_indicators(&gutter, &run_indicator_rows, window, cx)
-                    } else {
-                        Vec::new()
-                    };
-
                     let show_bookmarks =
                         snapshot.show_bookmarks.unwrap_or(gutter_settings.bookmarks);
 
                     let bookmark_rows = self.editor.update(cx, |editor, cx| {
-                        let mut rows = editor.active_bookmarks(start_row..end_row, window, cx);
-                        rows.retain(|k| !run_indicator_rows.contains(k));
-                        rows
+                        editor.active_bookmarks(start_row..end_row, window, cx)
                     });
 
                     let bookmarks = if show_bookmarks {
@@ -9341,7 +9261,6 @@ impl Element for EditorElement {
                         .map(|phantom| phantom.display_row);
 
                     if let Some(row) = gutter_hover_button
-                        && !run_indicator_rows.contains(&row)
                         && !bookmark_rows.contains(&row)
                         && show_bookmarks
                     {
@@ -9599,7 +9518,6 @@ impl Element for EditorElement {
                         selections,
                         diff_hunk_controls,
                         mouse_context_menu,
-                        test_indicators,
                         bookmarks,
                         gutter_hover_buttons,
                         crease_toggles,
@@ -9814,7 +9732,6 @@ pub struct EditorLayout {
     visible_cursors: Vec<CursorLayout>,
     navigation_overlay_paint_commands: Vec<NavigationOverlayPaintCommand>,
     selections: Vec<(PlayerColor, Vec<SelectionLayout>)>,
-    test_indicators: Vec<AnyElement>,
     bookmarks: Vec<AnyElement>,
     gutter_hover_buttons: Vec<AnyElement>,
     crease_toggles: Vec<Option<AnyElement>>,

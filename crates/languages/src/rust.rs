@@ -9,12 +9,10 @@ use http_client::github::{GitHubLspBinaryVersion, latest_github_release};
 use http_client::github_download::{GithubBinaryMetadata, download_server_binary};
 pub use language::*;
 use lsp::{InitializeParams, LanguageServerBinary, LanguageServerBinaryOptions};
-use project::lsp_store::lsp_ext_command;
 use project::lsp_store::rust_analyzer_ext::CARGO_DIAGNOSTICS_SOURCE_NAME;
-use project::project_settings::ProjectSettings;
 use regex::Regex;
 use serde_json::json;
-use settings::{SemanticTokenRules, Settings as _};
+use settings::SemanticTokenRules;
 use smallvec::SmallVec;
 use smol::fs::{self};
 use std::cmp::Reverse;
@@ -692,31 +690,18 @@ impl LspAdapter for RustLspAdapter {
     fn prepare_initialize_params(
         &self,
         mut original: InitializeParams,
-        cx: &App,
+        _cx: &App,
     ) -> Result<InitializeParams> {
-        let enable_lsp_tasks = ProjectSettings::get_global(cx)
-            .lsp
-            .get(&SERVER_NAME)
-            .is_some_and(|s| s.enable_lsp_tasks);
-
-        let mut commands = vec![
-            "rust-analyzer.showReferences",
-            "rust-analyzer.gotoLocation",
-            "rust-analyzer.triggerParameterHints",
-            "rust-analyzer.rename",
-        ];
-        if enable_lsp_tasks {
-            commands.push("rust-analyzer.runSingle");
-        }
-
-        let mut experimental = json!({
+        let experimental = json!({
             "commands": {
-                "commands": commands,
+                "commands": [
+                    "rust-analyzer.showReferences",
+                    "rust-analyzer.gotoLocation",
+                    "rust-analyzer.triggerParameterHints",
+                    "rust-analyzer.rename",
+                ],
             }
         });
-        if enable_lsp_tasks {
-            experimental["runnables"] = json!({ "kinds": ["cargo", "shell"] });
-        }
 
         if let Some(original_experimental) = &mut original.capabilities.experimental {
             merge_json_value_into(experimental, original_experimental);
@@ -730,18 +715,10 @@ impl LspAdapter for RustLspAdapter {
     fn client_command(
         &self,
         command_name: &str,
-        arguments: &[serde_json::Value],
+        _arguments: &[serde_json::Value],
     ) -> Option<ClientCommand> {
         match command_name {
             "rust-analyzer.showReferences" => Some(ClientCommand::ShowLocations),
-            "rust-analyzer.runSingle" => {
-                let first_arg = arguments.first()?;
-                let runnable =
-                    serde_json::from_value::<lsp_ext_command::Runnable>(first_arg.clone()).ok()?;
-                let template =
-                    lsp_ext_command::runnable_to_task_template(runnable.label, runnable.args);
-                Some(ClientCommand::ScheduleTask(template))
-            }
             _ => None,
         }
     }

@@ -702,8 +702,6 @@
   "gutter": {
     // Whether to show line numbers in the gutter.
     "line_numbers": true,
-    // Whether to show runnables buttons in the gutter.
-    "runnables": false,
     // Whether to show bookmarks in the gutter.
     "bookmarks": true,
     // Whether to show fold buttons in the gutter.

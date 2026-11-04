@@ -1,9 +1,6 @@
 pub use crate::commit_context_menu::{CopyCommitSha, CopyCommitTag, OpenCommitView};
 use crate::{
-    commit_context_menu::{
-        CUSTOM_GIT_COMMANDS_DOCS_SLUG, CommitContextMenuData, CommitContextMenuSource,
-        commit_context_menu, git_context_menu_tasks, git_task_context,
-    },
+    commit_context_menu::{CommitContextMenuData, CommitContextMenuSource, commit_context_menu},
     commit_tooltip::CommitAvatar,
     commit_view::CommitView,
     git_status_icon,
@@ -30,7 +27,7 @@ use markdown::{Markdown, MarkdownElement};
 use menu::{Cancel, SelectFirst, SelectLast, SelectNext, SelectPrevious};
 use picker::{Picker, PickerDelegate};
 use project::{
-    ProjectPath, TaskSourceKind,
+    ProjectPath,
     git_store::{
         CommitDataState, CommitDiff, CommitFile, GitGraphEvent, GitStore, GitStoreEvent,
         GraphDataResponse, Repository, RepositoryEvent, RepositoryId,
@@ -44,7 +41,6 @@ use std::{
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
-use task::ResolvedTask;
 use zed_actions::{
     buffer_search,
     search::{SelectNextMatch, SelectPreviousMatch, ToggleCaseSensitive},
@@ -53,9 +49,9 @@ use zed_actions::{
 use theme::AccentColors;
 use time::{OffsetDateTime, UtcOffset, format_description::BorrowedFormatItem};
 use ui::{
-    Chip, ColumnWidthConfig, CommonAnimationExt as _, ContextMenu, ContextMenuEntry, DiffStat,
-    Disclosure, Divider, HeaderResizeInfo, HighlightedLabel, IndentGuideColors, ListItem,
-    ListItemSpacing, RedistributableColumnsState, ScrollableHandle, Table, TableInteractionState,
+    Chip, ColumnWidthConfig, CommonAnimationExt as _, ContextMenu, DiffStat, Disclosure, Divider,
+    HeaderResizeInfo, HighlightedLabel, IndentGuideColors, ListItem, ListItemSpacing,
+    RedistributableColumnsState, ScrollableHandle, Table, TableInteractionState,
     TableRenderContext, TableResizeBehavior, Tooltip, WithScrollbar, bind_redistributable_columns,
     prelude::*, redistribute_hidden_fractions, redistribute_hidden_widths,
     render_redistributable_columns_resize_handles, render_table_header, table_row::TableRow,
@@ -1392,55 +1388,15 @@ struct GitGraphContextMenu {
 #[derive(Clone)]
 struct RefMenuEntry {
     ref_name: Option<SharedString>,
-    git_tasks: Vec<(TaskSourceKind, ResolvedTask)>,
 }
 
 impl RefMenuEntry {
-    fn add_entries(
-        self,
-        mut menu: ContextMenu,
-        git_graph: &Entity<GitGraph>,
-        window: &mut Window,
-    ) -> ContextMenu {
+    fn add_entries(self, mut menu: ContextMenu) -> ContextMenu {
         if let Some(ref_name) = self.ref_name {
             menu = menu.entry("Copy Ref Name", None, move |_window, cx| {
                 cx.write_to_clipboard(ClipboardItem::new_string(ref_name.to_string()));
             });
         }
-
-        menu = menu.separator().header("Custom Commands");
-
-        if self.git_tasks.is_empty() {
-            return menu.item(
-                ContextMenuEntry::new("Learn More")
-                    .icon(IconName::ArrowUpRight)
-                    .icon_color(Color::Muted)
-                    .icon_position(IconPosition::End)
-                    .handler(|_window, cx| {
-                        cx.open_url(&release_channel::docs_url(
-                            CUSTOM_GIT_COMMANDS_DOCS_SLUG,
-                            cx,
-                        ));
-                    }),
-            );
-        }
-
-        for (task_source_kind, resolved_task) in self.git_tasks {
-            let label = resolved_task.display_label().to_string();
-            menu = menu.entry(
-                label,
-                None,
-                window.handler_for(git_graph, move |this, window, cx| {
-                    this.schedule_git_task(
-                        task_source_kind.clone(),
-                        resolved_task.clone(),
-                        window,
-                        cx,
-                    );
-                }),
-            );
-        }
-
         menu
     }
 }
@@ -2639,26 +2595,6 @@ impl GitGraph {
         self.copy_commit_tag(selected_entry_index, window, cx);
     }
 
-    fn schedule_git_task(
-        &mut self,
-        task_source_kind: TaskSourceKind,
-        resolved_task: ResolvedTask,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.workspace
-            .update(cx, |workspace, cx| {
-                workspace.schedule_resolved_task(
-                    task_source_kind,
-                    resolved_task,
-                    false,
-                    window,
-                    cx,
-                );
-            })
-            .ok();
-    }
-
     fn deploy_ref_context_menu(
         &mut self,
         position: Point<Pixels>,
@@ -2667,15 +2603,14 @@ impl GitGraph {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(commit) = self.graph_data.commits.get(index) else {
+        if self.graph_data.commits.get(index).is_none() {
             return;
-        };
+        }
 
-        let ref_entry = self.ref_menu_entry(commit.data.sha, &name, cx);
-        let git_graph = cx.entity();
-        let context_menu = ContextMenu::build(window, cx, move |menu, window, _| {
+        let ref_entry = Self::ref_menu_entry(&name);
+        let context_menu = ContextMenu::build(window, cx, move |menu, _window, _| {
             menu.header(format!("Ref {name}"))
-                .map(|menu| ref_entry.add_entries(menu, &git_graph, window))
+                .map(|menu| ref_entry.add_entries(menu))
         });
 
         self.set_context_menu(context_menu, position, Some(index), window, cx);
@@ -2692,22 +2627,20 @@ impl GitGraph {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(commit) = self.graph_data.commits.get(index) else {
+        if self.graph_data.commits.get(index).is_none() {
             return;
-        };
+        }
 
         let ref_entries = hidden_refs
             .into_iter()
-            .map(|name| (self.ref_menu_entry(commit.data.sha, &name, cx), name))
+            .map(|name| (Self::ref_menu_entry(&name), name))
             .collect::<Vec<_>>();
 
-        let git_graph = cx.entity();
         let context_menu = ContextMenu::build(window, cx, move |mut menu, _window, _| {
             menu = menu.header("Refs");
             for (ref_entry, name) in ref_entries {
-                let git_graph = git_graph.clone();
-                menu = menu.submenu(name, move |submenu, window, _cx| {
-                    ref_entry.clone().add_entries(submenu, &git_graph, window)
+                menu = menu.submenu(name, move |submenu, _window, _cx| {
+                    ref_entry.clone().add_entries(submenu)
                 });
             }
             menu
@@ -2716,22 +2649,11 @@ impl GitGraph {
         self.set_context_menu(context_menu, position, Some(index), window, cx);
     }
 
-    /// Resolves the data needed to populate a single ref's context-menu entries
-    /// (its short name and any custom git command tasks). Kept separate so the
-    /// same entries can be rendered both as a standalone menu and as a submenu.
-    fn ref_menu_entry(&self, sha: Oid, name: &SharedString, cx: &App) -> RefMenuEntry {
-        let ref_name = Self::ref_name_from_decoration(name);
-        let repository = self
-            .get_repository(cx)
-            .map(|repository| repository.downgrade());
-        let git_tasks = git_context_menu_tasks(
-            git_task_context(&repository, sha, ref_name.as_deref(), cx),
-            &self.workspace,
-            cx,
-        );
+    /// Kept separate so the same entries can be rendered both as a standalone
+    /// menu and as a submenu.
+    fn ref_menu_entry(name: &SharedString) -> RefMenuEntry {
         RefMenuEntry {
-            ref_name,
-            git_tasks,
+            ref_name: Self::ref_name_from_decoration(name),
         }
     }
 
@@ -5358,10 +5280,8 @@ mod tests {
     use git::Oid;
     use git::repository::{CommitData, InitialGraphCommitData};
     use gpui::{TestAppContext, UpdateGlobal};
+    use project::Project;
     use project::git_store::{GitStoreEvent, RepositoryEvent};
-    use project::{
-        GIT_COMMAND_TASK_TAG, Project, TaskSourceKind, task_store::TaskSettingsLocation,
-    };
     use rand::prelude::*;
     use serde_json::json;
     use settings::{SettingsStore, ThemeSettingsContent};
@@ -7947,286 +7867,6 @@ mod tests {
         git_graph.read_with(&*cx, |graph, _| {
             assert_eq!(graph.selected_entry_idx, Some(0));
         });
-    }
-
-    #[gpui::test]
-    async fn test_global_git_command_task_runs_from_context_menu(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(
-            Path::new("/project"),
-            json!({
-                ".git": {},
-                "file.txt": "content",
-            }),
-        )
-        .await;
-
-        let commit_sha = Oid::try_from("abcdef1234567890abcdef1234567890abcdef12")
-            .expect("commit SHA should be valid");
-        fs.set_graph_commits(
-            Path::new("/project/.git"),
-            vec![Arc::new(InitialGraphCommitData {
-                sha: commit_sha,
-                parents: SmallVec::new(),
-                ref_names: Vec::new(),
-            })],
-        );
-
-        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
-        cx.run_until_parked();
-
-        let repository = project.read_with(cx, |project, cx| {
-            project
-                .active_repository(cx)
-                .expect("project should have an active repository")
-        });
-        let task_inventory = project.read_with(cx, |project, cx| {
-            project
-                .task_store()
-                .read(cx)
-                .task_inventory()
-                .cloned()
-                .expect("project should have a task inventory")
-        });
-
-        task_inventory.update(cx, |inventory, _| {
-            inventory
-                .update_file_based_tasks(
-                    TaskSettingsLocation::Global(Path::new("/tasks.json")),
-                    Some(
-                        &serde_json::to_string(&json!([
-                            // Tagged global task that should be scheduled from the Git graph context menu.
-                            {
-                                "label": "Git Show $ZED_GIT_SHA_SHORT",
-                                "command": "git",
-                                "args": ["show", "$ZED_GIT_SHA"],
-                                "cwd": "$ZED_GIT_REPOSITORY_PATH",
-                                "env": {
-                                    "REPOSITORY": "$ZED_GIT_REPOSITORY_NAME",
-                                },
-                                "tags": [GIT_COMMAND_TASK_TAG],
-                            },
-                            // Untagged task that should not appear in the Git graph context menu.
-                            {
-                                "label": "Git Status",
-                                "command": "git",
-                                "args": ["status"],
-                            },
-                            // Tagged task that still should not appear because Git graph task contexts
-                            // do not provide editor-specific variables.
-                            {
-                                "label": "Print File $ZED_FILE",
-                                "command": "echo",
-                                "args": ["$ZED_FILE"],
-                                "tags": [GIT_COMMAND_TASK_TAG],
-                            },
-                        ]))
-                        .expect("tasks JSON should serialize"),
-                    ),
-                )
-                .expect("tasks should parse");
-        });
-
-        let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
-            workspace::MultiWorkspace::test_new(project.clone(), window, cx)
-        });
-        let workspace = multi_workspace.read_with(&*cx, |multi_workspace, _| {
-            multi_workspace.workspace().clone()
-        });
-        let workspace_weak = workspace.downgrade();
-
-        let git_graph = cx.new_window_entity(|window, cx| {
-            GitGraph::new(
-                repository.read(cx).id,
-                project.read(cx).git_store().clone(),
-                workspace_weak,
-                None,
-                window,
-                cx,
-            )
-        });
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(git_graph.clone()), None, true, window, cx);
-        });
-        cx.run_until_parked();
-
-        git_graph.update_in(cx, |git_graph, window, cx| {
-            assert_eq!(git_graph.graph_data.commits.len(), 1);
-            git_graph.deploy_entry_context_menu(point(px(20.), px(20.)), 0, None, window, cx);
-        });
-        cx.run_until_parked();
-
-        let context_menu = git_graph.read_with(&*cx, |git_graph, _| {
-            git_graph
-                .context_menu
-                .as_ref()
-                .expect("context menu should be open")
-                .menu
-                .clone()
-        });
-        context_menu.update_in(cx, |context_menu, window, cx| {
-            context_menu
-                .select_last(window, cx)
-                .expect("custom Git task should be selectable");
-            context_menu.confirm(&menu::Confirm, window, cx);
-        });
-        cx.run_until_parked();
-
-        let (task_source_kind, resolved_task) = task_inventory.read_with(&*cx, |inventory, _| {
-            inventory
-                .last_scheduled_task(None)
-                .expect("custom Git task should be scheduled")
-        });
-
-        assert!(
-            matches!(task_source_kind, TaskSourceKind::AbsPath { .. }),
-            "scheduled task should come from global tasks"
-        );
-        assert_eq!(resolved_task.resolved_label, "Git Show abcdef1");
-        assert_eq!(resolved_task.resolved.command, Some("git".to_string()));
-        assert_eq!(
-            resolved_task.resolved.args,
-            vec![
-                "show".to_string(),
-                "abcdef1234567890abcdef1234567890abcdef12".to_string(),
-            ]
-        );
-        assert_eq!(
-            resolved_task.resolved.cwd,
-            Some(Path::new("/project").to_path_buf())
-        );
-        assert_eq!(
-            resolved_task.resolved.env.get("REPOSITORY"),
-            Some(&"project".to_string())
-        );
-    }
-
-    #[gpui::test]
-    async fn test_global_git_command_task_runs_from_ref_context_menu(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(
-            Path::new("/project"),
-            json!({
-                ".git": {},
-                "file.txt": "content",
-            }),
-        )
-        .await;
-
-        let commit_sha = Oid::try_from("abcdef1234567890abcdef1234567890abcdef12")
-            .expect("commit SHA should be valid");
-        fs.set_graph_commits(
-            Path::new("/project/.git"),
-            vec![Arc::new(InitialGraphCommitData {
-                sha: commit_sha,
-                parents: SmallVec::new(),
-                ref_names: vec!["HEAD -> feature-x".into()],
-            })],
-        );
-
-        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
-        cx.run_until_parked();
-
-        let repository = project.read_with(cx, |project, cx| {
-            project
-                .active_repository(cx)
-                .expect("project should have an active repository")
-        });
-        let task_inventory = project.read_with(cx, |project, cx| {
-            project
-                .task_store()
-                .read(cx)
-                .task_inventory()
-                .cloned()
-                .expect("project should have a task inventory")
-        });
-
-        task_inventory.update(cx, |inventory, _| {
-            inventory
-                .update_file_based_tasks(
-                    TaskSettingsLocation::Global(Path::new("/tasks.json")),
-                    Some(
-                        &serde_json::to_string(&json!([
-                            {
-                                "label": "Check out $ZED_GIT_REF",
-                                "command": "git",
-                                "args": ["checkout", "$ZED_GIT_REF"],
-                                "cwd": "$ZED_GIT_REPOSITORY_PATH",
-                                "tags": [GIT_COMMAND_TASK_TAG],
-                            },
-                        ]))
-                        .expect("tasks JSON should serialize"),
-                    ),
-                )
-                .expect("tasks should parse");
-        });
-
-        let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
-            workspace::MultiWorkspace::test_new(project.clone(), window, cx)
-        });
-        let workspace = multi_workspace.read_with(&*cx, |multi_workspace, _| {
-            multi_workspace.workspace().clone()
-        });
-        let workspace_weak = workspace.downgrade();
-
-        let git_graph = cx.new_window_entity(|window, cx| {
-            GitGraph::new(
-                repository.read(cx).id,
-                project.read(cx).git_store().clone(),
-                workspace_weak,
-                None,
-                window,
-                cx,
-            )
-        });
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(git_graph.clone()), None, true, window, cx);
-        });
-        cx.run_until_parked();
-
-        git_graph.update_in(cx, |git_graph, window, cx| {
-            assert_eq!(git_graph.graph_data.commits.len(), 1);
-            git_graph.deploy_entry_context_menu(
-                point(px(20.), px(20.)),
-                0,
-                Some("feature-x".into()),
-                window,
-                cx,
-            );
-        });
-        cx.run_until_parked();
-
-        let context_menu = git_graph.read_with(&*cx, |git_graph, _| {
-            git_graph
-                .context_menu
-                .as_ref()
-                .expect("context menu should be open")
-                .menu
-                .clone()
-        });
-        context_menu.update_in(cx, |context_menu, window, cx| {
-            context_menu
-                .select_last(window, cx)
-                .expect("custom Git task should be selectable");
-            context_menu.confirm(&menu::Confirm, window, cx);
-        });
-        cx.run_until_parked();
-
-        let (_task_source_kind, resolved_task) = task_inventory.read_with(&*cx, |inventory, _| {
-            inventory
-                .last_scheduled_task(None)
-                .expect("custom Git task should be scheduled")
-        });
-
-        assert_eq!(resolved_task.resolved_label, "Check out feature-x");
-        assert_eq!(
-            resolved_task.resolved.args,
-            vec!["checkout".to_string(), "feature-x".to_string()]
-        );
     }
 
     #[test]

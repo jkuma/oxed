@@ -79,7 +79,6 @@ settings.workspace = true
 smallvec.workspace = true
 snippet.workspace = true
 sum_tree.workspace = true
-task.workspace = true
 text.workspace = true
 theme.workspace = true
 theme_settings.workspace = true

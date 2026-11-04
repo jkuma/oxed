@@ -99,16 +99,11 @@ pub struct ToggleCodeActions {
     #[serde(default)]
     #[serde(skip)]
     pub deployed_from: Option<CodeActionSource>,
-    // Run first available task if there is only one.
-    #[serde(default)]
-    #[serde(skip)]
-    pub quick_launch: bool,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum CodeActionSource {
     Indicator(DisplayRow),
-    RunMenu(DisplayRow),
     QuickActionBar,
 }
 
@@ -305,15 +300,6 @@ pub struct CutToEndOfLine {
 #[derive(PartialEq, Clone, Deserialize, Default, JsonSchema, Action)]
 #[action(namespace = editor)]
 pub struct FoldAtLevel(pub u32);
-
-/// Spawns the nearest available task from the current cursor position.
-#[derive(PartialEq, Clone, Deserialize, Default, JsonSchema, Action)]
-#[action(namespace = editor)]
-#[serde(deny_unknown_fields)]
-pub struct SpawnNearestTask {
-    #[serde(default)]
-    pub reveal: task::RevealStrategy,
-}
 
 #[derive(Clone, PartialEq, Action)]
 #[action(no_json, no_register)]

@@ -124,7 +124,6 @@ pub enum IconName {
     Person,
     Pin,
     PlayFilled,
-    PlayOutlined,
     Plus,
     PullRequest,
     Quote,

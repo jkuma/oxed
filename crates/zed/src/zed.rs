@@ -9,7 +9,6 @@ use assets::Assets;
 
 use breadcrumbs::Breadcrumbs;
 use collections::VecDeque;
-use command_palette_hooks::CommandPaletteFilter;
 use editor::{Editor, MultiBuffer};
 use extension_host::ExtensionStore;
 use fs::Fs;
@@ -54,7 +53,6 @@ use settings::{
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
 
 use std::{
-    any::TypeId,
     borrow::Cow,
     path::{Path, PathBuf},
     sync::Arc,
@@ -342,11 +340,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         _on_close_subscription = bind_on_window_closed(cx);
     })
     .detach();
-
-    // Tasks are not available.
-    CommandPaletteFilter::update_global(cx, |filter, _| {
-        filter.hide_action_types(&[TypeId::of::<editor::actions::SpawnNearestTask>()]);
-    });
 
     init_cursor_hide_mode(cx);
     init_app_appearance(cx);

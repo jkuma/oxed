@@ -333,7 +333,6 @@ impl VsCodeSettings {
                 _ => None,
             }),
             min_line_number_digits: None,
-            runnables: None,
             bookmarks: None,
             folds: self.read_enum("editor.showFoldingControls", |s| match s {
                 "always" | "mouseover" => Some(true),

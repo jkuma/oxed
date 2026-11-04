@@ -297,8 +297,6 @@ pub fn lsp_to_symbol_kind(kind: lsp::SymbolKind) -> SymbolKind {
 pub enum ClientCommand {
     /// Open a location list (references panel / peek view).
     ShowLocations,
-    /// Schedule a task from an LSP command's arguments.
-    ScheduleTask(task::TaskTemplate),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

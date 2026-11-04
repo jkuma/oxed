@@ -5,9 +5,8 @@ use futures::{StreamExt as _, future::join_all, stream::FuturesUnordered};
 use gpui::{MouseButton, SharedString, Task, TaskExt, WeakEntity};
 use itertools::Itertools;
 use language::{BufferId, ClientCommand};
-use multi_buffer::{Anchor, BufferOffset, MultiBufferRow, MultiBufferSnapshot, ToPoint as _};
-use project::{CodeAction, TaskSourceKind, lsp_store::code_lens::CodeLensActions};
-use task::TaskContext;
+use multi_buffer::{Anchor, MultiBufferRow, MultiBufferSnapshot, ToPoint as _};
+use project::{CodeAction, lsp_store::code_lens::CodeLensActions};
 use text::ToOffset as _;
 
 use ui::{Context, Window, div, prelude::*};
@@ -17,7 +16,6 @@ use crate::{
     actions::ToggleCodeLens,
     display_map::{BlockPlacement, BlockProperties, BlockStyle, CustomBlockId, RenderBlock},
     hover_links::HoverLink,
-    runnables::RunnableTaskStatus,
 };
 
 static EMPTY_LENS_FALLBACK_TITLE: SharedString = SharedString::new_static("0 references");
@@ -85,94 +83,11 @@ pub(super) fn try_handle_client_command(
         });
 
     match client_command {
-        Some(ClientCommand::ScheduleTask(task_template)) => {
-            schedule_task(task_template, action, editor, workspace, window, cx)
-        }
         Some(ClientCommand::ShowLocations) => {
             try_show_references(arguments, action, editor, window, cx)
         }
         None => false,
     }
-}
-
-fn schedule_task(
-    task_template: task::TaskTemplate,
-    action: &CodeAction,
-    editor: &mut Editor,
-    workspace: &gpui::Entity<workspace::Workspace>,
-    window: &mut Window,
-    cx: &mut Context<Editor>,
-) -> bool {
-    let task_context = TaskContext {
-        cwd: task_template.cwd.as_ref().map(std::path::PathBuf::from),
-        ..TaskContext::default()
-    };
-    let language_name = editor
-        .buffer()
-        .read(cx)
-        .buffer(action.range.start.buffer_id)
-        .and_then(|buffer| buffer.read(cx).language())
-        .map(|language| language.name());
-    let task_source_kind = match language_name {
-        Some(language_name) => TaskSourceKind::Lsp {
-            server: action.server_id,
-            language_name: SharedString::from(language_name),
-        },
-        None => TaskSourceKind::AbsPath {
-            id_base: "code-lens".into(),
-            abs_path: task_template
-                .cwd
-                .as_ref()
-                .map(std::path::PathBuf::from)
-                .unwrap_or_default(),
-        },
-    };
-
-    let Some(resolved_task) =
-        task_template.resolve_task(&task_source_kind.to_id_base(), &task_context)
-    else {
-        return true;
-    };
-    let runnable_task_key = editor
-        .buffer()
-        .read(cx)
-        .buffer(action.range.start.buffer_id)
-        .and_then(|buffer| {
-            let buffer_snapshot = buffer.read(cx).snapshot();
-            let buffer_id = buffer_snapshot.remote_id();
-            let offset = BufferOffset(action.range.start.to_offset(&buffer_snapshot));
-            editor.runnable_task_key_for_offset(buffer_id, offset)
-        });
-    if let Some((buffer_id, buffer_row)) = runnable_task_key {
-        editor.set_runnable_task_status(buffer_id, buffer_row, RunnableTaskStatus::Running, cx);
-    }
-    let editor_handle = cx.weak_entity();
-    workspace.update(cx, |workspace, cx| {
-        if let Some((buffer_id, buffer_row)) = runnable_task_key {
-            workspace.schedule_resolved_task_with_completion(
-                task_source_kind,
-                resolved_task,
-                false,
-                move |result, cx| {
-                    editor_handle
-                        .update(cx, |editor, cx| {
-                            editor.set_runnable_task_status(
-                                buffer_id,
-                                buffer_row,
-                                RunnableTaskStatus::from(result),
-                                cx,
-                            );
-                        })
-                        .ok();
-                },
-                window,
-                cx,
-            );
-        } else {
-            workspace.schedule_resolved_task(task_source_kind, resolved_task, false, window, cx);
-        }
-    });
-    true
 }
 
 fn try_show_references(

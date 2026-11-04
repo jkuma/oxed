@@ -13,7 +13,7 @@ use markdown::{CopyButtonVisibility, Markdown, MarkdownElement};
 use multi_buffer::Anchor;
 use ordered_float::OrderedFloat;
 use project::lsp_store::CompletionDocumentation;
-use project::{CodeAction, Completion, CompletionGroup, TaskSourceKind};
+use project::{CodeAction, Completion, CompletionGroup};
 use project::{CompletionDisplayOptions, CompletionSource};
 
 use std::sync::Arc;
@@ -25,7 +25,6 @@ use std::{
     ops::Range,
     rc::Rc,
 };
-use task::ResolvedTask;
 use ui::{
     Divider, ListItem, ListSubHeader, Popover, ScrollAxes, Scrollbars, Tooltip, WithScrollbar,
     prelude::*,
@@ -35,7 +34,6 @@ use util::ResultExt;
 use crate::hover_popover::{hover_markdown_style, open_markdown_url};
 use crate::{
     CodeActionProvider, CompletionId, CompletionProvider, DisplayRow, Editor, EditorStyle,
-    ResolvedTasks,
     actions::{ConfirmCodeAction, ConfirmCompletion},
     split_words, styled_runs_for_code_label,
 };
@@ -1845,92 +1843,36 @@ pub struct AvailableCodeAction {
     pub provider: Rc<dyn CodeActionProvider>,
 }
 
+impl AvailableCodeAction {
+    fn menu_label(&self) -> String {
+        self.action.lsp_action.title().replace("\n", "")
+    }
+}
+
 #[derive(Clone)]
 pub struct CodeActionContents {
-    tasks: Option<Rc<ResolvedTasks>>,
     actions: Option<Rc<[AvailableCodeAction]>>,
 }
 
 impl CodeActionContents {
-    pub(crate) fn new(
-        tasks: Option<ResolvedTasks>,
-        actions: Option<Rc<[AvailableCodeAction]>>,
-    ) -> Self {
-        Self {
-            tasks: tasks.map(Rc::new),
-            actions,
-        }
-    }
-
-    pub fn tasks(&self) -> Option<&ResolvedTasks> {
-        self.tasks.as_deref()
+    pub(crate) fn new(actions: Option<Rc<[AvailableCodeAction]>>) -> Self {
+        Self { actions }
     }
 
     fn len(&self) -> usize {
-        let tasks_len = self.tasks.as_ref().map_or(0, |tasks| tasks.templates.len());
-        let code_actions_len = self.actions.as_ref().map_or(0, |actions| actions.len());
-        tasks_len + code_actions_len
+        self.actions.as_ref().map_or(0, |actions| actions.len())
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    fn iter(&self) -> impl Iterator<Item = CodeActionsItem> + '_ {
-        self.tasks
-            .iter()
-            .flat_map(|tasks| {
-                tasks
-                    .templates
-                    .iter()
-                    .map(|(kind, task)| CodeActionsItem::Task(kind.clone(), task.clone()))
-            })
-            .chain(self.actions.iter().flat_map(|actions| {
-                actions.iter().map(|available| CodeActionsItem::CodeAction {
-                    action: available.action.clone(),
-                    provider: available.provider.clone(),
-                })
-            }))
+    fn iter(&self) -> impl Iterator<Item = &AvailableCodeAction> {
+        self.actions.iter().flat_map(|actions| actions.iter())
     }
 
-    pub fn get(&self, mut index: usize) -> Option<CodeActionsItem> {
-        if let Some(tasks) = &self.tasks {
-            if let Some((kind, task)) = tasks.templates.get(index) {
-                return Some(CodeActionsItem::Task(kind.clone(), task.clone()));
-            } else {
-                index -= tasks.templates.len();
-            }
-        }
-        let available = self.actions.as_ref()?.get(index)?;
-        Some(CodeActionsItem::CodeAction {
-            action: available.action.clone(),
-            provider: available.provider.clone(),
-        })
-    }
-}
-
-#[derive(Clone)]
-pub enum CodeActionsItem {
-    Task(TaskSourceKind, ResolvedTask),
-    CodeAction {
-        action: CodeAction,
-        provider: Rc<dyn CodeActionProvider>,
-    },
-}
-
-impl CodeActionsItem {
-    pub fn label(&self) -> String {
-        match self {
-            Self::CodeAction { action, .. } => action.lsp_action.title().to_owned(),
-            Self::Task(_, task) => task.resolved_label.clone(),
-        }
-    }
-
-    pub fn menu_label(&self) -> String {
-        match self {
-            Self::CodeAction { action, .. } => action.lsp_action.title().replace("\n", ""),
-            Self::Task(_, task) => task.resolved_label.replace("\n", ""),
-        }
+    pub fn get(&self, index: usize) -> Option<&AvailableCodeAction> {
+        self.actions.as_ref()?.get(index)
     }
 }
 
@@ -2009,9 +1951,7 @@ impl CodeActionsMenu {
 
     fn origin(&self) -> ContextMenuOrigin {
         match &self.deployed_from {
-            Some(CodeActionSource::Indicator(row)) | Some(CodeActionSource::RunMenu(row)) => {
-                ContextMenuOrigin::GutterIndicator(*row)
-            }
+            Some(CodeActionSource::Indicator(row)) => ContextMenuOrigin::GutterIndicator(*row),
             Some(CodeActionSource::QuickActionBar) => ContextMenuOrigin::QuickActionBar,
             None => ContextMenuOrigin::Cursor,
         }
@@ -2079,12 +2019,7 @@ impl CodeActionsMenu {
             self.actions
                 .iter()
                 .enumerate()
-                .max_by_key(|(_, action)| match action {
-                    CodeActionsItem::Task(_, task) => task.resolved_label.chars().count(),
-                    CodeActionsItem::CodeAction { action, .. } => {
-                        action.lsp_action.title().chars().count()
-                    }
-                })
+                .max_by_key(|(_, available)| available.action.lsp_action.title().chars().count())
                 .map(|(ix, _)| ix),
         )
         .with_sizing_behavior(ListSizingBehavior::Infer);
