@@ -11,10 +11,7 @@ use util::ResultExt;
 
 pub use language::*;
 
-use crate::{
-    json::JsonTaskProvider,
-    python::{BasedPyrightLspAdapter, PyreflyLspAdapter, RuffLspAdapter},
-};
+use crate::python::{BasedPyrightLspAdapter, PyreflyLspAdapter, RuffLspAdapter};
 
 mod bash;
 mod c;
@@ -23,7 +20,6 @@ mod css;
 mod eslint;
 mod go;
 mod json;
-mod package_json;
 mod python;
 mod rust;
 mod tailwind;
@@ -31,8 +27,6 @@ mod tailwindcss;
 mod typescript;
 mod vtsls;
 mod yaml;
-
-pub(crate) use package_json::{PackageJson, PackageJsonData};
 
 /// A shared grammar for plain text, exposed for reuse by downstream crates.
 #[cfg(feature = "tree-sitter-gitcommit")]
@@ -63,24 +57,19 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
     let c_lsp_adapter = Arc::new(c::CLspAdapter);
     let css_lsp_adapter = Arc::new(css::CssLspAdapter::new(node.clone()));
     let eslint_adapter = Arc::new(eslint::EsLintLspAdapter::new(node.clone(), fs.clone()));
-    let go_context_provider = Arc::new(go::GoContextProvider);
     let go_lsp_adapter = Arc::new(go::GoLspAdapter);
-    let json_context_provider = Arc::new(JsonTaskProvider);
     let json_lsp_adapter = Arc::new(json::JsonLspAdapter::new(languages.clone(), node.clone()));
     let node_version_lsp_adapter = Arc::new(json::NodeVersionAdapter);
     let py_lsp_adapter = Arc::new(python::PyLspAdapter::new());
     let ty_lsp_adapter = Arc::new(python::TyLspAdapter::new(fs.clone()));
-    let python_context_provider = Arc::new(python::PythonContextProvider);
     let python_lsp_adapter = Arc::new(python::PyrightLspAdapter::new(node.clone()));
     let basedpyright_lsp_adapter = Arc::new(BasedPyrightLspAdapter::new(node.clone()));
     let ruff_lsp_adapter = Arc::new(RuffLspAdapter::new(fs.clone()));
     let pyrefly_lsp_adapter = Arc::new(PyreflyLspAdapter::new(fs.clone()));
     let python_toolchain_provider = Arc::new(python::PythonToolchainProvider);
-    let rust_context_provider = Arc::new(rust::RustContextProvider);
     let rust_lsp_adapter = Arc::new(rust::RustLspAdapter);
     let tailwind_adapter = Arc::new(tailwind::TailwindLspAdapter::new(node.clone()));
     let tailwindcss_adapter = Arc::new(tailwindcss::TailwindCssLspAdapter::new(node.clone()));
-    let typescript_context = Arc::new(typescript::TypeScriptContextProvider::new(fs.clone()));
     let typescript_lsp_adapter = Arc::new(typescript::TypeScriptLspAdapter::new(
         node.clone(),
         fs.clone(),
@@ -91,7 +80,6 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
     let built_in_languages = [
         LanguageInfo {
             name: "bash",
-            context: Some(Arc::new(bash::bash_task_context())),
             adapters: vec![bash_lsp_adapter],
             ..Default::default()
         },
@@ -124,32 +112,27 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
         LanguageInfo {
             name: "go",
             adapters: vec![go_lsp_adapter.clone()],
-            context: Some(go_context_provider.clone()),
             semantic_token_rules: Some(go::semantic_token_rules()),
             ..Default::default()
         },
         LanguageInfo {
             name: "gomod",
             adapters: vec![go_lsp_adapter.clone()],
-            context: Some(go_context_provider.clone()),
             ..Default::default()
         },
         LanguageInfo {
             name: "gowork",
             adapters: vec![go_lsp_adapter],
-            context: Some(go_context_provider),
             ..Default::default()
         },
         LanguageInfo {
             name: "json",
             adapters: vec![json_lsp_adapter.clone(), node_version_lsp_adapter],
-            context: Some(json_context_provider.clone()),
             ..Default::default()
         },
         LanguageInfo {
             name: "jsonc",
             adapters: vec![json_lsp_adapter],
-            context: Some(json_context_provider),
             ..Default::default()
         },
         LanguageInfo {
@@ -172,7 +155,6 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
                 python_lsp_adapter,
                 pyrefly_lsp_adapter,
             ],
-            context: Some(python_context_provider),
             toolchain: Some(python_toolchain_provider),
             manifest_name: Some(SharedString::new_static("pyproject.toml").into()),
             semantic_token_rules: Some(python::semantic_token_rules()),
@@ -180,7 +162,6 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
         LanguageInfo {
             name: "rust",
             adapters: vec![rust_lsp_adapter],
-            context: Some(rust_context_provider),
             manifest_name: Some(SharedString::new_static("Cargo.toml").into()),
             semantic_token_rules: Some(rust::semantic_token_rules()),
             ..Default::default()
@@ -188,19 +169,16 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
         LanguageInfo {
             name: "tsx",
             adapters: vec![typescript_lsp_adapter.clone(), vtsls_adapter.clone()],
-            context: Some(typescript_context.clone()),
             ..Default::default()
         },
         LanguageInfo {
             name: "typescript",
             adapters: vec![typescript_lsp_adapter.clone(), vtsls_adapter.clone()],
-            context: Some(typescript_context.clone()),
             ..Default::default()
         },
         LanguageInfo {
             name: "javascript",
             adapters: vec![typescript_lsp_adapter.clone(), vtsls_adapter.clone()],
-            context: Some(typescript_context),
             ..Default::default()
         },
         LanguageInfo {
@@ -233,7 +211,6 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
             &languages,
             registration.name,
             registration.adapters,
-            registration.context,
             registration.toolchain,
             registration.manifest_name,
             registration.semantic_token_rules,
@@ -339,7 +316,6 @@ pub fn init(languages: Arc<LanguageRegistry>, fs: Arc<dyn Fs>, node: NodeRuntime
 struct LanguageInfo {
     name: &'static str,
     adapters: Vec<Arc<dyn LspAdapter>>,
-    context: Option<Arc<dyn ContextProvider>>,
     toolchain: Option<Arc<dyn ToolchainLister>>,
     manifest_name: Option<ManifestName>,
     semantic_token_rules: Option<SemanticTokenRules>,
@@ -349,7 +325,6 @@ fn register_language(
     languages: &LanguageRegistry,
     name: &'static str,
     adapters: Vec<Arc<dyn LspAdapter>>,
-    context: Option<Arc<dyn ContextProvider>>,
     toolchain: Option<Arc<dyn ToolchainLister>>,
     manifest_name: Option<ManifestName>,
     semantic_token_rules: Option<SemanticTokenRules>,
@@ -372,14 +347,12 @@ fn register_language(
         manifest_name.clone(),
         Arc::new(move || {
             let config = config.clone();
-            let context = context.clone();
             let toolchain = toolchain.clone();
             let manifest_name = manifest_name.clone();
             async move {
                 Ok(LoadedLanguage {
                     config,
                     queries: grammars::load_queries(name),
-                    context_provider: context,
                     toolchain_provider: toolchain,
                     manifest_name,
                 })

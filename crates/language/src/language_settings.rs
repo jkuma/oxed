@@ -140,8 +140,6 @@ pub struct LanguageSettings {
     pub code_actions_on_format: HashMap<String, bool>,
     /// Whether to perform linked edits
     pub linked_edits: bool,
-    /// Task configuration for this language.
-    pub tasks: LanguageTaskSettings,
     /// Whether to pop the completions menu while typing in an editor without
     /// explicitly requesting it.
     pub show_completions_on_input: bool,
@@ -227,21 +225,6 @@ impl IndentGuideSettings {
         };
         Some(width.clamp(1, 10))
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct LanguageTaskSettings {
-    /// Extra task variables to set for a particular language.
-    pub variables: HashMap<String, String>,
-    pub enabled: bool,
-    /// Use LSP tasks over Zed language extension ones.
-    /// If no LSP tasks are returned due to error/timeout or regular execution,
-    /// Zed language extension tasks will be used instead.
-    ///
-    /// Other Zed tasks will still be shown:
-    /// * Zed task from either of the task config file
-    /// * Zed task from history (e.g. one-off task was spawned before)
-    pub prefer_lsp: bool,
 }
 
 /// Allows to enable/disable formatting with Prettier
@@ -592,7 +575,6 @@ impl settings::Settings for AllLanguageSettings {
             let completions = settings.completions.unwrap();
             let prettier = settings.prettier.unwrap();
             let indent_guides = settings.indent_guides.unwrap();
-            let tasks = settings.tasks.unwrap();
             let whitespace_map = settings.whitespace_map.unwrap();
 
             LanguageSettings {
@@ -660,11 +642,6 @@ impl settings::Settings for AllLanguageSettings {
                     .unwrap(),
                 code_actions_on_format: settings.code_actions_on_format.unwrap(),
                 linked_edits: settings.linked_edits.unwrap(),
-                tasks: LanguageTaskSettings {
-                    variables: tasks.variables.unwrap_or_default(),
-                    enabled: tasks.enabled.unwrap(),
-                    prefer_lsp: tasks.prefer_lsp.unwrap(),
-                },
                 show_completions_on_input: settings.show_completions_on_input.unwrap(),
                 show_completion_documentation: settings.show_completion_documentation.unwrap(),
                 colorize_brackets: settings.colorize_brackets.unwrap(),

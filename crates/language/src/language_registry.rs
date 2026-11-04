@@ -2,8 +2,7 @@ use crate::available_languages::{AvailableLanguage, LanguageOrigin};
 use crate::{
     CachedLspAdapter, File, Language, LanguageConfig, LanguageId, LanguageMatcher,
     LanguageServerName, LspAdapter, ManifestName, PLAIN_TEXT, ToolchainLister,
-    available_languages::AvailableLanguages, language_settings::all_language_settings,
-    task_context::ContextProvider, with_parser,
+    available_languages::AvailableLanguages, language_settings::all_language_settings, with_parser,
 };
 use anyhow::{Context as _, Result, anyhow};
 use collections::{FxHashMap, HashMap, HashSet, hash_map};
@@ -106,7 +105,6 @@ struct ServerStatusSenderState {
 pub struct LoadedLanguage {
     pub config: LanguageConfig,
     pub queries: LanguageQueries,
-    pub context_provider: Option<Arc<dyn ContextProvider>>,
     pub toolchain_provider: Option<Arc<dyn ToolchainLister>>,
     pub manifest_name: Option<ManifestName>,
 }
@@ -210,7 +208,6 @@ impl LanguageRegistry {
                         config,
                         queries: Default::default(),
                         toolchain_provider: None,
-                        context_provider: None,
                         manifest_name: None,
                     })
                 }
@@ -739,7 +736,6 @@ impl LanguageRegistry {
                                 let grammar = Some(this.get_or_load_grammar(grammar).await?);
 
                                 Language::new_with_id(language_id, loaded_language.config, grammar)
-                                    .with_context_provider(loaded_language.context_provider)
                                     .with_toolchain_lister(loaded_language.toolchain_provider)
                                     .with_manifest(loaded_language.manifest_name)
                                     .with_queries(loaded_language.queries)
@@ -750,7 +746,6 @@ impl LanguageRegistry {
                                         loaded_language.config,
                                         None,
                                     )
-                                    .with_context_provider(loaded_language.context_provider)
                                     .with_manifest(loaded_language.manifest_name)
                                     .with_toolchain_lister(loaded_language.toolchain_provider),
                                 )

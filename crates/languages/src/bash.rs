@@ -5,28 +5,11 @@ use gpui::AsyncApp;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate, LspInstaller, Toolchain};
 use lsp::{LanguageServerBinary, Uri};
 use node_runtime::{NodeRuntime, VersionStrategy};
-use project::{ContextProviderWithTasks, lsp_store::language_server_settings};
+use project::lsp_store::language_server_settings;
 use semver::Version;
 use serde_json::Value;
 use std::{future::Future, path::PathBuf, sync::Arc, vec};
-use task::{TaskTemplate, TaskTemplates, VariableName};
 use util::{ResultExt, maybe};
-
-pub(super) fn bash_task_context() -> ContextProviderWithTasks {
-    ContextProviderWithTasks::new(TaskTemplates(vec![
-        TaskTemplate {
-            label: "execute selection".to_owned(),
-            command: VariableName::SelectedText.template_value(),
-            ..TaskTemplate::default()
-        },
-        TaskTemplate {
-            label: format!("run '{}'", VariableName::File.template_value()),
-            command: VariableName::File.template_value(),
-            tags: vec!["bash-script".to_owned()],
-            ..TaskTemplate::default()
-        },
-    ]))
-}
 
 pub struct BashLspAdapter {
     node: NodeRuntime,

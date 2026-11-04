@@ -11667,6 +11667,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
             )ˇ»
         );
     "});
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.cut(&Cut, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11676,6 +11677,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
     "});
 
     // Paste it at the same position.
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11694,6 +11696,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
             c(),
         );
     "});
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         d(
@@ -11715,6 +11718,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
             )
         ˇ»);
     "});
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.cut(&Cut, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11723,6 +11727,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
     "});
 
     // Paste it at the same position.
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11744,6 +11749,7 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
             )
         );
     "});
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11769,10 +11775,12 @@ async fn test_paste_multiline(cx: &mut TestAppContext) {
             )ˇ»
         );
     "});
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.copy(&Copy, window, cx));
 
     // Paste it on a line with a lower indent level
     cx.update_editor(|e, window, cx| e.move_to_end(&Default::default(), window, cx));
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         const a: B = (
@@ -11806,6 +11814,7 @@ async fn test_paste_undo_does_not_include_preceding_edits(cx: &mut TestAppContex
 
     // Paste some text immediately after typing
     cx.write_to_clipboard(ClipboardItem::new_string(" world".into()));
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state("hello worldˇ");
 
@@ -11828,7 +11837,6 @@ async fn test_paste_content_from_other_app(cx: &mut TestAppContext) {
 
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(rust_lang()), cx));
-    cx.run_until_parked();
 
     cx.set_state(indoc! {"
         fn a() {
@@ -11839,6 +11847,7 @@ async fn test_paste_content_from_other_app(cx: &mut TestAppContext) {
         }
     "});
 
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         fn a() {
@@ -11859,6 +11868,7 @@ async fn test_paste_content_from_other_app(cx: &mut TestAppContext) {
         }
     "});
 
+    cx.run_until_parked();
     cx.update_editor(|e, window, cx| e.paste(&Paste, window, cx));
     cx.assert_editor_state(indoc! {"
         fn a() {
@@ -11916,7 +11926,6 @@ async fn test_paste_shifts_block_by_first_line_delta(cx: &mut TestAppContext) {
     ));
     cx.set_state("package test\n\nˇ");
     cx.update_editor(|editor, window, cx| editor.paste(&Paste, window, cx));
-    cx.run_until_parked();
     cx.assert_editor_state("package test\n\nfunc find() {\n\treturn 1\n}ˇ");
 
     // The block moves by however far its first line moved, so a first line that
@@ -11924,7 +11933,6 @@ async fn test_paste_shifts_block_by_first_line_delta(cx: &mut TestAppContext) {
     cx.write_to_clipboard(ClipboardItem::new_string("        foo()\n    bar()".into()));
     cx.set_state("func test() {\nˇ\n}");
     cx.update_editor(|editor, window, cx| editor.paste(&Paste, window, cx));
-    cx.run_until_parked();
     cx.assert_editor_state("func test() {\n    foo()\nbar()ˇ\n}");
 }
 
@@ -28444,7 +28452,6 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
                 initialization_options: Some(json!({
                     "some other init value": false
                 })),
-                enable_lsp_tasks: false,
                 fetch: None,
             },
         );
@@ -28465,7 +28472,6 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
                 initialization_options: Some(json!({
                     "anotherInitValue": false
                 })),
-                enable_lsp_tasks: false,
                 fetch: None,
             },
         );
@@ -28486,7 +28492,6 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
                 initialization_options: Some(json!({
                     "anotherInitValue": false
                 })),
-                enable_lsp_tasks: false,
                 fetch: None,
             },
         );
@@ -28505,7 +28510,6 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
                 binary: None,
                 settings: None,
                 initialization_options: None,
-                enable_lsp_tasks: false,
                 fetch: None,
             },
         );

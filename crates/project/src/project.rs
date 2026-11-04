@@ -11,8 +11,6 @@ pub mod prettier_store;
 pub mod project_search;
 pub mod project_settings;
 pub mod search;
-pub mod task_inventory;
-pub mod task_store;
 pub mod toolchain_store;
 pub mod trusted_worktrees;
 pub mod worktree_store;
@@ -107,7 +105,6 @@ use std::{
     time::Duration,
 };
 
-use task_store::TaskStore;
 use text::{Anchor, BufferId, Rope};
 use util::{
     ResultExt as _, maybe,
@@ -123,18 +120,9 @@ pub use worktree::{
 };
 use worktree_store::{WorktreeStore, WorktreeStoreEvent};
 
+pub use buffer_store::ProjectTransaction;
 pub use fs::*;
 pub use language::Location;
-#[cfg(any(test, feature = "test-support"))]
-pub use prettier::FORMAT_SUFFIX as TEST_PRETTIER_FORMAT_SUFFIX;
-#[cfg(any(test, feature = "test-support"))]
-pub use prettier::RANGE_FORMAT_SUFFIX as TEST_PRETTIER_RANGE_FORMAT_SUFFIX;
-pub use task_inventory::{
-    BasicContextProvider, ContextProviderWithTasks, GIT_COMMAND_TASK_TAG, Inventory, TaskContexts,
-    TaskSourceKind,
-};
-
-pub use buffer_store::ProjectTransaction;
 pub use lsp_command::{CallHierarchyItem, IncomingCall, OutgoingCall};
 pub use lsp_store::{
     DiagnosticSummary, InvalidationStrategy, LanguageServerLogType, LanguageServerProgress,
@@ -142,20 +130,22 @@ pub use lsp_store::{
     LanguageServerToQuery, LspStore, LspStoreEvent, ProgressToken,
     SERVER_PROGRESS_THROTTLE_TIMEOUT,
 };
+#[cfg(any(test, feature = "test-support"))]
+pub use prettier::FORMAT_SUFFIX as TEST_PRETTIER_FORMAT_SUFFIX;
+#[cfg(any(test, feature = "test-support"))]
+pub use prettier::RANGE_FORMAT_SUFFIX as TEST_PRETTIER_RANGE_FORMAT_SUFFIX;
 pub use toolchain_store::{ToolchainStore, Toolchains};
 const MAX_PROJECT_SEARCH_HISTORY_SIZE: usize = 500;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LocalProjectFlags {
     pub init_worktree_trust: bool,
-    pub watch_global_configs: bool,
 }
 
 impl Default for LocalProjectFlags {
     fn default() -> Self {
         Self {
             init_worktree_trust: true,
-            watch_global_configs: true,
         }
     }
 }
@@ -191,7 +181,6 @@ pub struct Project {
 
     bookmark_store: Entity<BookmarkStore>,
     http_client: Arc<HttpClientWithUrl>,
-    task_store: Entity<TaskStore>,
     fs: Arc<dyn Fs>,
     remote_client: Option<Entity<RemoteClient>>,
     git_store: Entity<GitStore>,
@@ -258,13 +247,6 @@ impl ProjectId {
     }
 }
 
-/// A link to display in a toast notification, useful to point to documentation.
-#[derive(PartialEq, Debug, Clone)]
-pub struct ToastLink {
-    pub label: &'static str,
-    pub url: &'static str,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     LanguageServerAdded(LanguageServerId, LanguageServerName, Option<WorktreeId>),
@@ -283,8 +265,6 @@ pub enum Event {
     Toast {
         notification_id: SharedString,
         message: String,
-        /// Optional link to display as a button in the toast.
-        link: Option<ToastLink>,
     },
     HideToast {
         notification_id: SharedString,
@@ -1118,26 +1098,8 @@ impl Project {
             });
             git_store.update(cx, |git_store, _| git_store.set_project(weak_self.clone()));
 
-            let task_store = cx.new(|cx| {
-                TaskStore::local(
-                    buffer_store.downgrade(),
-                    worktree_store.clone(),
-                    toolchain_store.read(cx).as_language_toolchain_store(),
-                    environment.clone(),
-                    git_store.clone(),
-                    cx,
-                )
-            });
-
-            let settings_observer = cx.new(|cx| {
-                SettingsObserver::new_local(
-                    fs.clone(),
-                    worktree_store.clone(),
-                    task_store.clone(),
-                    flags.watch_global_configs,
-                    cx,
-                )
-            });
+            let settings_observer =
+                cx.new(|cx| SettingsObserver::new_local(fs.clone(), worktree_store.clone(), cx));
             cx.subscribe(&settings_observer, Self::on_settings_observer_event)
                 .detach();
 
@@ -1173,7 +1135,6 @@ impl Project {
                 snippets,
                 languages,
                 http_client,
-                task_store,
                 settings_observer,
                 fs,
                 remote_client: None,
@@ -1304,23 +1265,9 @@ impl Project {
             });
             git_store.update(cx, |git_store, _| git_store.set_project(weak_self.clone()));
 
-            let task_store = cx.new(|cx| {
-                TaskStore::remote(
-                    buffer_store.downgrade(),
-                    worktree_store.clone(),
-                    toolchain_store.read(cx).as_language_toolchain_store(),
-                    remote.read(cx).proto_client(),
-                    REMOTE_SERVER_PROJECT_ID,
-                    git_store.clone(),
-                    cx,
-                )
-            });
-
             let settings_observer = cx.new(|cx| {
                 SettingsObserver::new_remote(
-                    fs.clone(),
                     worktree_store.clone(),
-                    task_store.clone(),
                     Some(remote_proto.clone()),
                     false,
                     cx,
@@ -1361,7 +1308,6 @@ impl Project {
                 snippets,
                 languages,
                 http_client,
-                task_store,
                 settings_observer,
                 fs,
                 remote_client: Some(remote.clone()),
@@ -1408,7 +1354,6 @@ impl Project {
             WorktreeStore::init_remote(&remote_proto);
             LspStore::init(&remote_proto);
             SettingsObserver::init(&remote_proto);
-            TaskStore::init(Some(&remote_proto));
             ToolchainStore::init(&remote_proto);
             GitStore::init(&remote_proto);
 
@@ -1458,7 +1403,6 @@ impl Project {
                 None,
                 LocalProjectFlags {
                     init_worktree_trust: false,
-                    ..Default::default()
                 },
                 cx,
             )
@@ -1512,7 +1456,6 @@ impl Project {
                 None,
                 LocalProjectFlags {
                     init_worktree_trust,
-                    ..Default::default()
                 },
                 cx,
             )
@@ -1695,11 +1638,6 @@ impl Project {
         } else {
             ReplicaId::LOCAL
         }
-    }
-
-    #[inline]
-    pub fn task_store(&self) -> &Entity<TaskStore> {
-        &self.task_store
     }
 
     #[inline]
@@ -2724,7 +2662,6 @@ impl Project {
             LspStoreEvent::Notification(message) => cx.emit(Event::Toast {
                 notification_id: "lsp".into(),
                 message: message.clone(),
-                link: None,
             }),
             LspStoreEvent::SnippetEdit {
                 buffer_id,
@@ -2776,7 +2713,6 @@ impl Project {
                     let message = format!("Failed to set local settings in {path:?}:\n{message}");
                     cx.emit(Event::Toast {
                         notification_id: format!("local-settings-{path:?}").into(),
-                        link: None,
                         message,
                     });
                 }
@@ -2785,24 +2721,6 @@ impl Project {
                 }),
                 Err(_) => {}
             },
-            SettingsObserverEvent::LocalTasksUpdated(result) => match result {
-                Err(InvalidSettingsError::Tasks { message, path }) => {
-                    let message = format!("Failed to set local tasks in {path:?}:\n{message}");
-                    cx.emit(Event::Toast {
-                        notification_id: format!("local-tasks-{path:?}").into(),
-                        link: Some(ToastLink {
-                            label: "Open Tasks Documentation",
-                            url: "https://zed.dev/docs/tasks",
-                        }),
-                        message,
-                    });
-                }
-                Ok(path) => cx.emit(Event::HideToast {
-                    notification_id: format!("local-tasks-{path:?}").into(),
-                }),
-                Err(_) => {}
-            },
-            SettingsObserverEvent::GlobalTasksUpdated(_) => {}
         }
     }
 
@@ -4281,7 +4199,6 @@ impl Project {
             cx.emit(Event::Toast {
                 notification_id: envelope.payload.notification_id.into(),
                 message: envelope.payload.message,
-                link: None,
             });
             Ok(())
         })

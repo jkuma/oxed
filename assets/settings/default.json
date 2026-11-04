@@ -1612,21 +1612,6 @@
     "pending_keystrokes_indicator": true,
   },
   "code_actions_on_format": {},
-  // Settings related to running tasks.
-  "tasks": {
-    "variables": {},
-    "enabled": false,
-    // Use LSP tasks over Zed language extension ones.
-    // If no LSP tasks are returned due to error/timeout or regular execution,
-    // Zed language extension tasks will be used instead.
-    //
-    // Other Zed tasks will still be shown:
-    // * Zed task from either of the task config file
-    // * Zed task from history (e.g. one-off task was spawned before)
-    //
-    // Default: true
-    "prefer_lsp": true,
-  },
   // An object whose keys are language names, and whose values
   // are arrays of filenames or extensions of files that should
   // use those languages.
@@ -1643,7 +1628,7 @@
     "JSONC": [
       "**/.oxed/*.json",
       "**/.vscode/**/*.json",
-      "**/{zed,Zed}/{settings,keymap,tasks}.json",
+      "**/{zed,Zed}/{settings,keymap}.json",
       "tsconfig*.json",
     ],
     "Markdown": [".rules", ".cursorrules", ".windsurfrules", ".clinerules"],
@@ -2020,8 +2005,6 @@
   "lsp": {
     // Specify the LSP name as a key here.
     // "rust-analyzer": {
-    //     // A special flag for rust-analyzer integration, to use server-provided tasks
-    //     enable_lsp_tasks": true,
     //     // These initialization options are merged into Zed's defaults
     //     "initialization_options": {
     //         "check": {

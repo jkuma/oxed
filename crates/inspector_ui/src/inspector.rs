@@ -34,7 +34,6 @@ pub fn init(app_state: Arc<AppState>, cx: &mut App) {
             None,
             project::LocalProjectFlags {
                 init_worktree_trust: false,
-                watch_global_configs: false,
             },
             cx,
         );

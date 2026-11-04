@@ -1226,7 +1226,6 @@ mod tests {
     use gpui::TestAppContext;
     use language::language_settings::AllLanguageSettings;
     use project::project_settings::ProjectSettings;
-    use project::task_store::TaskStore;
     use project::{FakeFs, WorktreeSettings};
     use serde_json::json;
     use settings::SettingsStore;
@@ -1246,7 +1245,6 @@ mod tests {
             ProjectSettings::register(cx);
             WorktreeSettings::register(cx);
             WorkspaceSettings::register(cx);
-            TaskStore::init(None);
         });
     }
 

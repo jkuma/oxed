@@ -414,10 +414,6 @@ pub struct LanguageSettingsContent {
     ///
     /// Default: true
     pub auto_indent_on_paste: Option<bool>,
-    /// Task configuration for this language.
-    ///
-    /// Default: {}
-    pub tasks: Option<LanguageTaskSettingsContent>,
     /// Whether to pop the completions menu while typing in an editor without
     /// explicitly requesting it.
     ///
@@ -904,23 +900,6 @@ pub struct IndentGuideSettingsContent {
     ///
     /// Default: Disabled
     pub background_coloring: Option<IndentGuideBackgroundColoring>,
-}
-
-/// The task settings for a particular language.
-#[with_fallible_options]
-#[derive(Debug, Clone, Default, Deserialize, PartialEq, Serialize, JsonSchema, MergeFrom)]
-pub struct LanguageTaskSettingsContent {
-    /// Extra task variables to set for a particular language.
-    pub variables: Option<HashMap<String, String>>,
-    pub enabled: Option<bool>,
-    /// Use LSP tasks over Zed language extension ones.
-    /// If no LSP tasks are returned due to error/timeout or regular execution,
-    /// Zed language extension tasks will be used instead.
-    ///
-    /// Other Zed tasks will still be shown:
-    /// * Zed task from either of the task config file
-    /// * Zed task from history (e.g. one-off task was spawned before)
-    pub prefer_lsp: Option<bool>,
 }
 
 /// Map from language name to settings.

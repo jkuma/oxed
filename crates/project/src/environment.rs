@@ -4,8 +4,7 @@ use language::Buffer;
 use remote::RemoteClient;
 use rpc::proto::{self, REMOTE_SERVER_PROJECT_ID};
 use std::{collections::VecDeque, path::Path, sync::Arc};
-use task::{Shell, shell_to_proto};
-use util::{ResultExt, command::new_command};
+use util::{ResultExt, command::new_command, shell::Shell};
 use worktree::Worktree;
 
 use collections::HashMap;
@@ -420,4 +419,19 @@ async fn load_direnv_environment(
     }
 
     serde_json::from_str(&output).context("parsing direnv json")
+}
+
+fn shell_to_proto(shell: Shell) -> proto::Shell {
+    let shell_type = match shell {
+        Shell::System => proto::shell::ShellType::System(proto::System {}),
+        Shell::Program(program) => proto::shell::ShellType::Program(program),
+        Shell::WithArguments {
+            program,
+            args,
+            title_override: _,
+        } => proto::shell::ShellType::WithArguments(proto::shell::WithArguments { program, args }),
+    };
+    proto::Shell {
+        shell_type: Some(shell_type),
+    }
 }

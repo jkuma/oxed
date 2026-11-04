@@ -17,11 +17,6 @@ const SCHEMA_URI_PREFIX: &str = "zed://schemas/";
 const TSCONFIG_SCHEMA: &str = include_str!("schemas/tsconfig.json");
 const PACKAGE_JSON_SCHEMA: &str = include_str!("schemas/package.json");
 
-static TASKS_SCHEMA: LazyLock<String> = LazyLock::new(|| {
-    serde_json::to_string(&task::TaskTemplates::generate_json_schema())
-        .expect("TaskTemplates schema should serialize")
-});
-
 static SNIPPETS_SCHEMA: LazyLock<String> = LazyLock::new(|| {
     serde_json::to_string(&snippet_provider::format::VsSnippetsFile::generate_json_schema())
         .expect("VsSnippetsFile schema should serialize")
@@ -153,7 +148,6 @@ fn resolve_static_schema(path: &str) -> Option<String> {
     match schema_name {
         "tsconfig" => Some(TSCONFIG_SCHEMA.to_string()),
         "package_json" => Some(PACKAGE_JSON_SCHEMA.to_string()),
-        "tasks" => Some(TASKS_SCHEMA.clone()),
         "snippets" => Some(SNIPPETS_SCHEMA.clone()),
         "jsonc" => Some(JSONC_SCHEMA.clone()),
         "keymap" => Some(KEYMAP_SCHEMA.clone()),
@@ -367,7 +361,6 @@ async fn resolve_dynamic_schema(
                 .flatten();
             root_schema_from_action_schema(schema, &mut generator).to_value()
         }
-        "tasks" => task::TaskTemplates::generate_json_schema(),
         _ => {
             anyhow::bail!("Unrecognized schema: {schema_name}");
         }
@@ -411,13 +404,6 @@ pub fn all_schema_file_associations(
         {
             "fileMatch": [schema_file_match(paths::keymap_file())],
             "url": format!("{SCHEMA_URI_PREFIX}keymap"),
-        },
-        {
-            "fileMatch": [
-                schema_file_match(paths::tasks_file()),
-                paths::local_tasks_file_relative_path()
-            ],
-            "url": format!("{SCHEMA_URI_PREFIX}tasks"),
         },
         {
             "fileMatch": [

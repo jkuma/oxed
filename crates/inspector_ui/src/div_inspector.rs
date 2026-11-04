@@ -798,7 +798,6 @@ mod tests {
                                     ..LanguageConfig::default()
                                 },
                                 queries: LanguageQueries::default(),
-                                context_provider: None,
                                 toolchain_provider: None,
                                 manifest_name: None,
                             })
@@ -1018,10 +1017,7 @@ mod tests {
 
     fn assert_inspector_watchers(fs: &FakeFs, baseline: &[PathBuf]) {
         let mut expected = baseline.to_vec();
-        expected.extend([
-            paths::tasks_file().clone(),
-            PathBuf::from(ZED_INSPECTOR_STYLE_JSON),
-        ]);
+        expected.push(PathBuf::from(ZED_INSPECTOR_STYLE_JSON));
         expected.sort();
         assert_eq!(watched_paths(fs), expected);
     }

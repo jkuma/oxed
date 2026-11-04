@@ -116,7 +116,6 @@ members = [
     "crates/syntax_theme",
     "crates/tab_switcher",
     "crates/tabular_data_preview",
-    "crates/task",
     "crates/text",
     "crates/theme",
     "crates/theme_extension",
@@ -281,7 +280,6 @@ svg_preview = { path = "crates/svg_preview" }
 syntax_theme = { path = "crates/syntax_theme" }
 tab_switcher = { path = "crates/tab_switcher" }
 tabular_data_preview = { path = "crates/tabular_data_preview"}
-task = { path = "crates/task" }
 text = { path = "crates/text" }
 theme = { path = "crates/theme" }
 theme_extension = { path = "crates/theme_extension" }

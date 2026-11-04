@@ -450,7 +450,6 @@ async fn test_reregistering_language_during_load_yields_current_language(cx: &mu
                 Ok(LoadedLanguage {
                     config: stale_config,
                     queries: LanguageQueries::default(),
-                    context_provider: None,
                     toolchain_provider: None,
                     manifest_name: None,
                 })

@@ -35,6 +35,5 @@ schemars.workspace = true
 serde_json.workspace = true
 settings.workspace = true
 snippet_provider.workspace = true
-task.workspace = true
 theme.workspace = true
 util.workspace = true

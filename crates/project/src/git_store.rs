@@ -86,8 +86,8 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 use sum_tree::{Edit, SumTree, TreeMap};
-use task::Shell;
 use text::{Bias, BufferId, OffsetRangeExt, Rope, ToOffset};
+use util::shell::Shell;
 use util::{
     ResultExt, debug_panic,
     paths::{PathStyle, SanitizedPath, normalize_path},

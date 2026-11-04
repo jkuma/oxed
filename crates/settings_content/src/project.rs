@@ -7,7 +7,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings_json::parse_json_with_comments;
 use settings_macros::{MergeFrom, with_fallible_options};
-use util::serde::default_true;
 
 use crate::{
     AllLanguageSettingsContent, DelayMs, ExtendingVec, ParseStatus, RootUserSettings, SplicingVec,
@@ -245,7 +244,9 @@ pub struct WorktreeSettingsContent {
 }
 
 #[with_fallible_options]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema, MergeFrom, Hash)]
+#[derive(
+    Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema, MergeFrom, Hash,
+)]
 #[serde(rename_all = "snake_case")]
 pub struct LspSettings {
     pub binary: Option<BinarySettings>,
@@ -261,24 +262,7 @@ pub struct LspSettings {
     ///
     /// Consult the documentation for the specific language server to see which settings are supported.
     pub settings: Option<serde_json::Value>,
-    /// If the server supports sending tasks over LSP extensions,
-    /// this setting can be used to enable or disable them in Zed.
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub enable_lsp_tasks: bool,
     pub fetch: Option<FetchSettings>,
-}
-
-impl Default for LspSettings {
-    fn default() -> Self {
-        Self {
-            binary: None,
-            initialization_options: None,
-            settings: None,
-            enable_lsp_tasks: true,
-            fetch: None,
-        }
-    }
 }
 
 #[with_fallible_options]

@@ -2305,7 +2305,6 @@ impl ProjectPanel {
                                             ),
                                             abs_path
                                         ),
-                                        link: None,
                                     })
                                 });
                                 None

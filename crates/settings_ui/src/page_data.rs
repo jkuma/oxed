@@ -7452,76 +7452,6 @@ fn language_settings_data() -> Box<[SettingsPageItem]> {
         ]
     }
 
-    fn tasks_section() -> [SettingsPageItem; 4] {
-        [
-            SettingsPageItem::SectionHeader("Tasks"),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Enabled",
-                description: "Whether tasks are enabled for this language.",
-                field: Box::new(SettingField {
-                    json_path: Some("languages.$(language).tasks.enabled"),
-                    pick: |settings_content| {
-                        language_settings_field(settings_content, |language| {
-                            language.tasks.as_ref()?.enabled.as_ref()
-                        })
-                    },
-                    write: |settings_content, value, _| {
-                        language_settings_field_mut(settings_content, value, |language, value| {
-                            language.tasks.get_or_insert_default().enabled = value;
-                        })
-                    },
-                }),
-                metadata: None,
-                files: USER | PROJECT,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Variables",
-                description: "Extra task variables to set for a particular language.",
-                field: Box::new(
-                    SettingField {
-                        json_path: Some("languages.$(language).tasks.variables"),
-                        pick: |settings_content| {
-                            language_settings_field(settings_content, |language| {
-                                language.tasks.as_ref()?.variables.as_ref()
-                            })
-                        },
-                        write: |settings_content, value, _| {
-                            language_settings_field_mut(
-                                settings_content,
-                                value,
-                                |language, value| {
-                                    language.tasks.get_or_insert_default().variables = value;
-                                },
-                            )
-                        },
-                    }
-                    .unimplemented(),
-                ),
-                metadata: None,
-                files: USER | PROJECT,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Prefer LSP",
-                description: "Use LSP tasks over Zed language extension tasks.",
-                field: Box::new(SettingField {
-                    json_path: Some("languages.$(language).tasks.prefer_lsp"),
-                    pick: |settings_content| {
-                        language_settings_field(settings_content, |language| {
-                            language.tasks.as_ref()?.prefer_lsp.as_ref()
-                        })
-                    },
-                    write: |settings_content, value, _| {
-                        language_settings_field_mut(settings_content, value, |language, value| {
-                            language.tasks.get_or_insert_default().prefer_lsp = value;
-                        })
-                    },
-                }),
-                metadata: None,
-                files: USER | PROJECT,
-            }),
-        ]
-    }
-
     fn miscellaneous_section() -> [SettingsPageItem; 7] {
         [
             SettingsPageItem::SectionHeader("Miscellaneous"),
@@ -7781,7 +7711,6 @@ fn language_settings_data() -> Box<[SettingsPageItem]> {
             inlay_hints_section(),
             code_lens_item,
             lsp_document_colors_item,
-            tasks_section(),
             miscellaneous_section(),
             global_only_miscellaneous_sub_section(),
         )
@@ -7796,7 +7725,6 @@ fn language_settings_data() -> Box<[SettingsPageItem]> {
             completions_section(),
             inlay_hints_section(),
             code_lens_item,
-            tasks_section(),
             miscellaneous_section(),
         )
     }

@@ -2907,9 +2907,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_json_lenient",
  "settings",
- "task",
  "tempfile",
  "theme",
  "theme_extension",
@@ -5081,7 +5079,6 @@ dependencies = [
  "serde_json",
  "settings",
  "snippet_provider",
- "task",
  "theme",
  "util",
 ]
@@ -5226,7 +5223,6 @@ dependencies = [
  "streaming-iterator",
  "strsim",
  "sum_tree",
- "task",
  "text",
  "theme",
  "theme_settings",
@@ -5378,7 +5374,6 @@ dependencies = [
  "async-fs",
  "async-tar",
  "async-trait",
- "chrono",
  "collections",
  "fs",
  "futures",
@@ -5386,7 +5381,6 @@ dependencies = [
  "gpui",
  "grammars",
  "http_client",
- "itertools 0.14.0",
  "json_schema_store",
  "language",
  "log",
@@ -5407,12 +5401,10 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_json_lenient",
  "settings",
  "smallvec",
  "smol",
  "snippet",
- "task",
  "tempfile",
  "theme",
  "tree-sitter",
@@ -8243,7 +8235,6 @@ dependencies = [
  "snippet",
  "snippet_provider",
  "sum_tree",
- "task",
  "tempfile",
  "text",
  "toml 0.9.8",
@@ -10695,28 +10686,6 @@ name = "target-lexicon"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
-
-[[package]]
-name = "task"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "collections",
- "futures",
- "gpui",
- "hex",
- "log",
- "parking_lot",
- "pretty_assertions",
- "proto",
- "schemars",
- "serde",
- "serde_json",
- "serde_json_lenient",
- "sha2",
- "shellexpand",
- "util",
-]
 
 [[package]]
 name = "tauri-winrt-notification"

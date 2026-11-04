@@ -1524,20 +1524,10 @@ impl Workspace {
                 project::Event::Toast {
                     notification_id,
                     message,
-                    link,
                 } => this.show_notification(
                     NotificationId::named(notification_id.clone()),
                     cx,
-                    |cx| {
-                        let mut notification = MessageNotification::new(message.clone(), cx);
-                        if let Some(link) = link {
-                            notification = notification
-                                .more_info_message(link.label)
-                                .more_info_url(link.url);
-                        }
-
-                        cx.new(|_| notification)
-                    },
+                    |cx| cx.new(|cx| MessageNotification::new(message.clone(), cx)),
                 ),
 
                 project::Event::HideToast { notification_id } => {
@@ -8706,7 +8696,6 @@ pub fn open_workspace_by_id(
         None,
         project::LocalProjectFlags {
             init_worktree_trust: true,
-            ..project::LocalProjectFlags::default()
         },
         cx,
     );
