@@ -28,7 +28,6 @@ pub struct WorkspaceSettings {
     pub reveal_if_open: bool,
     pub drop_target_size: f32,
     pub use_system_path_prompts: bool,
-    pub use_system_prompts: bool,
     pub accessible_mode: bool,
     pub command_aliases: HashMap<String, CommandAliasTarget>,
     pub max_tabs: Option<NonZeroUsize>,
@@ -46,14 +45,6 @@ pub struct WorkspaceSettings {
     pub focus_follows_mouse: FocusFollowsMouse,
 }
 
-#[cfg(target_os = "macos")]
-pub fn closing_last_window_quits_app(cx: &App) -> bool {
-    WorkspaceSettings::get_global(cx)
-        .on_last_window_closed
-        .is_quit_app()
-}
-
-#[cfg(not(target_os = "macos"))]
 pub fn closing_last_window_quits_app(_cx: &App) -> bool {
     true
 }
@@ -125,7 +116,6 @@ impl Settings for WorkspaceSettings {
             reveal_if_open: workspace.reveal_if_open.unwrap(),
             drop_target_size: workspace.drop_target_size.unwrap(),
             use_system_path_prompts: workspace.use_system_path_prompts.unwrap(),
-            use_system_prompts: workspace.use_system_prompts.unwrap(),
             accessible_mode: workspace.accessible_mode.unwrap(),
             command_aliases: workspace.command_aliases.clone(),
             max_tabs: workspace.max_tabs,

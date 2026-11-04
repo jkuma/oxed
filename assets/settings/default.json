@@ -127,9 +127,9 @@
   },
   // Determines the modifier to be used to add multiple cursors with the mouse. The open hover link mouse gestures will adapt such that it do not conflict with the multicursor modifier.
   //
-  // 1. Maps to `Alt` on Linux and Windows and to `Option` on MacOS:
+  // 1. Maps to `Alt`:
   //    "alt"
-  // 2. Maps `Control` on Linux and Windows and to `Command` on MacOS:
+  // 2. Maps to `Control`:
   //    "cmd_or_ctrl" (alias: "cmd", "ctrl")
   "multi_cursor_modifier": "alt",
   // Whether to show the informational hover box when moving the mouse
@@ -265,11 +265,6 @@
   // Whether to use the system provided dialogs for Open and Save As.
   // When set to false, Zed will use the built-in keyboard-first pickers.
   "use_system_path_prompts": true,
-  // Whether to use the system provided dialogs for prompts, such as confirmation
-  // prompts.
-  // When set to false, Zed will use its built-in prompts. Note that on Linux,
-  // this option is ignored and Zed will always use the built-in prompts.
-  "use_system_prompts": true,
   // Whether the cursor blinks in the editor.
   "cursor_blink": true,
   // Cursor shape for the default editor.
@@ -730,7 +725,7 @@
   // to both the horizontal and vertical delta values while scrolling.
   "scroll_sensitivity": 1.0,
   // Whether to zoom the editor font size with the mouse wheel
-  // while holding the primary modifier key (Cmd on macOS, Ctrl on other platforms).
+  // while holding the Ctrl key.
   "mouse_wheel_zoom": false,
   // Scroll sensitivity multiplier for fast scrolling. This multiplier is applied
   // to both the horizontal and vertical delta values while scrolling. Fast scrolling
@@ -1290,8 +1285,7 @@
   // How line endings should be handled for new files and during format and save.
   // This setting can take five values:
   //
-  // 1. Detect existing line endings and otherwise use the platform default
-  //    (`lf` on Unix, `crlf` on Windows):
+  // 1. Detect existing line endings and otherwise use `lf`:
   //    "line_ending": "detect"
   // 2. Prefer LF (`\n`) for new files and files with no existing line ending:
   //    "line_ending": "prefer_lf"
@@ -2114,16 +2108,6 @@
   },
   // Settings overrides to use when using Linux.
   "linux": {},
-  // Settings overrides to use when using macOS.
-  "macos": {},
-  // Settings overrides to use when using Windows.
-  "windows": {
-    "languages": {
-      "PHP": {
-        "language_servers": ["intelephense", "!phpactor", "!phptools", "!phpantom", "..."],
-      },
-    },
-  },
   // Whether to show full labels in line indicator or short ones
   //
   // Values:

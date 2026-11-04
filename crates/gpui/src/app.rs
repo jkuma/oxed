@@ -333,11 +333,6 @@ impl Application {
     pub fn text_system(&self) -> Arc<TextSystem> {
         self.0.borrow().text_system.clone()
     }
-
-    /// Returns the file URL of the executable with the specified name in the application bundle
-    pub fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf> {
-        self.0.borrow().path_for_auxiliary_executable(name)
-    }
 }
 
 type Handler = Box<dyn FnMut(&mut App) -> bool + 'static>;
@@ -1603,11 +1598,6 @@ impl App {
     /// Returns an empty string on other platforms.
     pub fn compositor_name(&self) -> &'static str {
         self.platform.compositor_name()
-    }
-
-    /// Returns the file URL of the executable with the specified name in the application bundle
-    pub fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf> {
-        self.platform.path_for_auxiliary_executable(name)
     }
 
     /// Displays a platform modal for selecting paths.

@@ -1253,7 +1253,6 @@ async fn test_scan_symlinks_always_respects_gitignore(cx: &mut TestAppContext) {
 // canonicalization or readdir behavior is not covered by the FakeFs tests.
 // These tests use a real temp directory and a real symlink to exercise the
 // production path on the host platform.
-#[cfg(unix)]
 #[gpui::test]
 async fn test_real_fs_scan_symlinks_always(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
@@ -1294,7 +1293,7 @@ async fn test_real_fs_scan_symlinks_always(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         project_root.as_path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -1324,7 +1323,6 @@ async fn test_real_fs_scan_symlinks_always(cx: &mut TestAppContext) {
     });
 }
 
-#[cfg(unix)]
 #[gpui::test]
 async fn test_real_fs_scan_symlinks_expanded(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
@@ -1356,7 +1354,7 @@ async fn test_real_fs_scan_symlinks_expanded(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         project_root.as_path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -1512,67 +1510,6 @@ async fn test_internal_symlink_updates_preserve_entry_ids(cx: &mut TestAppContex
     });
 }
 
-#[cfg(target_os = "macos")]
-#[gpui::test]
-async fn test_renaming_case_only(cx: &mut TestAppContext) {
-    cx.executor().allow_parking();
-    init_test(cx);
-
-    const OLD_NAME: &str = "aaa.rs";
-    const NEW_NAME: &str = "AAA.rs";
-
-    let fs = RealFs::new(None, cx.executor());
-    let temp_root = TempTree::new(json!({
-        OLD_NAME: "",
-    }));
-
-    let tree = Worktree::local(
-        temp_root.path(),
-        true,
-        fs.clone(),
-        Default::default(),
-        true,
-        WorktreeId::from_proto(0),
-        &mut cx.to_async(),
-    )
-    .await
-    .unwrap();
-
-    cx.read(|cx| tree.read(cx).as_local().unwrap().scan_complete())
-        .await;
-    tree.read_with(cx, |tree, _| {
-        assert_eq!(
-            tree.entries(true, 0)
-                .map(|entry| entry.path.as_ref())
-                .collect::<Vec<_>>(),
-            vec![rel_path(""), rel_path(OLD_NAME)]
-        );
-    });
-
-    fs.rename(
-        &temp_root.path().join(OLD_NAME),
-        &temp_root.path().join(NEW_NAME),
-        fs::RenameOptions {
-            overwrite: true,
-            ignore_if_exists: true,
-            create_parents: false,
-        },
-    )
-    .await
-    .unwrap();
-
-    tree.flush_fs_events(cx).await;
-
-    tree.read_with(cx, |tree, _| {
-        assert_eq!(
-            tree.entries(true, 0)
-                .map(|entry| entry.path.as_ref())
-                .collect::<Vec<_>>(),
-            vec![rel_path(""), rel_path(NEW_NAME)]
-        );
-    });
-}
-
 #[gpui::test]
 async fn test_root_rescan_reconciles_stale_state(cx: &mut TestAppContext) {
     init_test(cx);
@@ -1671,17 +1608,12 @@ async fn test_root_rescan_keeps_root_watcher_registered(cx: &mut TestAppContext)
         .into_iter()
         .filter(|path| path == Path::new("/root"))
         .count();
-    let expected_root_watch_calls = if cfg!(any(target_os = "windows", target_os = "macos")) {
-        1
-    } else {
-        2
-    };
+    let expected_root_watch_calls = 2;
     assert_eq!(root_watch_calls, expected_root_watch_calls);
 }
 
 // Native watches are recursive on macOS and Windows, so the new directory is
 // covered by the root watch and never watched separately.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 #[gpui::test]
 async fn test_new_directory_scan_does_not_miss_event_before_adding_watcher(
     cx: &mut TestAppContext,
@@ -2128,7 +2060,7 @@ async fn test_write_file(cx: &mut TestAppContext) {
     let worktree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2224,7 +2156,7 @@ async fn test_file_scan_inclusions(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2471,7 +2403,7 @@ async fn test_file_scan_exclusions_overrules_inclusions(cx: &mut TestAppContext)
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2533,7 +2465,7 @@ async fn test_file_scan_inclusions_reindexes_on_setting_change(cx: &mut TestAppC
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2622,7 +2554,7 @@ async fn test_file_scan_exclusions(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2709,7 +2641,7 @@ async fn test_hidden_files(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -2940,7 +2872,7 @@ async fn test_fs_events_in_exclusions(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -3057,7 +2989,7 @@ async fn test_fs_events_in_dot_git_worktree(cx: &mut TestAppContext) {
     let tree = Worktree::local(
         dot_git_worktree_dir.clone(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -3192,7 +3124,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
         assert!(tree.entry_for_path(rel_path("a/b")).unwrap().is_dir());
     });
 
-    let fs_real = RealFs::new(None, cx.executor());
+    let fs_real = RealFs::new(cx.executor());
     let temp_root = TempTree::new(json!({
         "a": {}
     }));
@@ -3605,36 +3537,33 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
         .map(|e| e.path.clone())
         .collect::<Vec<_>>();
 
-    {
-        let new_worktree = Worktree::local(
-            root_dir,
-            true,
-            fs.clone(),
-            Default::default(),
-            true,
-            WorktreeId::from_proto(0),
-            &mut cx.to_async(),
-        )
-        .await
-        .unwrap();
-        new_worktree
-            .update(cx, |tree, _| tree.as_local_mut().unwrap().scan_complete())
-            .await;
-        new_worktree
-            .update(cx, |tree, _| {
-                tree.as_local_mut()
-                    .unwrap()
-                    .refresh_entries_for_paths(expanded_paths)
-            })
-            .recv()
-            .await;
-        let new_snapshot =
-            new_worktree.read_with(cx, |tree, _| tree.as_local().unwrap().snapshot());
-        assert_eq!(
-            snapshot.entries_without_ids(true),
-            new_snapshot.entries_without_ids(true)
-        );
-    }
+    let new_worktree = Worktree::local(
+        root_dir,
+        true,
+        fs.clone(),
+        Default::default(),
+        true,
+        WorktreeId::from_proto(0),
+        &mut cx.to_async(),
+    )
+    .await
+    .unwrap();
+    new_worktree
+        .update(cx, |tree, _| tree.as_local_mut().unwrap().scan_complete())
+        .await;
+    new_worktree
+        .update(cx, |tree, _| {
+            tree.as_local_mut()
+                .unwrap()
+                .refresh_entries_for_paths(expanded_paths)
+        })
+        .recv()
+        .await;
+    let new_snapshot = new_worktree.read_with(cx, |tree, _| tree.as_local().unwrap().snapshot());
+    assert_eq!(
+        snapshot.entries_without_ids(true),
+        new_snapshot.entries_without_ids(true)
+    );
 }
 
 #[gpui::test(iterations = 100)]
@@ -5603,19 +5532,17 @@ async fn test_dot_git_dir_event_does_not_suppress_children(
         );
     }
 
-    {
-        let mut events = cx.events(&worktree);
-        fs.pause_events();
-        fs.emit_fs_event(project_dir, Some(PathEventKind::Rescan));
-        fs.unpause_events_and_flush();
-        executor.run_until_parked();
+    let mut events = cx.events(&worktree);
+    fs.pause_events();
+    fs.emit_fs_event(project_dir, Some(PathEventKind::Rescan));
+    fs.unpause_events_and_flush();
+    executor.run_until_parked();
 
-        let got_git_update = drain_git_repo_updates(&mut events);
-        assert!(
-            got_git_update,
-            "should emit UpdatedGitRepositories for a .git rescan event"
-        );
-    }
+    let got_git_update = drain_git_repo_updates(&mut events);
+    assert!(
+        got_git_update,
+        "should emit UpdatedGitRepositories for a .git rescan event"
+    );
 }
 
 #[gpui::test]
@@ -5721,19 +5648,17 @@ async fn test_dot_git_event_explained_by_filtered_sibling_does_not_emit_git_repo
 
     // A standalone bare .git event (macOS event coalescing) must still
     // trigger a rescan.
-    {
-        let mut events = cx.events(&worktree);
-        fs.pause_events();
-        fs.emit_fs_event(dot_git, Some(PathEventKind::Changed));
-        fs.unpause_events_and_flush();
-        executor.run_until_parked();
+    let mut events = cx.events(&worktree);
+    fs.pause_events();
+    fs.emit_fs_event(dot_git, Some(PathEventKind::Changed));
+    fs.unpause_events_and_flush();
+    executor.run_until_parked();
 
-        let got_git_update = drain_git_repo_updates(&mut events);
-        assert!(
-            got_git_update,
-            "a standalone bare .git event should still emit UpdatedGitRepositories"
-        );
-    }
+    let got_git_update = drain_git_repo_updates(&mut events);
+    assert!(
+        got_git_update,
+        "a standalone bare .git event should still emit UpdatedGitRepositories"
+    );
 }
 
 #[gpui::test]
@@ -5758,7 +5683,7 @@ async fn test_ref_updates_in_dot_git_subdirectories_are_detected(cx: &mut TestAp
     let tree = Worktree::local(
         dir.path(),
         true,
-        RealFs::new(None, cx.executor()),
+        RealFs::new(cx.executor()),
         Default::default(),
         true,
         WorktreeId::from_proto(0),
@@ -5940,11 +5865,7 @@ async fn test_load_file_encoding(cx: &mut TestAppContext) {
         },
     ];
 
-    let root_path = if cfg!(windows) {
-        Path::new("C:\\root")
-    } else {
-        Path::new("/root")
-    };
+    let root_path = Path::new("/root");
 
     let fs = FakeFs::new(cx.background_executor.clone());
     fs.create_dir(root_path).await.unwrap();
@@ -6012,11 +5933,7 @@ async fn test_write_file_encoding(cx: &mut gpui::TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
 
-    let root_path = if cfg!(windows) {
-        Path::new("C:\\root")
-    } else {
-        Path::new("/root")
-    };
+    let root_path = Path::new("/root");
     fs.create_dir(root_path).await.unwrap();
 
     let worktree = Worktree::local(

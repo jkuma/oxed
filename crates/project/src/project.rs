@@ -1086,7 +1086,7 @@ impl Project {
         root_paths: impl IntoIterator<Item = &Path>,
         cx: &mut AsyncApp,
     ) -> Entity<Project> {
-        let fs = RealFs::new(None, cx.background_executor().clone());
+        let fs = RealFs::new(cx.background_executor().clone());
         let languages = LanguageRegistry::test(cx.background_executor().clone());
         let http_client = http_client::FakeHttpClient::with_404_response();
         let project = cx.update(|cx| {

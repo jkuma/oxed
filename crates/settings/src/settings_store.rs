@@ -931,7 +931,7 @@ impl SettingsStore {
     }
 
     /// Parses the default settings JSON and folds any `dev`/`nightly`/`preview`/`stable`
-    /// release-channel overrides and `macos`/`linux`/`windows` platform overrides into
+    /// release-channel overrides and `linux` platform overrides into
     /// the returned [`SettingsContent`].
     ///
     /// Unlike user settings, default settings are used directly as the base for all

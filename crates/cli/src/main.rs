@@ -2,10 +2,6 @@
     clippy::disallowed_methods,
     reason = "We are not in an async environment, so std::process::Command is fine"
 )]
-#![cfg_attr(
-    any(target_os = "linux", target_os = "freebsd", target_os = "windows"),
-    allow(dead_code)
-)]
 
 mod completions;
 
@@ -87,12 +83,7 @@ struct Args {
     classic: bool,
     /// Sets a custom directory for all user data (e.g., database, extensions, logs).
     /// This overrides the default platform-specific data directory location:
-    #[cfg_attr(target_os = "macos", doc = "`~/Library/Application Support/Zed`.")]
-    #[cfg_attr(target_os = "windows", doc = "`%LOCALAPPDATA%\\Zed`.")]
-    #[cfg_attr(
-        not(any(target_os = "windows", target_os = "macos")),
-        doc = "`$XDG_DATA_HOME/zed`."
-    )]
+    #[doc = "`$XDG_DATA_HOME/zed`."]
     #[arg(long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
     user_data_dir: Option<String>,
     /// The paths to open in Zed (space-separated).
@@ -121,10 +112,7 @@ struct Args {
     #[arg(long, value_names = ["SHELL"])]
     completions: Option<Shell>,
     /// Uninstall Zed from user system
-    #[cfg(all(
-        any(target_os = "linux", target_os = "macos"),
-        not(feature = "no-bundled-uninstall")
-    ))]
+    #[cfg(not(feature = "no-bundled-uninstall"))]
     #[arg(long)]
     uninstall: bool,
 
@@ -352,10 +340,6 @@ mod tests {
         assert_path_eq!(result, expected);
     }
 
-    // NOTE:
-    // While POSIX symbolic links are somewhat supported on Windows, they are an opt in by the user, and thus
-    // we assume that they are not supported out of the box.
-    #[cfg(not(windows))]
     #[test]
     fn test_parse_symlink_file() {
         let temp_tree = TempTree::new(json!({
@@ -375,7 +359,6 @@ mod tests {
         assert_eq!(result, target_path.to_string_lossy());
     }
 
-    #[cfg(not(windows))]
     #[test]
     fn test_parse_symlink_dir() {
         let temp_tree = TempTree::new(json!({
@@ -416,11 +399,9 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    #[cfg(unix)]
     util::prevent_root_execution();
 
     // Exit flatpak sandbox if needed
-    #[cfg(target_os = "linux")]
     {
         flatpak::try_restart_to_host();
         flatpak::ld_extra_libs();
@@ -447,7 +428,6 @@ fn run() -> Result<()> {
         paths::set_custom_data_dir(dir);
     }
 
-    #[cfg(target_os = "linux")]
     let args = flatpak::set_bin_if_no_escape(args);
 
     let app = Detect::detect(args.zed.as_deref()).context("Bundle detection")?;
@@ -481,10 +461,7 @@ fn run() -> Result<()> {
         anyhow::bail!(msg.join("\n"));
     }
 
-    #[cfg(all(
-        any(target_os = "linux", target_os = "macos"),
-        not(feature = "no-bundled-uninstall")
-    ))]
+    #[cfg(not(feature = "no-bundled-uninstall"))]
     if args.uninstall {
         static UNINSTALL_SCRIPT: &[u8] = include_bytes!("../../../script/uninstall.sh");
 
@@ -523,33 +500,16 @@ fn run() -> Result<()> {
     };
 
     let env = {
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-        {
-            use collections::HashMap;
+        use collections::HashMap;
 
-            // On Linux, the desktop entry uses `cli` to spawn `zed`.
-            // We need to handle env vars correctly since std::env::vars() may not contain
-            // project-specific vars (e.g. those set by direnv).
-            // By setting env to None here, the LSP will use worktree env vars instead,
-            // which is what we want.
-            if !std::io::stdout().is_terminal() {
-                None
-            } else {
-                Some(std::env::vars().collect::<HashMap<_, _>>())
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            // On Windows, by default, a child process inherits a copy of the environment block of the parent process.
-            // So we don't need to pass env vars explicitly.
+        // On Linux, the desktop entry uses `cli` to spawn `zed`.
+        // We need to handle env vars correctly since std::env::vars() may not contain
+        // project-specific vars (e.g. those set by direnv).
+        // By setting env to None here, the LSP will use worktree env vars instead,
+        // which is what we want.
+        if !std::io::stdout().is_terminal() {
             None
-        }
-
-        #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "windows")))]
-        {
-            use collections::HashMap;
-
+        } else {
             Some(std::env::vars().collect::<HashMap<_, _>>())
         }
     };
@@ -703,45 +663,18 @@ fn run() -> Result<()> {
 }
 
 fn anonymous_fd(path: &str) -> Option<fs::File> {
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::fd::{self, FromRawFd};
+    use std::os::fd::{self, FromRawFd};
 
-        let fd_str = path.strip_prefix("/proc/self/fd/")?;
+    let fd_str = path.strip_prefix("/proc/self/fd/")?;
 
-        let link = fs::read_link(path).ok()?;
-        if !link.starts_with("memfd:") {
-            return None;
-        }
-
-        let fd: fd::RawFd = fd_str.parse().ok()?;
-        let file = unsafe { fs::File::from_raw_fd(fd) };
-        Some(file)
+    let link = fs::read_link(path).ok()?;
+    if !link.starts_with("memfd:") {
+        return None;
     }
-    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
-    {
-        use std::os::{
-            fd::{self, FromRawFd},
-            unix::fs::FileTypeExt,
-        };
 
-        let fd_str = path.strip_prefix("/dev/fd/")?;
-
-        let metadata = fs::metadata(path).ok()?;
-        let file_type = metadata.file_type();
-        if !file_type.is_fifo() && !file_type.is_socket() {
-            return None;
-        }
-        let fd: fd::RawFd = fd_str.parse().ok()?;
-        let file = unsafe { fs::File::from_raw_fd(fd) };
-        Some(file)
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "freebsd")))]
-    {
-        _ = path;
-        // not implemented for bsd, windows. Could be, but isn't yet
-        None
-    }
+    let fd: fd::RawFd = fd_str.parse().ok()?;
+    let file = unsafe { fs::File::from_raw_fd(fd) };
+    Some(file)
 }
 
 /// Shows an interactive prompt asking the user to choose the default open
@@ -781,17 +714,14 @@ fn prompt_open_behavior() -> Option<cli::CliBehaviorSetting> {
     })
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux {
     use std::{
         env,
         ffi::OsString,
         io,
-        os::unix::net::{SocketAddr, UnixDatagram},
+        os::unix::net::UnixDatagram,
         path::{Path, PathBuf},
         process::{self, ExitStatus},
-        thread,
-        time::Duration,
     };
 
     use anyhow::{Context as _, anyhow};
@@ -916,24 +846,9 @@ mod linux {
                 Err(_) => Err(anyhow!(io::Error::last_os_error())),
             }
         }
-
-        fn wait_for_socket(
-            &self,
-            sock_addr: &SocketAddr,
-            sock: &mut UnixDatagram,
-        ) -> Result<(), std::io::Error> {
-            for _ in 0..100 {
-                thread::sleep(Duration::from_millis(10));
-                if sock.connect_addr(sock_addr).is_ok() {
-                    return Ok(());
-                }
-            }
-            sock.connect_addr(sock_addr)
-        }
     }
 }
 
-#[cfg(target_os = "linux")]
 mod flatpak {
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};

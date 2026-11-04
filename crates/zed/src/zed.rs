@@ -227,27 +227,11 @@ pub fn init(cx: &mut App) {
 }
 
 fn bind_on_window_closed(cx: &mut App) -> Option<gpui::Subscription> {
-    #[cfg(target_os = "macos")]
-    {
-        WorkspaceSettings::get_global(cx)
-            .on_last_window_closed
-            .is_quit_app()
-            .then(|| {
-                cx.on_window_closed(|cx, _window_id| {
-                    if cx.windows().is_empty() {
-                        cx.quit();
-                    }
-                })
-            })
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        Some(cx.on_window_closed(|cx, _window_id| {
-            if cx.windows().is_empty() {
-                cx.quit();
-            }
-        }))
-    }
+    Some(cx.on_window_closed(|cx, _window_id| {
+        if cx.windows().is_empty() {
+            cx.quit();
+        }
+    }))
 }
 
 pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowOptions {
@@ -266,7 +250,6 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         },
     };
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     static APP_ICON: std::sync::LazyLock<Option<std::sync::Arc<image::RgbaImage>>> =
         std::sync::LazyLock::new(|| {
             // this shouldn't fail since decode is checked in build.rs
@@ -291,7 +274,6 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         display_id: display.map(|display| display.id()),
         window_background: cx.theme().window_background_appearance(),
         app_id: Some(app_id.to_owned()),
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         icon: APP_ICON.as_ref().cloned(),
         window_decorations: Some(window_decorations),
         window_min_size: Some(gpui::Size {
@@ -383,7 +365,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         })
         .detach();
 
-        #[cfg(not(any(test, target_os = "macos")))]
+        #[cfg(not(test))]
         initialize_file_watcher(workspace.app_state().fs.as_ref(), window, cx);
 
         if let Some(specs) = window.gpu_specs() {
@@ -448,7 +430,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     .detach();
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[allow(unused)]
 fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Workspace>) {
     if let Err(e) = fs.start_native_watcher() {
@@ -479,56 +460,17 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
     }
 }
 
-#[cfg(target_os = "windows")]
-#[allow(unused)]
-fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Workspace>) {
-    if let Err(e) = fs.start_native_watcher() {
-        let message = format!(
-            db::indoc! {r#"
-            ReadDirectoryChangesW initialization failed: {}
-
-            This may occur on network filesystems and WSL paths. For troubleshooting see: https://zed.dev/docs/windows
-            "#},
-            e
-        );
-        let prompt = window.prompt(
-            PromptLevel::Critical,
-            "Could not start ReadDirectoryChangesW",
-            Some(&message),
-            &["Troubleshoot and Quit"],
-            cx,
-        );
-        cx.spawn(async move |_, cx| {
-            if prompt.await == Ok(0) {
-                cx.update(|cx| {
-                    cx.open_url("https://zed.dev/docs/windows");
-                    cx.quit()
-                });
-            }
-        })
-        .detach()
-    }
-}
-
 fn show_software_emulation_warning_if_needed(
     specs: gpui::GpuSpecs,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
     if specs.is_software_emulated && std::env::var("ZED_ALLOW_EMULATED_GPU").is_err() {
-        let (graphics_api, docs_url, open_url) = if cfg!(target_os = "windows") {
-            (
-                "DirectX",
-                "https://zed.dev/docs/windows",
-                "https://zed.dev/docs/windows",
-            )
-        } else {
-            (
-                "Vulkan",
-                "https://zed.dev/docs/linux",
-                "https://zed.dev/docs/linux#zed-fails-to-open-windows",
-            )
-        };
+        let (graphics_api, docs_url, open_url) = (
+            "Vulkan",
+            "https://zed.dev/docs/linux",
+            "https://zed.dev/docs/linux#zed-fails-to-open-windows",
+        );
         let message = format!(
             db::indoc! {r#"
             Zed uses {} for rendering and requires a compatible GPU.
@@ -961,9 +903,6 @@ fn register_actions(
             }
         });
 
-    #[cfg(not(target_os = "windows"))]
-    workspace.register_action(install_cli);
-
     #[cfg(debug_assertions)]
     workspace.register_action(|workspace, _: &ShowWorkspaceError, _, cx| {
         struct DebugError;
@@ -1149,7 +1088,6 @@ fn open_about_window(cx: &mut App) {
                     .bg(cx.theme().colors().editor_background)
                     .text_color(cx.theme().colors().text)
                     .p_4()
-                    .when(cfg!(target_os = "macos"), |this| this.pt_10())
                     .gap_4()
                     .text_center()
                     .justify_between()
@@ -1272,16 +1210,6 @@ fn open_about_window(cx: &mut App) {
         },
     )
     .log_err();
-}
-
-#[cfg(not(target_os = "windows"))]
-fn install_cli(
-    _: &mut Workspace,
-    _: &install_cli::InstallCliBinary,
-    window: &mut Window,
-    cx: &mut Context<Workspace>,
-) {
-    install_cli::install_cli_binary(window, cx)
 }
 
 static WAITING_QUIT_CONFIRMATION: AtomicBool = AtomicBool::new(false);
@@ -1552,20 +1480,6 @@ pub fn handle_keymap_file_changes(
     })
     .detach();
 
-    #[cfg(target_os = "windows")]
-    {
-        let mut current_layout_id = cx.keyboard_layout().id().to_string();
-        cx.on_keyboard_layout_change(move |cx| {
-            let next_layout_id = cx.keyboard_layout().id();
-            if next_layout_id != current_layout_id {
-                current_layout_id = next_layout_id.to_string();
-                keyboard_layout_tx.unbounded_send(()).ok();
-            }
-        })
-        .detach();
-    }
-
-    #[cfg(not(target_os = "windows"))]
     {
         let mut current_mapping = cx.keyboard_mapper().get_key_equivalents().cloned();
         cx.on_keyboard_layout_change(move |cx| {
@@ -3689,20 +3603,9 @@ mod tests {
         let mouse_position = point(px(250.), px(250.));
 
         let event_modifiers = {
-            #[cfg(target_os = "macos")]
-            {
-                Modifiers {
-                    platform: true,
-                    ..Modifiers::default()
-                }
-            }
-
-            #[cfg(not(target_os = "macos"))]
-            {
-                Modifiers {
-                    control: true,
-                    ..Modifiers::default()
-                }
+            Modifiers {
+                control: true,
+                ..Modifiers::default()
             }
         };
 

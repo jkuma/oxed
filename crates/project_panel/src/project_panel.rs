@@ -1139,9 +1139,7 @@ impl ProjectPanel {
 
             let settings = ProjectPanelSettings::get_global(cx);
             let visible_worktrees_count = project.visible_worktrees(cx).count();
-            let should_hide_rename = is_root
-                && (cfg!(target_os = "windows")
-                    || (settings.hide_root && visible_worktrees_count == 1));
+            let should_hide_rename = is_root && settings.hide_root && visible_worktrees_count == 1;
             let should_show_compare = !is_dir && self.file_abs_paths_to_diff(cx).is_some();
 
             let (has_git_repo, has_history) = {
@@ -2521,11 +2519,6 @@ impl ProjectPanel {
         {
             let sub_entry_id = self.unflatten_entry_id(entry_id);
             if let Some(entry) = worktree.read(cx).entry_for_id(sub_entry_id) {
-                #[cfg(target_os = "windows")]
-                if Some(entry) == worktree.read(cx).root_entry() {
-                    return;
-                }
-
                 if Some(entry) == worktree.read(cx).root_entry() {
                     let settings = ProjectPanelSettings::get_global(cx);
                     let visible_worktrees_count =
@@ -4906,8 +4899,7 @@ impl ProjectPanel {
     }
 
     fn is_copy_modifier_set(modifiers: &Modifiers) -> bool {
-        cfg!(target_os = "macos") && modifiers.alt
-            || cfg!(not(target_os = "macos")) && modifiers.control
+        modifiers.control
     }
 
     fn file_drag_paths_for_selections(

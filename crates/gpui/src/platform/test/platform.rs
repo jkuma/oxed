@@ -702,10 +702,6 @@ impl Platform for TestPlatform {
         unimplemented!()
     }
 
-    fn path_for_auxiliary_executable(&self, _name: &str) -> Result<std::path::PathBuf> {
-        unimplemented!()
-    }
-
     fn set_cursor_style(&self, style: crate::CursorStyle) {
         *self.active_cursor.lock() = style;
     }

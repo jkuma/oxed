@@ -363,7 +363,7 @@ settings_overrides! {
 settings_overrides! {
     #[with_fallible_options]
     #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
-    pub struct PlatformOverrides { macos, linux, windows }
+    pub struct PlatformOverrides { linux }
 }
 
 /// Determines what settings a profile starts from before applying its overrides.

@@ -192,7 +192,6 @@ fn test_inclusion_parents_preserve_literal_braces() {
     }
 }
 
-#[cfg(not(windows))]
 #[test]
 fn test_inclusion_parents_preserve_escaping() {
     let settings = settings_with_patterns("file_scan_inclusions", &[r"{one\/two,three}/file.rs"]);
@@ -206,7 +205,6 @@ fn test_inclusion_parents_preserve_escaping() {
     assert!(settings.is_path_always_included(rel_path("ignored"), true));
 }
 
-#[cfg(not(windows))]
 #[test]
 fn test_inclusion_parents_preserve_character_classes() {
     let settings = settings_with_patterns("file_scan_inclusions", &[r"[a\]cache/file.rs"]);

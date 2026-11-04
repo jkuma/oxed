@@ -280,14 +280,9 @@ impl Measurement for HardwareCounter {
     }
 }
 
-#[cfg(target_os = "macos")]
-use darwin as backend;
 /// The platform backend behind [`HardwareCounter`]. Each provides a `Counter`
 /// with `open`, `snapshot`, `advanced`, and `delta`, and a `Snapshot` type.
-#[cfg(target_os = "linux")]
 use perf as backend;
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-use unsupported as backend;
 
 /// Linux backend: `perf_event_open` through the `perf-event2` crate, whose
 /// items are referenced through the `perf_event` path so this module's own
@@ -305,7 +300,6 @@ use unsupported as backend;
 /// scheduled; each PMU's encoding is read from sysfs. If the kernel
 /// multiplexes a conventional counter with other profiling, its count is
 /// scaled by `time_enabled / time_running` and a warning is printed once.
-#[cfg(target_os = "linux")]
 pub mod perf {
     use super::*;
 
@@ -654,210 +648,6 @@ pub mod perf {
     }
 }
 
-/// macOS backend. Apple Silicon exposes retired instructions and cycles to
-/// unprivileged processes through two XNU interfaces: `proc_pid_rusage` with
-/// `RUSAGE_INFO_V4` for the whole process (every thread, including exited
-/// ones), and `thread_selfcounts` for the calling thread. Both are plain
-/// reads with no counter to open or close. Intel Macs report zero for both,
-/// which [`HardwareCounter::new`] detects, and macOS virtual machines (CI
-/// runners included) reject `thread_selfcounts` with `ENOTSUP` while still
-/// serving `proc_pid_rusage`. Branch and cache events require the private
-/// `kperf` framework and root, so they are unsupported here.
-#[cfg(target_os = "macos")]
-pub mod darwin {
-    use super::*;
-
-    pub(super) struct Counter {
-        event: HardwareEvent,
-        scope: MetricScope,
-    }
-
-    /// `[instructions, cycles]` at one instant.
-    #[doc(hidden)]
-    pub struct Snapshot([u64; 2]);
-
-    /// The leading fields of `struct rusage_info_v4` from `<sys/resource.h>`,
-    /// up to and including the two counters this backend reads. Only a
-    /// prefix is declared: the kernel copies out `sizeof` the flavor's full
-    /// struct, so the buffer below is padded to that size.
-    #[repr(C)]
-    struct RusageInfoV4Prefix {
-        ri_uuid: [u8; 16],
-        ri_user_time: u64,
-        ri_system_time: u64,
-        ri_pkg_idle_wkups: u64,
-        ri_interrupt_wkups: u64,
-        ri_pageins: u64,
-        ri_wired_size: u64,
-        ri_resident_size: u64,
-        ri_phys_footprint: u64,
-        ri_proc_start_abstime: u64,
-        ri_proc_exit_abstime: u64,
-        ri_child_user_time: u64,
-        ri_child_system_time: u64,
-        ri_child_pkg_idle_wkups: u64,
-        ri_child_interrupt_wkups: u64,
-        ri_child_pageins: u64,
-        ri_child_elapsed_abstime: u64,
-        ri_diskio_bytesread: u64,
-        ri_diskio_byteswritten: u64,
-        ri_cpu_time_qos_default: u64,
-        ri_cpu_time_qos_maintenance: u64,
-        ri_cpu_time_qos_background: u64,
-        ri_cpu_time_qos_utility: u64,
-        ri_cpu_time_qos_legacy: u64,
-        ri_cpu_time_qos_user_initiated: u64,
-        ri_cpu_time_qos_user_interactive: u64,
-        ri_billed_system_time: u64,
-        ri_serviced_system_time: u64,
-        ri_logical_writes: u64,
-        ri_lifetime_max_phys_footprint: u64,
-        ri_instructions: u64,
-        ri_cycles: u64,
-    }
-
-    /// `sizeof(struct rusage_info_v4)`: the prefix above plus the four trailing
-    /// `u64` fields (`ri_billed_energy`, `ri_serviced_energy`,
-    /// `ri_interval_max_phys_footprint`, `ri_runnable_time`).
-    const RUSAGE_INFO_V4_SIZE: usize = std::mem::size_of::<RusageInfoV4Prefix>() + 4 * 8;
-    const RUSAGE_INFO_V4: libc::c_int = 4;
-    /// `THSC_CPI` in `<sys/thread_selfcounts.h>` (not in `libc`).
-    const THREAD_SELFCOUNTS_CPI: libc::c_int = 1;
-
-    #[repr(C, align(8))]
-    struct RusageInfoV4Buffer([u8; RUSAGE_INFO_V4_SIZE]);
-
-    unsafe extern "C" {
-        fn proc_pid_rusage(
-            pid: libc::c_int,
-            flavor: libc::c_int,
-            buffer: *mut RusageInfoV4Buffer,
-        ) -> libc::c_int;
-        fn thread_selfcounts(
-            kind: libc::c_int,
-            buffer: *mut u64,
-            size: libc::size_t,
-        ) -> libc::c_int;
-    }
-
-    impl Counter {
-        pub(super) fn open(event: HardwareEvent, scope: MetricScope) -> Result<Self> {
-            if !matches!(event, HardwareEvent::Instructions | HardwareEvent::Cycles) {
-                return Err(anyhow!(
-                    "macOS exposes only instructions and cycles without root; {} needs kperf",
-                    event.name()
-                ));
-            }
-            let this = Self { event, scope };
-            this.read().map_err(|error| {
-                anyhow!(
-                    "{error}; hardware counters are unavailable for {} on this Mac (Intel Macs and \
-                     macOS virtual machines such as CI runners do not expose them)",
-                    scope.label()
-                )
-            })?;
-            Ok(this)
-        }
-
-        fn read(&self) -> Result<[u64; 2]> {
-            match self.scope {
-                MetricScope::Process => {
-                    let mut buffer = RusageInfoV4Buffer([0; RUSAGE_INFO_V4_SIZE]);
-                    // SAFETY: the buffer is the flavor's full size and aligned
-                    // for its `u64` fields; the kernel fills it on success.
-                    let status = unsafe {
-                        proc_pid_rusage(
-                            std::process::id() as libc::c_int,
-                            RUSAGE_INFO_V4,
-                            &mut buffer,
-                        )
-                    };
-                    if status != 0 {
-                        return Err(anyhow!(
-                            "proc_pid_rusage failed: {}",
-                            std::io::Error::last_os_error()
-                        ));
-                    }
-                    // SAFETY: the buffer is at least as large and as aligned as
-                    // the prefix struct, and every field is a plain integer.
-                    let info = unsafe { &*(buffer.0.as_ptr() as *const RusageInfoV4Prefix) };
-                    Ok([info.ri_instructions, info.ri_cycles])
-                }
-                MetricScope::CallingThread => {
-                    let mut counts = [0_u64; 2];
-                    // SAFETY: `counts` holds the two `u64`s the CPI flavor writes.
-                    let status = unsafe {
-                        thread_selfcounts(
-                            THREAD_SELFCOUNTS_CPI,
-                            counts.as_mut_ptr(),
-                            std::mem::size_of_val(&counts),
-                        )
-                    };
-                    if status != 0 {
-                        return Err(anyhow!(
-                            "thread_selfcounts failed: {}",
-                            std::io::Error::last_os_error()
-                        ));
-                    }
-                    Ok(counts)
-                }
-            }
-        }
-
-        fn value(&self, snapshot: &Snapshot) -> u64 {
-            match self.event {
-                HardwareEvent::Instructions => snapshot.0[0],
-                _ => snapshot.0[1],
-            }
-        }
-
-        pub(super) fn snapshot(&self) -> Snapshot {
-            Snapshot(self.read().unwrap_or_else(|error| panic!("{error}")))
-        }
-
-        pub(super) fn advanced(&self, before: &Snapshot, after: &Snapshot) -> bool {
-            self.value(after) > self.value(before)
-        }
-
-        pub(super) fn delta(&self, start: &Snapshot, end: &Snapshot) -> f64 {
-            self.value(end).saturating_sub(self.value(start)) as f64
-        }
-    }
-}
-
-/// Fallback backend for platforms without a hardware-counter source.
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-pub mod unsupported {
-    use super::*;
-
-    pub(super) struct Counter;
-
-    #[doc(hidden)]
-    pub struct Snapshot;
-
-    impl Counter {
-        pub(super) fn open(event: HardwareEvent, scope: MetricScope) -> Result<Self> {
-            Err(anyhow!(
-                "hardware counters ({} for {}) are unavailable on this platform",
-                event.name(),
-                scope.label()
-            ))
-        }
-
-        pub(super) fn snapshot(&self) -> Snapshot {
-            Snapshot
-        }
-
-        pub(super) fn advanced(&self, _: &Snapshot, _: &Snapshot) -> bool {
-            false
-        }
-
-        pub(super) fn delta(&self, _: &Snapshot, _: &Snapshot) -> f64 {
-            0.0
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // getrusage statistics
 // ---------------------------------------------------------------------------
@@ -883,7 +673,6 @@ impl ResourceMetric {
         }
     }
 
-    #[cfg(unix)]
     fn read(self, usage: &libc::rusage) -> u64 {
         let value = match self {
             Self::VoluntaryContextSwitches => usage.ru_nvcsw,
@@ -927,19 +716,10 @@ impl ResourceCounter {
         self.scope
     }
 
-    #[cfg(unix)]
     fn read(&self) -> Result<u64> {
         let who = match self.scope {
             MetricScope::Process => libc::RUSAGE_SELF,
-            #[cfg(target_os = "linux")]
             MetricScope::CallingThread => libc::RUSAGE_THREAD,
-            #[cfg(not(target_os = "linux"))]
-            MetricScope::CallingThread => {
-                return Err(anyhow!(
-                    "getrusage statistics for {} need RUSAGE_THREAD, which only Linux provides",
-                    self.scope.label()
-                ));
-            }
         };
         // SAFETY: `rusage` is plain old data that `getrusage` fully initializes
         // on success, and `who` is one of the constants the call accepts.
@@ -952,14 +732,6 @@ impl ResourceCounter {
             ));
         }
         Ok(self.metric.read(&usage))
-    }
-
-    #[cfg(not(unix))]
-    fn read(&self) -> Result<u64> {
-        Err(anyhow!(
-            "getrusage statistics for {} are unavailable on this platform",
-            self.scope.label()
-        ))
     }
 }
 
@@ -2116,7 +1888,6 @@ mod tests {
         assert_eq!(formatter.scale_for_machines(&mut values), "cycles");
     }
 
-    #[cfg(unix)]
     #[test]
     fn resource_counter_counts_page_faults_and_context_switches() {
         let faults = ResourceCounter::new(ResourceMetric::MinorPageFaults, MetricScope::Process)
@@ -2127,19 +1898,16 @@ mod tests {
         std::hint::black_box(&buffer);
         assert!(faults.end(start) > 100.0);
 
-        #[cfg(target_os = "linux")]
-        {
-            let switches = ResourceCounter::new(
-                ResourceMetric::VoluntaryContextSwitches,
-                MetricScope::CallingThread,
-            )
-            .expect("RUSAGE_THREAD is available on Linux");
-            let start = switches.start();
-            for _ in 0..5 {
-                std::thread::sleep(std::time::Duration::from_micros(100));
-            }
-            assert!(switches.end(start) >= 5.0);
+        let switches = ResourceCounter::new(
+            ResourceMetric::VoluntaryContextSwitches,
+            MetricScope::CallingThread,
+        )
+        .expect("RUSAGE_THREAD is available on Linux");
+        let start = switches.start();
+        for _ in 0..5 {
+            std::thread::sleep(std::time::Duration::from_micros(100));
         }
+        assert!(switches.end(start) >= 5.0);
     }
 
     /// Returns a closure measuring a background thread spinning `iterations`

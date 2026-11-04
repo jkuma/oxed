@@ -14,24 +14,17 @@ actions!(
     app_menu,
     [
         /// Activates the menu on the right in the client-side application menu.
-        ///
-        /// Does not apply to platform menu bars (e.g. on macOS).
         ActivateMenuRight,
         /// Activates the menu on the left in the client-side application menu.
-        ///
-        /// Does not apply to platform menu bars (e.g. on macOS).
         ActivateMenuLeft
     ]
 );
 
 /// Opens the named menu in the client-side application menu.
-///
-/// Does not apply to platform menu bars (e.g. on macOS).
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Default, Action)]
 #[action(namespace = app_menu)]
 pub struct OpenApplicationMenu(String);
 
-#[cfg(not(target_os = "macos"))]
 pub enum ActivateDirection {
     Left,
     Right,
@@ -143,15 +136,7 @@ impl ApplicationMenu {
                                 } => menu
                                     .action_checked_with_disabled(name, action, checked, disabled),
                                 OwnedMenuItem::Submenu(_) => menu,
-                                OwnedMenuItem::SystemMenu(_) => {
-                                    // A system menu doesn't make sense in this context, so ignore it
-                                    menu
-                                }
                             })
-                    }
-                    OwnedMenuItem::SystemMenu(_) => {
-                        // A system menu doesn't make sense in this context, so ignore it
-                        menu
                     }
                 })
         })
@@ -233,7 +218,6 @@ impl ApplicationMenu {
             })
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn open_menu(
         &mut self,
         action: &OpenApplicationMenu,
@@ -243,7 +227,6 @@ impl ApplicationMenu {
         self.pending_menu_open = Some(action.0.clone());
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn navigate_menus_in_direction(
         &mut self,
         direction: ActivateDirection,
@@ -300,7 +283,6 @@ impl ApplicationMenu {
 
 pub(crate) fn show_menus(cx: &mut App) -> bool {
     TitleBarSettings::get_global(cx).show_menus
-        && (cfg!(not(target_os = "macos")) || option_env!("ZED_USE_CROSS_PLATFORM_MENU").is_some())
 }
 
 pub(crate) fn open_menus_on_hover(cx: &mut App) -> bool {
@@ -379,7 +361,6 @@ mod tests {
             items: vec![OwnedMenuItem::Action {
                 name: item_name.to_string(),
                 action: OpenApplicationMenu(String::new()).boxed_clone(),
-                os_action: None,
                 checked: false,
                 disabled: false,
             }],

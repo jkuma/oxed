@@ -443,7 +443,6 @@ pub trait Platform: 'static {
         None
     }
     fn app_path(&self) -> Result<PathBuf>;
-    fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf>;
 
     fn set_cursor_style(&self, style: CursorStyle);
 

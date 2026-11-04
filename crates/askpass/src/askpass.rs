@@ -9,7 +9,6 @@ use util::fs::make_file_executable;
 use std::ffi::OsStr;
 use std::ops::ControlFlow;
 use std::sync::Arc;
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
@@ -20,12 +19,9 @@ use futures::{
 };
 use gpui::{AsyncApp, BackgroundExecutor, Task};
 use smol::fs;
-use util::{ResultExt as _, debug_panic, maybe};
+use util::{ResultExt as _, maybe};
 
 use util::{paths::PathExt, shell::ShellKind};
-
-/// Path to the program used for askpass; defaults to the current executable.
-static ASKPASS_PROGRAM: OnceLock<std::path::PathBuf> = OnceLock::new();
 
 #[derive(PartialEq, Eq)]
 pub enum AskPassResult {
@@ -222,8 +218,7 @@ impl PasswordProxy {
         let askpass_socket = temp_dir.path().join("askpass.sock");
         let current_exec =
             std::env::current_exe().context("Failed to determine current zed executable path.")?;
-
-        let askpass_program = ASKPASS_PROGRAM.get_or_init(|| current_exec);
+        let askpass_program = current_exec.as_path();
 
         let askpass_script_path = temp_dir.path().join(ASKPASS_SCRIPT_NAME);
 
@@ -384,12 +379,6 @@ fn connect_and_write_prompt(socket: &str, mut buffer: Vec<u8>) {
     if let Err(err) = io::stdout().write_all(&response) {
         eprintln!("Error writing to stdout: {}", err);
         exit(1);
-    }
-}
-
-pub fn set_askpass_program(path: std::path::PathBuf) {
-    if ASKPASS_PROGRAM.set(path).is_err() {
-        debug_panic!("askpass program has already been set");
     }
 }
 

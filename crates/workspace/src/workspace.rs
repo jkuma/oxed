@@ -10022,88 +10022,6 @@ mod tests {
         assert!(task.await.unwrap());
     }
 
-    // See https://github.com/zed-industries/zed/issues/55726.
-    //
-    // macOS only: on Linux/Windows, closing the last window sets
-    // `save_last_workspace`, which preserves the session (same as `Quit`),
-    // so hot-exit is safe there.
-    #[cfg(target_os = "macos")]
-    #[gpui::test]
-    async fn test_close_window_without_worktrees_prompts(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        cx.update(|cx| {
-            register_serializable_item::<TestItem>(cx);
-        });
-
-        let fs = FakeFs::new(cx.executor());
-        let project = Project::test(fs, None, cx).await;
-        let (workspace, cx) =
-            cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
-
-        let item = cx.new(|cx| {
-            TestItem::new(cx)
-                .with_dirty(true)
-                .with_serialize(|| Some(Task::ready(Ok(()))))
-        });
-        workspace.update_in(cx, |w, window, cx| {
-            w.add_item_to_active_pane(Box::new(item.clone()), None, true, window, cx);
-        });
-
-        let task = workspace.update_in(cx, |w, window, cx| {
-            w.prepare_to_close(CloseIntent::CloseWindow, window, cx)
-        });
-        cx.executor().run_until_parked();
-
-        assert!(
-            cx.has_pending_prompt(),
-            "closing a no-folder workspace with a dirty serializable item should prompt, \
-             since the workspace will not be reachable after close"
-        );
-        cx.simulate_prompt_answer("Don't Save");
-        cx.executor().run_until_parked();
-
-        assert!(task.await.unwrap());
-    }
-
-    #[cfg(target_os = "macos")]
-    #[gpui::test]
-    async fn test_cancelled_close_window_resets_removing(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        cx.update(|cx| {
-            register_serializable_item::<TestItem>(cx);
-        });
-
-        let fs = FakeFs::new(cx.executor());
-        let project = Project::test(fs, None, cx).await;
-        let (multi_workspace, cx) =
-            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
-        let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
-
-        let item = cx.new(|cx| {
-            TestItem::new(cx)
-                .with_dirty(true)
-                .with_serialize(|| Some(Task::ready(Ok(()))))
-        });
-        workspace.update_in(cx, |w, window, cx| {
-            w.add_item_to_active_pane(Box::new(item.clone()), None, true, window, cx);
-        });
-
-        multi_workspace.update_in(cx, |mw, window, cx| {
-            mw.close_window(&CloseWindow, window, cx);
-        });
-        cx.executor().run_until_parked();
-
-        assert!(cx.has_pending_prompt());
-        cx.simulate_prompt_answer("Cancel");
-        cx.executor().run_until_parked();
-
-        assert!(!workspace.read_with(cx, |workspace, _| workspace.removing));
-        let remaining_windows = cx.update(|_window, cx| cx.windows().len());
-        assert_eq!(remaining_windows, 1);
-    }
-
     #[gpui::test]
     async fn test_failed_close_window_resets_removing(cx: &mut TestAppContext) {
         init_test(cx);
@@ -12585,71 +12503,69 @@ mod tests {
         }
 
         // Flexible panel: both pixel size and ratio are persisted and restored.
-        {
-            let project = Project::test(fs.clone(), [], cx).await;
-            let (multi_workspace, cx) =
-                cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
-            let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
+        let project = Project::test(fs.clone(), [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
 
-            workspace.update(cx, |workspace, _cx| {
-                workspace.set_random_database_id();
-                workspace.bounds.size.width = px(800.);
+        workspace.update(cx, |workspace, _cx| {
+            workspace.set_random_database_id();
+            workspace.bounds.size.width = px(800.);
+        });
+
+        let panel = workspace.update_in(cx, |workspace, window, cx| {
+            let item = cx.new(|cx| {
+                TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "one.txt", cx)])
             });
+            workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx);
 
-            let panel = workspace.update_in(cx, |workspace, window, cx| {
-                let item = cx.new(|cx| {
-                    TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "one.txt", cx)])
-                });
-                workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx);
+            let panel = cx.new(|cx| TestPanel::new_flexible(DockPosition::Right, 100, cx));
+            workspace.add_panel(panel.clone(), window, cx);
+            workspace.toggle_dock(DockPosition::Right, window, cx);
+            panel
+        });
 
-                let panel = cx.new(|cx| TestPanel::new_flexible(DockPosition::Right, 100, cx));
-                workspace.add_panel(panel.clone(), window, cx);
-                workspace.toggle_dock(DockPosition::Right, window, cx);
-                panel
-            });
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.resize_right_dock(px(300.), window, cx);
+        });
 
-            workspace.update_in(cx, |workspace, window, cx| {
-                workspace.resize_right_dock(px(300.), window, cx);
-            });
+        cx.run_until_parked();
 
-            cx.run_until_parked();
+        let persisted = workspace
+            .read_with(cx, |workspace, cx| {
+                workspace.persisted_panel_size_state(TestPanel::panel_key(), cx)
+            })
+            .expect("flexible panel state should be persisted to KVP");
+        assert_eq!(
+            persisted.size, None,
+            "flexible panel should not persist a redundant pixel size"
+        );
+        let original_ratio = persisted.flex.expect("panel's flex should be persisted");
 
-            let persisted = workspace
-                .read_with(cx, |workspace, cx| {
-                    workspace.persisted_panel_size_state(TestPanel::panel_key(), cx)
-                })
-                .expect("flexible panel state should be persisted to KVP");
+        // Remove the panel and re-add: both size and ratio should be restored.
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.remove_panel(&panel, window, cx);
+        });
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            let new_panel = cx.new(|cx| TestPanel::new_flexible(DockPosition::Right, 100, cx));
+            workspace.add_panel(new_panel, window, cx);
+
+            let right_dock = workspace.right_dock().read(cx);
+            let size_state = right_dock
+                .panel::<TestPanel>()
+                .and_then(|p| right_dock.stored_panel_size_state(&p))
+                .expect("re-added flexible panel should have restored size state from KVP");
             assert_eq!(
-                persisted.size, None,
-                "flexible panel should not persist a redundant pixel size"
+                size_state.size, None,
+                "re-added flexible panel should not have a persisted pixel size"
             );
-            let original_ratio = persisted.flex.expect("panel's flex should be persisted");
-
-            // Remove the panel and re-add: both size and ratio should be restored.
-            workspace.update_in(cx, |workspace, window, cx| {
-                workspace.remove_panel(&panel, window, cx);
-            });
-
-            workspace.update_in(cx, |workspace, window, cx| {
-                let new_panel = cx.new(|cx| TestPanel::new_flexible(DockPosition::Right, 100, cx));
-                workspace.add_panel(new_panel, window, cx);
-
-                let right_dock = workspace.right_dock().read(cx);
-                let size_state = right_dock
-                    .panel::<TestPanel>()
-                    .and_then(|p| right_dock.stored_panel_size_state(&p))
-                    .expect("re-added flexible panel should have restored size state from KVP");
-                assert_eq!(
-                    size_state.size, None,
-                    "re-added flexible panel should not have a persisted pixel size"
-                );
-                assert_eq!(
-                    size_state.flex,
-                    Some(original_ratio),
-                    "re-added flexible panel should restore persisted flex"
-                );
-            });
-        }
+            assert_eq!(
+                size_state.flex,
+                Some(original_ratio),
+                "re-added flexible panel should restore persisted flex"
+            );
+        });
     }
 
     #[gpui::test]

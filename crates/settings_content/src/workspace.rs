@@ -79,7 +79,7 @@ pub struct WorkspaceSettingsContent {
     pub drop_target_size: Option<f32>,
     /// Whether to close the window when using 'close active item' on a workspace with no tabs
     ///
-    /// Default: auto ("on" on macOS, "off" otherwise)
+    /// Default: auto ("off")
     pub when_closing_with_no_tabs: Option<CloseWindowWhenNoItems>,
     /// Whether to optimize Zed's interface for assistive technology such as
     /// screen readers.
@@ -91,13 +91,6 @@ pub struct WorkspaceSettingsContent {
     ///
     /// Default: true
     pub use_system_path_prompts: Option<bool>,
-    /// Whether to use the system provided prompts.
-    /// When set to false, Zed will use the built-in prompts.
-    /// Note that this setting has no effect on Linux, where Zed will always
-    /// use the built-in prompts.
-    ///
-    /// Default: true
-    pub use_system_prompts: Option<bool>,
     /// Aliases for the command palette. When you type a key in this map,
     /// it will be assumed to equal the value.
     ///
@@ -115,7 +108,7 @@ pub struct WorkspaceSettingsContent {
     pub on_new_window: Option<OnNewWindow>,
     /// What to do when the last window is closed
     ///
-    /// Default: auto (nothing on macOS, "app quit" otherwise)
+    /// Default: auto ("app quit")
     pub on_last_window_closed: Option<OnLastWindowClosed>,
     /// Whether to resize all the panels in a dock when resizing the dock.
     ///
@@ -399,7 +392,7 @@ pub enum WindowDecorations {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum CloseWindowWhenNoItems {
-    /// Match platform conventions by default, so "on" on macOS and "off" everywhere else
+    /// Match platform conventions, which keep the window open
     #[default]
     PlatformDefault,
     /// Close the window when there are no tabs
@@ -411,9 +404,10 @@ pub enum CloseWindowWhenNoItems {
 impl CloseWindowWhenNoItems {
     pub fn should_close(&self) -> bool {
         match self {
-            CloseWindowWhenNoItems::PlatformDefault => cfg!(target_os = "macos"),
             CloseWindowWhenNoItems::CloseWindow => true,
-            CloseWindowWhenNoItems::KeepWindowOpen => false,
+            CloseWindowWhenNoItems::PlatformDefault | CloseWindowWhenNoItems::KeepWindowOpen => {
+                false
+            }
         }
     }
 }
@@ -716,7 +710,7 @@ pub enum OnNewWindow {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum OnLastWindowClosed {
-    /// Match platform conventions by default, so don't quit on macOS, and quit on other platforms
+    /// Match platform conventions, which quit the application
     #[default]
     PlatformDefault,
     /// Quit the application the last window is closed

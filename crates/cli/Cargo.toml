@@ -56,11 +56,9 @@ util = { workspace = true, optional = true }
 tempfile = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
 walkdir = { workspace = true, optional = true }
+exec = { workspace = true, optional = true }
+fork = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
 util = { workspace = true, features = ["test-support"] }
-
-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
-exec = { workspace = true, optional = true }
-fork = { workspace = true, optional = true }

@@ -1771,11 +1771,7 @@ impl SettingsWindow {
         })
         .detach();
 
-        let title_bar = if !cfg!(target_os = "macos") {
-            Some(cx.new(|_| PlatformTitleBar::new("settings-title-bar")))
-        } else {
-            None
-        };
+        let title_bar = Some(cx.new(|_| PlatformTitleBar::new("settings-title-bar")));
 
         let list_state = gpui::ListState::new(0, gpui::ListAlignment::Top, px(0.0)).measure_all();
 
@@ -2970,7 +2966,6 @@ impl SettingsWindow {
             .w(SIDEBAR_WIDTH)
             .h_full()
             .p_2p5()
-            .when(cfg!(target_os = "macos"), |this| this.pt_10())
             .flex_none()
             .border_r_1()
             .border_color(cx.theme().colors().border)
@@ -4288,9 +4283,8 @@ impl Render for SettingsWindow {
                         .font(ui_font)
                         .bg(cx.theme().colors().background)
                         .text_color(cx.theme().colors().text)
-                        .when(!cfg!(target_os = "macos"), |this| {
-                            this.border_t_1().border_color(cx.theme().colors().border)
-                        })
+                        .border_t_1()
+                        .border_color(cx.theme().colors().border)
                         .child(self.render_nav(window, cx))
                         .child(self.render_page(window, cx)),
                 ),

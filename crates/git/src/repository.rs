@@ -1187,13 +1187,11 @@ impl RefEdit {
 impl RealGitRepository {
     pub fn new(
         dotgit_path: &Path,
-        bundled_git_binary_path: Option<PathBuf>,
         system_git_binary_path: Option<PathBuf>,
         executor: BackgroundExecutor,
     ) -> Result<Self> {
         let any_git_binary_path = system_git_binary_path
             .clone()
-            .or(bundled_git_binary_path)
             .context("no git binary available")?;
         log::info!(
             "opening git repository at {dotgit_path:?} using git binary {any_git_binary_path:?}"
@@ -4350,7 +4348,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4393,7 +4390,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4444,7 +4440,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4495,7 +4490,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4556,7 +4550,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4642,7 +4635,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4714,7 +4706,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4815,7 +4806,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &clone_dir.path().join("shallow").join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4854,7 +4844,6 @@ mod tests {
 
         let source_repository = RealGitRepository::new(
             &source_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4875,7 +4864,6 @@ mod tests {
         let repo_dir = tempfile::tempdir().unwrap();
         let repository = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4911,7 +4899,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &worktree_dir.join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -4945,7 +4932,7 @@ mod tests {
         );
 
         let repository =
-            RealGitRepository::new(&repo_dir, None, Some("git".into()), cx.executor()).unwrap();
+            RealGitRepository::new(&repo_dir, Some("git".into()), cx.executor()).unwrap();
 
         assert_same_path(&repository.git_dir, &repo_dir);
         assert_same_path(&repository.common_dir, &repo_dir);
@@ -4972,7 +4959,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &clone_directory.join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5045,7 +5031,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &clone_directory.join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5110,7 +5095,6 @@ mod tests {
 
         let repository = RealGitRepository::new(
             &clone_directory.join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5154,7 +5138,6 @@ mod tests {
 
         let error = match RealGitRepository::new(
             &worktree_dir.join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         ) {
@@ -5291,7 +5274,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5333,7 +5315,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5382,7 +5363,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5429,7 +5409,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5647,7 +5626,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5734,7 +5712,6 @@ mod tests {
         git_init_repo(repo_dir.path());
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5849,7 +5826,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -5931,7 +5907,6 @@ mod tests {
         git_init_repo(repo_dir.path());
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6000,7 +5975,6 @@ mod tests {
         git_init_repo(repo_dir.path());
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6048,7 +6022,6 @@ mod tests {
         git_init_repo(repo_dir.path());
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6104,7 +6077,6 @@ mod tests {
         git_init_repo(repo_dir.path());
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6155,7 +6127,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6416,13 +6387,9 @@ mod tests {
 
         git_init_repo(&repo_dir);
 
-        let repo = RealGitRepository::new(
-            &repo_dir.join(".git"),
-            None,
-            Some("git".into()),
-            cx.executor(),
-        )
-        .unwrap();
+        let repo =
+            RealGitRepository::new(&repo_dir.join(".git"), Some("git".into()), cx.executor())
+                .unwrap();
 
         // Create an initial commit (required for worktrees)
         smol::fs::write(repo_dir.join("file.txt"), "content")
@@ -6504,13 +6471,9 @@ mod tests {
         let worktrees_dir = temp_dir.path().join("worktrees");
         git_init_repo(&repo_dir);
 
-        let repo = RealGitRepository::new(
-            &repo_dir.join(".git"),
-            None,
-            Some("git".into()),
-            cx.executor(),
-        )
-        .unwrap();
+        let repo =
+            RealGitRepository::new(&repo_dir.join(".git"), Some("git".into()), cx.executor())
+                .unwrap();
 
         // Create an initial commit
         smol::fs::write(repo_dir.join("file.txt"), "content")
@@ -6602,13 +6565,9 @@ mod tests {
 
         git_init_repo(&repo_dir);
 
-        let repo = RealGitRepository::new(
-            &repo_dir.join(".git"),
-            None,
-            Some("git".into()),
-            cx.executor(),
-        )
-        .unwrap();
+        let repo =
+            RealGitRepository::new(&repo_dir.join(".git"), Some("git".into()), cx.executor())
+                .unwrap();
 
         // Create an initial commit
         smol::fs::write(repo_dir.join("file.txt"), "content")
@@ -6674,7 +6633,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6734,13 +6692,9 @@ mod tests {
         let repo_dir = temp_dir.path().join("repo");
         git_init_repo(&repo_dir);
 
-        let repo = RealGitRepository::new(
-            &repo_dir.join(".git"),
-            None,
-            Some("git".into()),
-            cx.executor(),
-        )
-        .unwrap();
+        let repo =
+            RealGitRepository::new(&repo_dir.join(".git"), Some("git".into()), cx.executor())
+                .unwrap();
 
         // New repo doesn't have any commits yet
         assert!(repo.check_for_pushed_commit().await.unwrap().is_empty());
@@ -6816,7 +6770,6 @@ mod tests {
 
         let repo = RealGitRepository::new(
             &repo_dir.path().join(".git"),
-            None,
             Some("git".into()),
             cx.executor(),
         )
@@ -6925,13 +6878,9 @@ mod tests {
 
         git_init_repo(&repo_dir);
 
-        let repo = RealGitRepository::new(
-            &repo_dir.join(".git"),
-            None,
-            Some("git".into()),
-            cx.executor(),
-        )
-        .unwrap();
+        let repo =
+            RealGitRepository::new(&repo_dir.join(".git"), Some("git".into()), cx.executor())
+                .unwrap();
 
         let git = repo.git_binary();
         git.run(&[

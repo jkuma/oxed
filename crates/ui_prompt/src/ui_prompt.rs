@@ -4,26 +4,13 @@ use gpui::{
     div, prelude::*,
 };
 use markdown::{Markdown, MarkdownElement, MarkdownStyle};
-use settings::{Settings, SettingsStore};
+use settings::Settings;
 use theme::ClientDecorationsExt;
 use theme_settings::ThemeSettings;
 use ui::{FluentBuilder, TintColor, prelude::*};
-use workspace::WorkspaceSettings;
 
 pub fn init(cx: &mut App) {
-    process_settings(cx);
-
-    cx.observe_global::<SettingsStore>(process_settings)
-        .detach();
-}
-
-fn process_settings(cx: &mut App) {
-    let settings = WorkspaceSettings::get_global(cx);
-    if settings.use_system_prompts && cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
-        cx.reset_prompt_builder();
-    } else {
-        cx.set_prompt_builder(zed_prompt_renderer);
-    }
+    cx.set_prompt_builder(zed_prompt_renderer);
 }
 
 /// Use this function in conjunction with [App::set_prompt_builder] to force

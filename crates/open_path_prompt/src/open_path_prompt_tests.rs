@@ -48,10 +48,7 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["root"]);
 
-    #[cfg(not(windows))]
     let expected_separator = "./";
-    #[cfg(windows)]
-    let expected_separator = ".\\";
 
     // If the query ends with a slash, the picker should show the contents of the directory and not show any of the hidden entries.
     let query = path!("/root/");
@@ -238,7 +235,7 @@ async fn test_open_path_prompt_completion(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-#[cfg_attr(not(target_os = "windows"), ignore)]
+#[ignore]
 async fn test_open_path_prompt_on_windows(cx: &mut TestAppContext) {
     let app_state = init_test(cx);
     app_state
@@ -425,10 +422,7 @@ async fn test_open_path_prompt_with_show_hidden(cx: &mut TestAppContext) {
 
     let (picker, cx) = build_open_path_prompt(project, false, true, cx);
 
-    #[cfg(not(windows))]
     let expected_separator = "./";
-    #[cfg(windows)]
-    let expected_separator = ".\\";
 
     insert_query(path!("/root/"), &picker, cx).await;
     assert_eq!(

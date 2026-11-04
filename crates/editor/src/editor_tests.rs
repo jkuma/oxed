@@ -5927,27 +5927,25 @@ async fn test_newline_comments_with_multiple_delimiters(cx: &mut TestAppContext)
         },
         None,
     ));
-    {
-        let mut cx = EditorTestContext::new(cx).await;
-        cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
-        cx.set_state(indoc! {"
-        //ˇ
+    let mut cx = EditorTestContext::new(cx).await;
+    cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
+    cx.set_state(indoc! {"
+    //ˇ
     "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-        //
-        // ˇ
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+    //
+    // ˇ
     "});
 
-        cx.set_state(indoc! {"
-        ///ˇ
+    cx.set_state(indoc! {"
+    ///ˇ
     "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-        ///
-        /// ˇ
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+    ///
+    /// ˇ
     "});
-    }
 }
 
 #[gpui::test]
@@ -5973,18 +5971,16 @@ async fn test_newline_comments_with_brackets(cx: &mut TestAppContext) {
         None,
     ));
 
-    {
-        let mut cx = EditorTestContext::new(cx).await;
-        cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
-        cx.set_state(indoc! {"
-        // (ˇ)
+    let mut cx = EditorTestContext::new(cx).await;
+    cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
+    cx.set_state(indoc! {"
+    // (ˇ)
     "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-        // (
-        // ˇ)
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+    // (
+    // ˇ)
     "})
-    }
 }
 
 #[gpui::test]
@@ -6000,36 +5996,34 @@ async fn test_newline_comments_repl_separators(cx: &mut TestAppContext) {
         None,
     ));
 
-    {
-        let mut cx = EditorTestContext::new(cx).await;
-        cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
-        cx.set_state(indoc! {"
-        # %%ˇ
+    let mut cx = EditorTestContext::new(cx).await;
+    cx.update_buffer(|buffer, cx| buffer.set_language(Some(language), cx));
+    cx.set_state(indoc! {"
+    # %%ˇ
     "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-        # %%
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+    # %%
+    ˇ
+    "});
+
+    cx.set_state(indoc! {"
+        # %%%%%ˇ
+    "});
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+        # %%%%%
         ˇ
     "});
 
-        cx.set_state(indoc! {"
-            # %%%%%ˇ
+    cx.set_state(indoc! {"
+        # %ˇ%
     "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-            # %%%%%
-            ˇ
+    cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
+    cx.assert_editor_state(indoc! {"
+        # %
+        # ˇ%
     "});
-
-        cx.set_state(indoc! {"
-            # %ˇ%
-    "});
-        cx.update_editor(|e, window, cx| e.newline(&Newline, window, cx));
-        cx.assert_editor_state(indoc! {"
-            # %
-            # ˇ%
-    "});
-    }
 }
 
 #[gpui::test]
@@ -7648,76 +7642,74 @@ async fn test_join_lines_strips_comment_prefix(cx: &mut TestAppContext) {
         "});
     }
 
-    {
-        let markdown_language = Arc::new(Language::new(
-            LanguageConfig {
-                unordered_list: vec!["- ".into(), "* ".into(), "+ ".into()],
-                ..LanguageConfig::default()
-            },
-            None,
-        ));
+    let markdown_language = Arc::new(Language::new(
+        LanguageConfig {
+            unordered_list: vec!["- ".into(), "* ".into(), "+ ".into()],
+            ..LanguageConfig::default()
+        },
+        None,
+    ));
 
-        let mut cx = EditorTestContext::new(cx).await;
-        cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
+    let mut cx = EditorTestContext::new(cx).await;
+    cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
 
-        // Strips the `- ` list marker from the joined-in line.
-        cx.set_state(indoc! {"
-            - ˇfoo
-            - bar
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
-        cx.assert_editor_state(indoc! {"
-            - fooˇ bar
-        "});
+    // Strips the `- ` list marker from the joined-in line.
+    cx.set_state(indoc! {"
+        - ˇfoo
+        - bar
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
+    cx.assert_editor_state(indoc! {"
+        - fooˇ bar
+    "});
 
-        // Strips the `* ` list marker from the joined-in line.
-        cx.set_state(indoc! {"
-            * ˇfoo
-            * bar
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
-        cx.assert_editor_state(indoc! {"
-            * fooˇ bar
-        "});
+    // Strips the `* ` list marker from the joined-in line.
+    cx.set_state(indoc! {"
+        * ˇfoo
+        * bar
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
+    cx.assert_editor_state(indoc! {"
+        * fooˇ bar
+    "});
 
-        // Strips the `+ ` list marker from the joined-in line.
-        cx.set_state(indoc! {"
-            + ˇfoo
-            + bar
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
-        cx.assert_editor_state(indoc! {"
-            + fooˇ bar
-        "});
+    // Strips the `+ ` list marker from the joined-in line.
+    cx.set_state(indoc! {"
+        + ˇfoo
+        + bar
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
+    cx.assert_editor_state(indoc! {"
+        + fooˇ bar
+    "});
 
-        cx.set_state(indoc! {"
-            fooˇ
-            *bar*
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
-        cx.assert_editor_state(indoc! {"
-            fooˇ *bar*
-        "});
+    cx.set_state(indoc! {"
+        fooˇ
+        *bar*
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
+    cx.assert_editor_state(indoc! {"
+        fooˇ *bar*
+    "});
 
-        cx.set_state(indoc! {"
-            * ˇfoo
-            *
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
-        cx.assert_editor_state(indoc! {"
-            * fooˇ
-        "});
+    cx.set_state(indoc! {"
+        * ˇfoo
+        *
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines(&JoinLines, window, cx));
+    cx.assert_editor_state(indoc! {"
+        * fooˇ
+    "});
 
-        // No-whitespace join also strips the list marker.
-        cx.set_state(indoc! {"
-            - ˇfoo
-            - bar
-        "});
-        cx.update_editor(|e, window, cx| e.join_lines_impl(false, window, cx));
-        cx.assert_editor_state(indoc! {"
-            - fooˇbar
-        "});
-    }
+    // No-whitespace join also strips the list marker.
+    cx.set_state(indoc! {"
+        - ˇfoo
+        - bar
+    "});
+    cx.update_editor(|e, window, cx| e.join_lines_impl(false, window, cx));
+    cx.assert_editor_state(indoc! {"
+        - fooˇbar
+    "});
 }
 
 #[gpui::test]
@@ -13565,59 +13557,55 @@ async fn test_add_selection_pending_overlap_absorbs_multiline_source(cx: &mut Te
 async fn test_add_selection_goal_changes_are_group_local(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
     let mut cx = EditorTestContext::new(cx).await;
-    {
-        for (changed_row, columns, goal_end) in [
-            (0, Some(1..2), 2),
-            (1, Some(1..2), 3),
-            (0, None, 4),
-            (1, None, 4),
-            (1, Some(1..4), 4),
-        ] {
-            cx.set_state(
-                "a«bc\ndefgˇ»hi\nuvwxyz\nabcdef\n\na«bc\ndefgˇ»hi\nuvwxyz\nabcdef\n012345",
-            );
-            cx.update_editor(|editor, window, cx| {
-                add_selection_in_direction(editor, false, true, window, cx);
-                editor.change_selections(SelectionEffects::no_scroll(), window, cx, |selections| {
-                    selections.insert_range(Point::new(9, 0)..Point::new(9, 0));
-                });
-                let snapshot = editor.display_snapshot(cx);
-                let selections = editor
-                    .selections
-                    .all_unexpanded::<Point>(&snapshot)
-                    .into_iter()
-                    .filter_map(|mut selection| {
-                        if selection.start.row == changed_row {
-                            let columns = columns.as_ref()?;
-                            selection.start.column = columns.start;
-                            selection.end.column = columns.end;
-                        }
-                        Some(selection)
-                    })
-                    .collect::<Vec<_>>();
-                editor.change_selections(SelectionEffects::no_scroll(), window, cx, |collection| {
-                    collection.select(selections);
-                });
-                add_selection_in_direction(editor, false, true, window, cx);
-                let expected = (0..10)
-                    .filter_map(|row| {
-                        let columns = if row == changed_row {
-                            columns.clone()?
-                        } else {
-                            match row {
-                                0 | 5 => 1..3,
-                                1 | 2 | 6 | 7 | 8 => 1..4,
-                                3 => 1..goal_end,
-                                9 => 0..0,
-                                _ => return None,
-                            }
-                        };
-                        Some(Point::new(row, columns.start)..Point::new(row, columns.end))
-                    })
-                    .collect::<Vec<_>>();
-                assert_add_selection_ranges(editor, &expected, cx);
+    for (changed_row, columns, goal_end) in [
+        (0, Some(1..2), 2),
+        (1, Some(1..2), 3),
+        (0, None, 4),
+        (1, None, 4),
+        (1, Some(1..4), 4),
+    ] {
+        cx.set_state("a«bc\ndefgˇ»hi\nuvwxyz\nabcdef\n\na«bc\ndefgˇ»hi\nuvwxyz\nabcdef\n012345");
+        cx.update_editor(|editor, window, cx| {
+            add_selection_in_direction(editor, false, true, window, cx);
+            editor.change_selections(SelectionEffects::no_scroll(), window, cx, |selections| {
+                selections.insert_range(Point::new(9, 0)..Point::new(9, 0));
             });
-        }
+            let snapshot = editor.display_snapshot(cx);
+            let selections = editor
+                .selections
+                .all_unexpanded::<Point>(&snapshot)
+                .into_iter()
+                .filter_map(|mut selection| {
+                    if selection.start.row == changed_row {
+                        let columns = columns.as_ref()?;
+                        selection.start.column = columns.start;
+                        selection.end.column = columns.end;
+                    }
+                    Some(selection)
+                })
+                .collect::<Vec<_>>();
+            editor.change_selections(SelectionEffects::no_scroll(), window, cx, |collection| {
+                collection.select(selections);
+            });
+            add_selection_in_direction(editor, false, true, window, cx);
+            let expected = (0..10)
+                .filter_map(|row| {
+                    let columns = if row == changed_row {
+                        columns.clone()?
+                    } else {
+                        match row {
+                            0 | 5 => 1..3,
+                            1 | 2 | 6 | 7 | 8 => 1..4,
+                            3 => 1..goal_end,
+                            9 => 0..0,
+                            _ => return None,
+                        }
+                    };
+                    Some(Point::new(row, columns.start)..Point::new(row, columns.end))
+                })
+                .collect::<Vec<_>>();
+            assert_add_selection_ranges(editor, &expected, cx);
+        });
     }
 }
 
@@ -16860,54 +16848,52 @@ async fn test_autoindent_selections(cx: &mut TestAppContext) {
         "});
     }
 
-    {
-        let mut cx = EditorTestContext::new_multibuffer(
-            cx,
-            [indoc! { "
+    let mut cx = EditorTestContext::new_multibuffer(
+        cx,
+        [indoc! { "
+            impl A {
+            «
+            // a
+            fn b(){}
+            »
+            «
+                }
+                fn c(){}
+            »
+        "}],
+    );
+
+    let buffer = cx.update_editor(|editor, _, cx| {
+        let buffer = editor.buffer().update(cx, |buffer, _| {
+            buffer.all_buffers().iter().next().unwrap().clone()
+        });
+        buffer.update(cx, |buffer, cx| buffer.set_language(Some(rust_lang()), cx));
+        buffer
+    });
+
+    cx.run_until_parked();
+    cx.update_editor(|editor, window, cx| {
+        editor.select_all(&Default::default(), window, cx);
+        editor.autoindent(&Default::default(), window, cx)
+    });
+    cx.run_until_parked();
+
+    cx.update(|_, cx| {
+        assert_eq!(
+            buffer.read(cx).text(),
+            indoc! { "
                 impl A {
-                «
-                // a
-                fn b(){}
-                »
-                «
-                    }
-                    fn c(){}
-                »
-            "}],
-        );
 
-        let buffer = cx.update_editor(|editor, _, cx| {
-            let buffer = editor.buffer().update(cx, |buffer, _| {
-                buffer.all_buffers().iter().next().unwrap().clone()
-            });
-            buffer.update(cx, |buffer, cx| buffer.set_language(Some(rust_lang()), cx));
-            buffer
-        });
-
-        cx.run_until_parked();
-        cx.update_editor(|editor, window, cx| {
-            editor.select_all(&Default::default(), window, cx);
-            editor.autoindent(&Default::default(), window, cx)
-        });
-        cx.run_until_parked();
-
-        cx.update(|_, cx| {
-            assert_eq!(
-                buffer.read(cx).text(),
-                indoc! { "
-                    impl A {
-
-                        // a
-                        fn b(){}
+                    // a
+                    fn b(){}
 
 
-                    }
-                    fn c(){}
+                }
+                fn c(){}
 
-                " }
-            )
-        });
-    }
+            " }
+        )
+    });
 }
 
 #[gpui::test]
@@ -19035,36 +19021,34 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
         );
     });
 
-    {
-        editor.update_in(cx, |editor, window, cx| {
-            editor.set_text("somehting_new\n", window, cx)
+    editor.update_in(cx, |editor, window, cx| {
+        editor.set_text("somehting_new\n", window, cx)
+    });
+    assert!(cx.read(|cx| editor.is_dirty(cx)));
+    let _formatting_request_signal = fake_server
+        .set_request_handler::<lsp::request::Formatting, _, _>(move |params, _| async move {
+            assert_eq!(
+                params.text_document.uri,
+                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+            );
+            assert_eq!(params.options.tab_size, 8);
+            Ok(Some(vec![]))
         });
-        assert!(cx.read(|cx| editor.is_dirty(cx)));
-        let _formatting_request_signal = fake_server
-            .set_request_handler::<lsp::request::Formatting, _, _>(move |params, _| async move {
-                assert_eq!(
-                    params.text_document.uri,
-                    lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
-                );
-                assert_eq!(params.options.tab_size, 8);
-                Ok(Some(vec![]))
-            });
-        let save = editor
-            .update_in(cx, |editor, window, cx| {
-                editor.save(
-                    SaveOptions {
-                        format: true,
-                        force_format: false,
-                        autosave: false,
-                    },
-                    project.clone(),
-                    window,
-                    cx,
-                )
-            })
-            .unwrap();
-        save.await;
-    }
+    let save = editor
+        .update_in(cx, |editor, window, cx| {
+            editor.save(
+                SaveOptions {
+                    format: true,
+                    force_format: false,
+                    autosave: false,
+                },
+                project.clone(),
+                window,
+                cx,
+            )
+        })
+        .unwrap();
+    save.await;
 }
 
 #[gpui::test]
@@ -21906,9 +21890,6 @@ async fn test_auto_formatter_failure_is_silent(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn test_external_formatter_with_no_output_leaves_buffer_unchanged(cx: &mut TestAppContext) {
     init_test(cx, |settings| {
-        #[cfg(windows)]
-        let (command, arguments) = ("cmd", vec!["/C".to_string(), "more > nul".to_string()]);
-        #[cfg(not(windows))]
         let (command, arguments) = ("sh", vec!["-c".to_string(), "cat >/dev/null".to_string()]);
 
         // Consume stdin without printing anything, mirroring tools like `cargo fmt`

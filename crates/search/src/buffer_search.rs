@@ -71,12 +71,7 @@ pub struct BufferSearchBar {
     replacement_editor_focused: bool,
     active_searchable_item: Option<Box<dyn SearchableItemHandle>>,
     active_match_index: Option<usize>,
-    #[cfg(target_os = "macos")]
-    active_searchable_item_subscriptions: Option<[Subscription; 2]>,
-    #[cfg(not(target_os = "macos"))]
     active_searchable_item_subscriptions: Option<Subscription>,
-    #[cfg(target_os = "macos")]
-    pending_external_query: Option<(String, SearchOptions)>,
     active_search: Option<Arc<SearchQuery>>,
     searchable_items_with_matches:
         HashMap<Box<dyn WeakSearchableItemHandle>, (AnyVec<dyn Send>, SearchToken)>,
@@ -564,46 +559,6 @@ impl ToolbarItemView for BufferSearchBar {
                 }),
             );
 
-            #[cfg(target_os = "macos")]
-            {
-                let item_focus_handle = searchable_item_handle.item_focus_handle(cx);
-
-                self.active_searchable_item_subscriptions = Some([
-                    search_event_subscription,
-                    cx.on_focus(&item_focus_handle, window, |this, window, cx| {
-                        if this.query_editor_focused || this.replacement_editor_focused {
-                            // no need to read pasteboard since focus came from toolbar
-                            return;
-                        }
-
-                        cx.defer_in(window, |this, window, cx| {
-                            let Some(item) = cx.read_from_find_pasteboard() else {
-                                return;
-                            };
-                            let Some(text) = item.text() else {
-                                return;
-                            };
-
-                            if this.query(cx) == text {
-                                return;
-                            }
-
-                            let search_options = item
-                                .metadata()
-                                .and_then(|m| m.parse().ok())
-                                .and_then(SearchOptions::from_bits)
-                                .unwrap_or(this.search_options);
-
-                            if this.dismissed {
-                                this.pending_external_query = Some((text, search_options));
-                            } else {
-                                drop(this.search(&text, Some(search_options), true, window, cx));
-                            }
-                        });
-                    }),
-                ]);
-            }
-            #[cfg(not(target_os = "macos"))]
             {
                 self.active_searchable_item_subscriptions = Some(search_event_subscription);
             }
@@ -793,8 +748,6 @@ impl BufferSearchBar {
             replacement_editor_focused: false,
             active_searchable_item: None,
             active_searchable_item_subscriptions: None,
-            #[cfg(target_os = "macos")]
-            pending_external_query: None,
             active_match_index: None,
             searchable_items_with_matches: Default::default(),
             default_options: search_options,
@@ -1055,13 +1008,6 @@ impl BufferSearchBar {
                 self.search(&suggestion, Some(self.default_options), true, window, cx)
             });
 
-        #[cfg(target_os = "macos")]
-        let search = search.or_else(|| {
-            self.pending_external_query
-                .take()
-                .map(|(query, options)| self.search(&query, Some(options), true, window, cx))
-        });
-
         if let Some(search) = search {
             cx.spawn_in(window, async move |this, cx| {
                 if search.await.is_ok() {
@@ -1163,19 +1109,9 @@ impl BufferSearchBar {
             });
             self.set_search_options(options, cx);
             self.clear_matches(window, cx);
-            #[cfg(target_os = "macos")]
-            self.update_find_pasteboard(cx);
             cx.notify();
         }
         self.update_matches(!updated, add_to_history, window, cx)
-    }
-
-    #[cfg(target_os = "macos")]
-    pub fn update_find_pasteboard(&mut self, cx: &mut App) {
-        cx.write_to_find_pasteboard(gpui::ClipboardItem::new_string_with_metadata(
-            self.query(cx),
-            self.search_options.bits().to_string(),
-        ));
     }
 
     pub fn use_selection_for_find(
@@ -1305,22 +1241,6 @@ impl BufferSearchBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        #[cfg(target_os = "macos")]
-        if let Some((query, options)) = self.pending_external_query.take() {
-            let search_rx = self.search(&query, Some(options), true, window, cx);
-            cx.spawn_in(window, async move |this, cx| {
-                if search_rx.await.is_ok() {
-                    this.update_in(cx, |this, window, cx| {
-                        this.activate_current_match(window, cx);
-                    })
-                    .ok();
-                }
-            })
-            .detach();
-
-            return;
-        }
-
         if let Some(index) = self.active_match_index
             && let Some(searchable_item) = self.active_searchable_item.as_ref()
             && let Some((matches, token)) = self
@@ -1393,8 +1313,6 @@ impl BufferSearchBar {
                     if search.await.is_ok() {
                         this.update_in(cx, |this, window, cx| {
                             this.activate_current_match(window, cx);
-                            #[cfg(target_os = "macos")]
-                            this.update_find_pasteboard(cx);
                         })?;
                     }
                     anyhow::Ok(())
@@ -1512,8 +1430,6 @@ impl BufferSearchBar {
         let (done_tx, done_rx) = oneshot::channel();
         let query = self.query(cx);
         self.pending_search.take();
-        #[cfg(target_os = "macos")]
-        self.pending_external_query.take();
 
         if let Some(active_searchable_item) = self.active_searchable_item.as_ref() {
             self.query_error = None;
@@ -1887,13 +1803,9 @@ mod tests {
     use futures::stream::StreamExt as _;
     use gpui::{FocusHandle, Hsla, TestAppContext, UpdateGlobal, VisualTestContext};
     use language::{Buffer, Point};
-    #[cfg(target_os = "macos")]
-    use project::Project;
     use settings::{SearchSettingsContent, SettingsStore};
     use unindent::Unindent as _;
     use util_macros::perf;
-    #[cfg(target_os = "macos")]
-    use workspace::{AppState, MultiWorkspace, Workspace};
     use workspace::{item::Item, searchable::SearchableItem};
 
     fn init_globals(cx: &mut TestAppContext) {
@@ -1964,7 +1876,7 @@ mod tests {
         let mut editor = None;
         let window = cx.add_window(|window, cx| {
             let default_key_bindings = settings::KeymapFile::load_asset_allow_partial_failure(
-                "keymaps/default-macos.json",
+                settings::DEFAULT_KEYMAP_PATH,
                 cx,
             )
             .unwrap();
@@ -2007,7 +1919,7 @@ mod tests {
         let mut editor = None;
         let window = cx.add_window(|window, cx| {
             let default_key_bindings = settings::KeymapFile::load_asset_allow_partial_failure(
-                "keymaps/default-macos.json",
+                settings::DEFAULT_KEYMAP_PATH,
                 cx,
             )
             .unwrap();
@@ -3348,129 +3260,6 @@ mod tests {
                 "focus should stay in the search bar",
             );
         });
-    }
-
-    #[cfg(target_os = "macos")]
-    #[gpui::test]
-    async fn test_cmd_e_then_cmd_g_uses_selection_for_find(cx: &mut TestAppContext) {
-        init_globals(cx);
-        let app_state = cx.update(AppState::test);
-        let project = Project::test(app_state.fs.clone(), [], cx).await;
-        let buffer = cx.new(|cx| {
-            Buffer::local(
-                r#"
-                dad
-                cat
-                mom
-                dog
-                dog
-                cat
-                dad
-                mom
-                "#
-                .unindent(),
-                cx,
-            )
-        });
-        let multibuffer = cx.update(|cx| MultiBuffer::build_from_buffer(buffer, cx));
-        let mut editor = None;
-        let mut search_bar = None;
-
-        let window = cx.add_window(|window, cx| {
-            let default_key_bindings = settings::KeymapFile::load_asset_allow_partial_failure(
-                "keymaps/default-macos.json",
-                cx,
-            )
-            .unwrap();
-            cx.bind_keys(default_key_bindings);
-            let workspace = cx.new(|cx| Workspace::test_new(project.clone(), window, cx));
-            let multi_workspace = MultiWorkspace::new(workspace.clone(), window, cx);
-            let buffer_search_bar = cx.new(|cx| BufferSearchBar::new(None, window, cx));
-            workspace.update(cx, |workspace, cx| {
-                workspace.active_pane().update(cx, |pane, cx| {
-                    pane.toolbar().update(cx, |toolbar, cx| {
-                        toolbar.add_item(buffer_search_bar.clone(), window, cx);
-                    });
-                });
-            });
-            let editor_handle = cx.new(|cx| {
-                Editor::new(
-                    editor::EditorMode::full(),
-                    multibuffer.clone(),
-                    Some(project.clone()),
-                    window,
-                    cx,
-                )
-            });
-            workspace.update(cx, |workspace, cx| {
-                workspace.add_item_to_center(Box::new(editor_handle.clone()), window, cx);
-            });
-            window.focus(&editor_handle.focus_handle(cx), cx);
-            search_bar = Some(buffer_search_bar);
-            editor = Some(editor_handle);
-            multi_workspace
-        });
-        let cx = VisualTestContext::from_window(*window, cx).into_mut();
-        let editor = editor.unwrap();
-        let search_bar = search_bar.unwrap();
-
-        editor.update_in(cx, |editor, window, cx| {
-            editor.change_selections(SelectionEffects::no_scroll(), window, cx, |selections| {
-                selections.select_display_ranges([
-                    DisplayPoint::new(DisplayRow(3), 1)..DisplayPoint::new(DisplayRow(3), 1)
-                ]);
-            });
-        });
-
-        cx.simulate_keystrokes("cmd-e");
-
-        search_bar.read_with(cx, |search_bar, cx| {
-            assert_eq!(search_bar.query(cx), "dog");
-            assert_eq!(search_bar.active_match_index, Some(0));
-        });
-        cx.read(|cx| {
-            assert_eq!(
-                cx.read_from_find_pasteboard().and_then(|item| item.text()),
-                Some("dog".to_string())
-            );
-        });
-
-        cx.simulate_keystrokes("cmd-g");
-        assert_eq!(
-            editor.update(cx, |editor, cx| editor
-                .selections
-                .display_ranges(&editor.display_snapshot(cx))),
-            [DisplayPoint::new(DisplayRow(4), 0)..DisplayPoint::new(DisplayRow(4), 3)]
-        );
-
-        editor.update_in(cx, |editor, window, cx| {
-            editor.change_selections(SelectionEffects::no_scroll(), window, cx, |selections| {
-                selections.select_display_ranges([
-                    DisplayPoint::new(DisplayRow(1), 1)..DisplayPoint::new(DisplayRow(1), 1)
-                ]);
-            });
-        });
-
-        cx.simulate_keystrokes("cmd-e");
-
-        search_bar.read_with(cx, |search_bar, cx| {
-            assert_eq!(search_bar.query(cx), "cat");
-            assert_eq!(search_bar.active_match_index, Some(0));
-        });
-        cx.read(|cx| {
-            assert_eq!(
-                cx.read_from_find_pasteboard().and_then(|item| item.text()),
-                Some("cat".to_string())
-            );
-        });
-
-        cx.simulate_keystrokes("cmd-g");
-        assert_eq!(
-            editor.update(cx, |editor, cx| editor
-                .selections
-                .display_ranges(&editor.display_snapshot(cx))),
-            [DisplayPoint::new(DisplayRow(5), 0)..DisplayPoint::new(DisplayRow(5), 3)]
-        );
     }
 
     #[perf]

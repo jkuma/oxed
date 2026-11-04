@@ -149,10 +149,6 @@ impl Connection {
                     )
                 };
 
-                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
-                let offset = unsafe { sqlite3_error_offset(temp_connection.sqlite3) };
-
-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 let offset = 0;
 
                 unsafe {
@@ -174,10 +170,6 @@ impl Connection {
                     )
                 };
 
-                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
-                let offset = unsafe { sqlite3_error_offset(self.sqlite3) };
-
-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 let offset = 0;
 
                 unsafe {
@@ -503,23 +495,6 @@ mod test {
             .unwrap(),
             Some(2)
         );
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
-    #[test]
-    fn test_sql_has_syntax_errors() {
-        let connection = Connection::open_memory(Some("test_sql_has_syntax_errors"));
-        let first_stmt =
-            "CREATE TABLE kv_store(key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT ;";
-        let second_stmt = "SELECT FROM";
-
-        let second_offset = connection.sql_has_syntax_error(second_stmt).unwrap().1;
-
-        let res = connection
-            .sql_has_syntax_error(&format!("{}\n{}", first_stmt, second_stmt))
-            .map(|(_, offset)| offset);
-
-        assert_eq!(res, Some(first_stmt.len() + second_offset + 1));
     }
 
     #[test]

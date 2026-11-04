@@ -97,7 +97,7 @@ pub struct EditorSettingsContent {
     #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
     pub scroll_sensitivity: Option<f32>,
     /// Whether to zoom the editor font size with the mouse wheel
-    /// while holding the primary modifier key (Cmd on macOS, Ctrl on other platforms).
+    /// while holding the Ctrl key.
     ///
     /// Default: false
     pub mouse_wheel_zoom: Option<bool>,

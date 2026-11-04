@@ -3608,7 +3608,6 @@ dependencies = [
  "pretty_assertions",
  "project",
  "rand 0.9.4",
- "release_channel",
  "schemars",
  "search",
  "serde",
@@ -3786,7 +3785,6 @@ dependencies = [
  "derive_more",
  "dioxus-cli-config",
  "dioxus-devtools-types",
- "env_logger 0.11.8",
  "etagere",
  "futures",
  "futures-concurrency",
@@ -3815,7 +3813,6 @@ dependencies = [
  "raw-window-handle",
  "refineable",
  "regex",
- "reqwest_client",
  "resvg",
  "scheduler",
  "schemars",
@@ -3833,13 +3830,11 @@ dependencies = [
  "taffy",
  "thiserror 2.0.17",
  "ttf-parser",
- "unicode-segmentation",
  "url",
  "usvg",
  "util_macros",
  "uuid",
  "waker-fn",
- "web-time",
  "zed-scap",
 ]
 
@@ -4730,11 +4725,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "gpui",
- "log",
- "release_channel",
- "smol",
- "util",
- "workspace",
 ]
 
 [[package]]
@@ -7637,14 +7627,10 @@ name = "platform_title_bar"
 version = "0.1.0"
 dependencies = [
  "gpui",
- "settings",
  "smallvec",
  "theme",
- "theme_settings",
  "ui",
- "windows 0.62.2",
  "workspace",
- "zed_actions",
 ]
 
 [[package]]
@@ -7934,7 +7920,6 @@ dependencies = [
  "async-channel 2.5.0",
  "async-lock",
  "async-trait",
- "base64",
  "buffer_diff",
  "clock",
  "collections",
@@ -7951,7 +7936,6 @@ dependencies = [
  "gpui",
  "http_client",
  "image",
- "indexmap",
  "itertools 0.14.0",
  "language",
  "log",
@@ -7990,7 +7974,6 @@ dependencies = [
  "wax",
  "which",
  "worktree",
- "zeroize",
  "zlog",
  "ztracing",
 ]
@@ -9744,7 +9727,6 @@ dependencies = [
 name = "sqlez_macros"
 version = "0.1.0"
 dependencies = [
- "sqlez",
  "sqlformat",
  "syn 2.0.117",
 ]
@@ -11240,7 +11222,6 @@ dependencies = [
  "theme",
  "theme_settings",
  "ui",
- "workspace",
 ]
 
 [[package]]

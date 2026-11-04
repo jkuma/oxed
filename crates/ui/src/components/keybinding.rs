@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
-use crate::PlatformStyle;
 use crate::utils::capitalize;
-use crate::{Icon, IconName, IconSize, h_flex, prelude::*};
+use crate::{h_flex, prelude::*};
 use gpui::{
     Action, AnyElement, App, FocusHandle, Global, IntoElement, KeybindingKeystroke, Keystroke,
     Modifiers, Window, relative,
@@ -48,8 +47,6 @@ pub struct KeyBinding {
     size: Option<AbsoluteLength>,
     style: KeyBindingStyle,
     color: Option<Color>,
-    /// The [`PlatformStyle`] to use when displaying this keybinding.
-    platform_style: PlatformStyle,
     /// Indicates whether the keybinding is currently disabled.
     disabled: bool,
 }
@@ -117,7 +114,6 @@ impl KeyBinding {
             size: None,
             style: KeyBindingStyle::Default,
             color: None,
-            platform_style: PlatformStyle::platform(),
             disabled: false,
         }
     }
@@ -128,15 +124,8 @@ impl KeyBinding {
             size: None,
             style: KeyBindingStyle::Default,
             color: None,
-            platform_style: PlatformStyle::platform(),
             disabled: false,
         }
-    }
-
-    /// Sets the [`PlatformStyle`] for this [`KeyBinding`].
-    pub fn platform_style(mut self, platform_style: PlatformStyle) -> Self {
-        self.platform_style = platform_style;
-        self
     }
 
     /// Sets the size for this [`KeyBinding`].
@@ -196,31 +185,9 @@ impl KeyBinding {
         let keystrokes = self.resolve_keystrokes(window, cx)?;
         let text = keystrokes
             .iter()
-            .map(|keystroke| {
-                keystroke_text(keystroke.modifiers(), keystroke.key(), self.platform_style)
-            })
+            .map(|keystroke| keystroke_text(keystroke.modifiers(), keystroke.key()))
             .join(" ");
         Some(text.into())
-    }
-}
-
-fn render_key(
-    key: &str,
-    color: Option<Color>,
-    platform_style: PlatformStyle,
-    size: impl Into<Option<AbsoluteLength>>,
-    style: KeyBindingStyle,
-) -> AnyElement {
-    let key_icon = icon_for_key(key, platform_style);
-    match key_icon {
-        Some(icon) => KeyIcon::new(icon, color).size(size).into_any_element(),
-        None => {
-            let key = capitalize(key);
-            match style {
-                KeyBindingStyle::Default => Key::new(&key, color).size(size).into_any_element(),
-                KeyBindingStyle::Label => LabelKey::new(&key, color).size(size).into_any_element(),
-            }
-        }
     }
 }
 
@@ -260,11 +227,7 @@ impl RenderOnce for KeyBinding {
                         .rounded_xs()
                         .text_color(color.unwrap_or(Color::Muted).color(cx))
                         .children(render_keybinding_keystroke_with_style(
-                            keystroke,
-                            color,
-                            self.size,
-                            PlatformStyle::platform(),
-                            self.style,
+                            keystroke, color, self.size, self.style,
                         ))
                 }))
                 .into_any_element()
@@ -291,207 +254,46 @@ pub fn render_keybinding_keystroke(
     keystroke: &KeybindingKeystroke,
     color: Option<Color>,
     size: impl Into<Option<AbsoluteLength>>,
-    platform_style: PlatformStyle,
 ) -> Vec<AnyElement> {
-    render_keybinding_keystroke_with_style(
-        keystroke,
-        color,
-        size,
-        platform_style,
-        KeyBindingStyle::Default,
-    )
+    render_keybinding_keystroke_with_style(keystroke, color, size, KeyBindingStyle::Default)
 }
 
 fn render_keybinding_keystroke_with_style(
     keystroke: &KeybindingKeystroke,
     color: Option<Color>,
     size: impl Into<Option<AbsoluteLength>>,
-    platform_style: PlatformStyle,
     style: KeyBindingStyle,
 ) -> Vec<AnyElement> {
-    let use_text = matches!(
-        platform_style,
-        PlatformStyle::Linux | PlatformStyle::Windows
-    );
     let size = size.into();
-
-    if use_text {
-        let text = keystroke_text(keystroke.modifiers(), keystroke.key(), platform_style);
-        let element = match style {
-            KeyBindingStyle::Default => Key::new(text, color).size(size).into_any_element(),
-            KeyBindingStyle::Label => LabelKey::new(text, color).size(size).into_any_element(),
-        };
-        vec![element]
-    } else {
-        let mut elements = Vec::new();
-        let modifiers = render_modifiers_with_style(
-            keystroke.modifiers(),
-            platform_style,
-            color,
-            size,
-            true,
-            style,
-        )
-        .collect::<Vec<_>>();
-        if style == KeyBindingStyle::Label && !modifiers.is_empty() {
-            elements.push(h_flex().children(modifiers).mr_0p5().into_any_element());
-        } else {
-            elements.extend(modifiers);
-        }
-        elements.push(render_key(
-            keystroke.key(),
-            color,
-            platform_style,
-            size,
-            style,
-        ));
-        elements
-    }
-}
-
-fn icon_for_key(key: &str, platform_style: PlatformStyle) -> Option<IconName> {
-    match key {
-        "left" => Some(IconName::ArrowLeft),
-        "right" => Some(IconName::ArrowRight),
-        "up" => Some(IconName::ArrowUp),
-        "down" => Some(IconName::ArrowDown),
-        "backspace" => Some(IconName::Backspace),
-        "delete" => Some(IconName::Delete),
-        "return" => Some(IconName::Return),
-        "enter" => Some(IconName::Return),
-        "tab" => Some(IconName::Tab),
-        "space" => Some(IconName::Space),
-        "escape" => Some(IconName::Escape),
-        "pagedown" => Some(IconName::PageDown),
-        "pageup" => Some(IconName::PageUp),
-        "shift" if platform_style == PlatformStyle::Mac => Some(IconName::Shift),
-        "control" if platform_style == PlatformStyle::Mac => Some(IconName::Control),
-        "platform" if platform_style == PlatformStyle::Mac => Some(IconName::Command),
-        "function" if platform_style == PlatformStyle::Mac => Some(IconName::Control),
-        "alt" if platform_style == PlatformStyle::Mac => Some(IconName::Option),
-        _ => None,
-    }
+    let text = keystroke_text(keystroke.modifiers(), keystroke.key());
+    let element = match style {
+        KeyBindingStyle::Default => Key::new(text, color).size(size).into_any_element(),
+        KeyBindingStyle::Label => LabelKey::new(text, color).size(size).into_any_element(),
+    };
+    vec![element]
 }
 
 pub fn render_modifiers(
     modifiers: &Modifiers,
-    platform_style: PlatformStyle,
     color: Option<Color>,
     size: Option<AbsoluteLength>,
     trailing_separator: bool,
 ) -> impl Iterator<Item = AnyElement> {
-    render_modifiers_with_style(
-        modifiers,
-        platform_style,
-        color,
-        size,
-        trailing_separator,
-        KeyBindingStyle::Default,
-    )
-}
+    let keys = [
+        (modifiers.function, "Fn"),
+        (modifiers.control, "Ctrl"),
+        (modifiers.alt, "Alt"),
+        (modifiers.platform, "Super"),
+        (modifiers.shift, "Shift"),
+    ]
+    .into_iter()
+    .filter_map(|(enabled, key)| enabled.then_some(Some(key)));
 
-fn render_modifiers_with_style(
-    modifiers: &Modifiers,
-    platform_style: PlatformStyle,
-    color: Option<Color>,
-    size: Option<AbsoluteLength>,
-    trailing_separator: bool,
-    style: KeyBindingStyle,
-) -> impl Iterator<Item = AnyElement> {
-    #[derive(Clone)]
-    enum KeyOrIcon {
-        Key(&'static str),
-        Plus,
-        Icon(IconName),
-    }
-
-    struct Modifier {
-        enabled: bool,
-        mac: KeyOrIcon,
-        linux: KeyOrIcon,
-        windows: KeyOrIcon,
-    }
-
-    let mac_modifier = |icon, label| match style {
-        KeyBindingStyle::Default => KeyOrIcon::Icon(icon),
-        KeyBindingStyle::Label => KeyOrIcon::Key(label),
-    };
-
-    let table = {
-        use KeyOrIcon::*;
-
-        [
-            Modifier {
-                enabled: modifiers.function,
-                mac: mac_modifier(IconName::Control, "Fn"),
-                linux: Key("Fn"),
-                windows: Key("Fn"),
-            },
-            Modifier {
-                enabled: modifiers.control,
-                mac: mac_modifier(IconName::Control, "⌃"),
-                linux: Key("Ctrl"),
-                windows: Key("Ctrl"),
-            },
-            Modifier {
-                enabled: modifiers.alt,
-                mac: mac_modifier(IconName::Option, "⌥"),
-                linux: Key("Alt"),
-                windows: Key("Alt"),
-            },
-            Modifier {
-                enabled: modifiers.platform,
-                mac: mac_modifier(IconName::Command, "⌘"),
-                linux: Key("Super"),
-                windows: Key("Win"),
-            },
-            Modifier {
-                enabled: modifiers.shift,
-                mac: mac_modifier(IconName::Shift, "⇧"),
-                linux: Key("Shift"),
-                windows: Key("Shift"),
-            },
-        ]
-    };
-
-    let filtered = table
-        .into_iter()
-        .filter(|modifier| modifier.enabled)
-        .collect::<Vec<_>>();
-
-    let platform_keys = filtered
-        .into_iter()
-        .map(move |modifier| match platform_style {
-            PlatformStyle::Mac => Some(modifier.mac),
-            PlatformStyle::Linux => Some(modifier.linux),
-            PlatformStyle::Windows => Some(modifier.windows),
-        });
-
-    let separator = match platform_style {
-        PlatformStyle::Mac => None,
-        PlatformStyle::Linux => Some(KeyOrIcon::Plus),
-        PlatformStyle::Windows => Some(KeyOrIcon::Plus),
-    };
-
-    let platform_keys = itertools::intersperse(platform_keys, separator.clone());
-
-    platform_keys
-        .chain(if modifiers.modified() && trailing_separator {
-            Some(separator)
-        } else {
-            None
-        })
-        .flatten()
-        .map(move |key_or_icon| match key_or_icon {
-            KeyOrIcon::Key(key) => match style {
-                KeyBindingStyle::Default => Key::new(key, color).size(size).into_any_element(),
-                KeyBindingStyle::Label => LabelKey::new(key, color).size(size).into_any_element(),
-            },
-            KeyOrIcon::Icon(icon) => KeyIcon::new(icon, color).size(size).into_any_element(),
-            KeyOrIcon::Plus => match style {
-                KeyBindingStyle::Default => "+".into_any_element(),
-                KeyBindingStyle::Label => LabelKey::new("+", color).size(size).into_any_element(),
-            },
+    itertools::intersperse(keys, None)
+        .chain((modifiers.modified() && trailing_separator).then_some(None))
+        .map(move |key| match key {
+            Some(key) => Key::new(key, color).size(size).into_any_element(),
+            None => "+".into_any_element(),
         })
 }
 
@@ -576,38 +378,6 @@ impl LabelKey {
     }
 }
 
-#[derive(IntoElement)]
-pub struct KeyIcon {
-    icon: IconName,
-    color: Option<Color>,
-    size: Option<AbsoluteLength>,
-}
-
-impl RenderOnce for KeyIcon {
-    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let size = self.size.unwrap_or(IconSize::Small.rems().into());
-
-        Icon::new(self.icon)
-            .size(IconSize::Custom(size.to_rems(window.rem_size())))
-            .color(self.color.unwrap_or(Color::Muted))
-    }
-}
-
-impl KeyIcon {
-    pub fn new(icon: IconName, color: Option<Color>) -> Self {
-        Self {
-            icon,
-            color,
-            size: None,
-        }
-    }
-
-    pub fn size(mut self, size: impl Into<Option<AbsoluteLength>>) -> Self {
-        self.size = size.into();
-        self
-    }
-}
-
 /// Returns a textual representation of the key binding for the given [`Action`].
 pub fn text_for_action(action: &dyn Action, window: &Window, cx: &App) -> Option<String> {
     let key_binding = window.highest_precedence_binding_for_action(action)?;
@@ -615,27 +385,25 @@ pub fn text_for_action(action: &dyn Action, window: &Window, cx: &App) -> Option
 }
 
 pub fn text_for_keystrokes(keystrokes: &[Keystroke], _cx: &App) -> String {
-    let platform_style = PlatformStyle::platform();
     keystrokes
         .iter()
-        .map(|keystroke| keystroke_text(&keystroke.modifiers, &keystroke.key, platform_style))
+        .map(|keystroke| keystroke_text(&keystroke.modifiers, &keystroke.key))
         .join(" ")
 }
 
 pub fn text_for_keybinding_keystrokes(keystrokes: &[KeybindingKeystroke], _cx: &App) -> String {
-    let platform_style = PlatformStyle::platform();
     keystrokes
         .iter()
-        .map(|keystroke| keystroke_text(keystroke.modifiers(), keystroke.key(), platform_style))
+        .map(|keystroke| keystroke_text(keystroke.modifiers(), keystroke.key()))
         .join(" ")
 }
 
 pub fn text_for_keystroke(modifiers: &Modifiers, key: &str, _cx: &App) -> String {
-    keystroke_text(modifiers, key, PlatformStyle::platform())
+    keystroke_text(modifiers, key)
 }
 
 /// Returns a textual representation of the given [`Keystroke`].
-fn keystroke_text(modifiers: &Modifiers, key: &str, platform_style: PlatformStyle) -> String {
+fn keystroke_text(modifiers: &Modifiers, key: &str) -> String {
     let mut text = String::new();
     let delimiter = '-';
 
@@ -645,27 +413,17 @@ fn keystroke_text(modifiers: &Modifiers, key: &str, platform_style: PlatformStyl
     }
 
     if modifiers.control {
-        match platform_style {
-            PlatformStyle::Mac => text.push_str("Control"),
-            PlatformStyle::Linux | PlatformStyle::Windows => text.push_str("Ctrl"),
-        }
+        text.push_str("Ctrl");
         text.push(delimiter);
     }
 
     if modifiers.platform {
-        match platform_style {
-            PlatformStyle::Mac => text.push_str("Command"),
-            PlatformStyle::Linux => text.push_str("Super"),
-            PlatformStyle::Windows => text.push_str("Win"),
-        }
+        text.push_str("Super");
         text.push(delimiter);
     }
 
     if modifiers.alt {
-        match platform_style {
-            PlatformStyle::Mac => text.push_str("Option"),
-            PlatformStyle::Linux | PlatformStyle::Windows => text.push_str("Alt"),
-        }
+        text.push_str("Alt");
         text.push(delimiter);
     }
 
@@ -694,8 +452,7 @@ impl Component for KeyBinding {
     }
 
     fn description() -> &'static str {
-        "A component that displays a key binding, \
-        supporting different platform styles."
+        "A component that displays a key binding."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {
@@ -712,27 +469,11 @@ impl Component for KeyBinding {
         v_flex()
             .gap_6()
             .children(vec![example_group_with_title(
-                "Platform Styles",
-                vec![
-                    single_example(
-                        "Mac Style",
-                        keybinding("cmd-s")
-                            .platform_style(PlatformStyle::Mac)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Linux Style",
-                        keybinding("ctrl-s")
-                            .platform_style(PlatformStyle::Linux)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Windows Style",
-                        keybinding("ctrl-s")
-                            .platform_style(PlatformStyle::Windows)
-                            .into_any_element(),
-                    ),
-                ],
+                "Key Bindings",
+                vec![single_example(
+                    "Save",
+                    keybinding("ctrl-s").into_any_element(),
+                )],
             )])
             .into_any_element()
     }
@@ -743,62 +484,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_backspace_and_delete_have_distinct_icons() {
-        for platform_style in [
-            PlatformStyle::Mac,
-            PlatformStyle::Linux,
-            PlatformStyle::Windows,
-        ] {
-            let backspace = icon_for_key("backspace", platform_style);
-            let delete = icon_for_key("delete", platform_style);
-            assert!(backspace.is_some());
-            assert!(delete.is_some());
-            assert_ne!(backspace, delete);
-        }
-    }
-
-    #[test]
     fn test_text_for_keystroke() {
         let keystroke = Keystroke::parse("cmd-c").unwrap();
         assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Mac),
-            "Command-C".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Linux),
-            "Super-C".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Windows),
-            "Win-C".to_string()
+            keystroke_text(&keystroke.modifiers, &keystroke.key),
+            "Super-C"
         );
 
         let keystroke = Keystroke::parse("ctrl-alt-delete").unwrap();
         assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Mac),
-            "Control-Option-Delete".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Linux),
-            "Ctrl-Alt-Delete".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Windows),
-            "Ctrl-Alt-Delete".to_string()
+            keystroke_text(&keystroke.modifiers, &keystroke.key),
+            "Ctrl-Alt-Delete"
         );
 
         let keystroke = Keystroke::parse("shift-pageup").unwrap();
         assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Mac),
-            "Shift-PageUp".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Linux),
-            "Shift-PageUp".to_string()
-        );
-        assert_eq!(
-            keystroke_text(&keystroke.modifiers, &keystroke.key, PlatformStyle::Windows),
-            "Shift-PageUp".to_string()
+            keystroke_text(&keystroke.modifiers, &keystroke.key),
+            "Shift-PageUp"
         );
     }
 }

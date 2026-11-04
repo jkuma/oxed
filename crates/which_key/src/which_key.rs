@@ -199,18 +199,7 @@ mod tests {
             assert!(!use_key_equivalents);
             self.call_count.set(self.call_count.get() + 1);
 
-            #[cfg(target_os = "windows")]
-            {
-                KeybindingKeystroke::new(
-                    keystroke,
-                    gpui::Modifiers::control_shift(),
-                    "2".to_owned(),
-                )
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                KeybindingKeystroke::from_keystroke(keystroke)
-            }
+            KeybindingKeystroke::from_keystroke(keystroke)
         }
 
         fn get_key_equivalents(&self) -> Option<&HashMap<char, char>> {
@@ -232,22 +221,8 @@ mod tests {
             panic!("expected mapped pending keystroke");
         };
         assert_eq!(mapped_keystroke.inner(), &keystroke);
-        #[cfg(target_os = "windows")]
-        {
-            assert_eq!(
-                mapped_keystroke.modifiers(),
-                &gpui::Modifiers::control_shift()
-            );
-            assert_eq!(mapped_keystroke.key(), "2");
-        }
 
-        let expected_display_text = if cfg!(target_os = "windows") {
-            "Ctrl-Shift-2"
-        } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
-            "Ctrl-@"
-        } else {
-            "Control-@"
-        };
+        let expected_display_text = "Ctrl-@";
         assert_eq!(
             ui::text_for_keybinding_keystrokes(&mapped, cx),
             expected_display_text

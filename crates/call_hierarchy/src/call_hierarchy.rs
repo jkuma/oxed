@@ -1270,10 +1270,7 @@ mod tests {
         .await;
         let display = cx.update(|cx| compute_call_display(&call, cx));
 
-        #[cfg(not(windows))]
         let expected_path = "test/src/main.rs:11";
-        #[cfg(windows)]
-        let expected_path = "test\\src\\main.rs:11";
 
         assert_eq!(display.name, "my_function");
         assert_eq!(display.detail, None);
@@ -1304,10 +1301,7 @@ mod tests {
         let call = make_call("my_function", &external_path, 10, None, &project, cx).await;
         let display = cx.update(|cx| compute_call_display(&call, cx));
 
-        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos"))]
         let expected_path = "~/projects/app/src/main.rs:11".to_string();
-        #[cfg(windows)]
-        let expected_path = format!("{}:11", external_path.to_string_lossy());
 
         assert_eq!(display.name, "my_function");
         assert_eq!(display.detail, None);
@@ -1334,10 +1328,7 @@ mod tests {
         .await;
         let display = cx.update(|cx| compute_call_display(&call, cx));
 
-        #[cfg(not(windows))]
         let expected_path = "test/src/lib.rs:6";
-        #[cfg(windows)]
-        let expected_path = "test\\src\\lib.rs:6";
 
         assert_eq!(display.name, "helper");
         assert_eq!(display.detail.as_deref(), Some("() -> i32"));

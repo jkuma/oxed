@@ -1310,11 +1310,7 @@ mod tests {
                 ])))
             });
 
-        let modifiers = if cfg!(target_os = "macos") {
-            Modifiers::command_shift()
-        } else {
-            Modifiers::control_shift()
-        };
+        let modifiers = Modifiers::control_shift();
 
         cx.simulate_mouse_move(screen_coord.unwrap(), None, modifiers);
 
@@ -1383,11 +1379,7 @@ mod tests {
         });
         cx.run_until_parked();
 
-        let modifiers = if cfg!(target_os = "macos") {
-            Modifiers::command_shift()
-        } else {
-            Modifiers::control_shift()
-        };
+        let modifiers = Modifiers::control_shift();
         cx.update_editor(|editor, window, cx| {
             editor.update_hovered_link(
                 point_for_position(link_start),
@@ -3806,10 +3798,7 @@ mod tests {
 
         // Base document with {ABS} placeholder for absolute path prefix.
         // Each test case replaces a specific line to add cursor (ˇ) or highlight («»ˇ) markers.
-        #[cfg(not(target_os = "windows"))]
         const ABS: &str = "/root/dir";
-        #[cfg(target_os = "windows")]
-        const ABS: &str = "C:/root/dir";
 
         let base = format!(
             "\

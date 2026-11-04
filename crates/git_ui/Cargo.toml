@@ -42,7 +42,6 @@ notifications.workspace = true
 picker.workspace = true
 project.workspace = true
 rand.workspace = true
-release_channel.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

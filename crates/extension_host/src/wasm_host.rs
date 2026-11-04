@@ -518,8 +518,6 @@ impl WasmHost {
 
         let permissions = wasmtime_wasi::FsPerms::ReadWrite;
         let path = SanitizedPath::new(&extension_work_dir).to_string();
-        #[cfg(target_os = "windows")]
-        let path = path.replace('\\', "/");
 
         let mut ctx = WasiCtxBuilder::new();
         ctx.inherit_stdio()

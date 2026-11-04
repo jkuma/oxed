@@ -62,9 +62,7 @@ use project::{
 use rand::{Rng as _, rngs::StdRng};
 use serde_json::json;
 use settings::{GlobalLspSettingsContent, SettingsStore, SplicingVec};
-#[cfg(target_os = "linux")]
 use settings::{LocalSettingsKind, LocalSettingsPath};
-#[cfg(not(windows))]
 use std::os;
 use std::{
     cell::RefCell,
@@ -79,7 +77,6 @@ use std::{
     task::Poll,
     time::Duration,
 };
-#[cfg(target_os = "linux")]
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt as _};
 use sum_tree::SumTree;
 use text::{Anchor, PointUtf16, ToOffset, Unclipped};
@@ -99,10 +96,7 @@ async fn test_block_via_channel(cx: &mut gpui::TestAppContext) {
 
     let (tx, mut rx) = futures::channel::mpsc::unbounded();
     let _thread = std::thread::spawn(move || {
-        #[cfg(not(target_os = "windows"))]
         std::fs::metadata("/tmp").unwrap();
-        #[cfg(target_os = "windows")]
-        std::fs::metadata("C:/Windows").unwrap();
         std::thread::sleep(Duration::from_millis(1000));
         tx.unbounded_send(1).unwrap();
     });
@@ -183,10 +177,6 @@ async fn test_default_session_work_dirs_falls_back_to_home_for_empty_project(
     assert_eq!(ordered_paths, vec![paths::home_dir().to_path_buf()]);
 }
 
-// NOTE:
-// While POSIX symbolic links are somewhat supported on Windows, they are an opt in by the user, and thus
-// we assume that they are not supported out of the box.
-#[cfg(not(windows))]
 #[gpui::test]
 async fn test_symlinks(cx: &mut gpui::TestAppContext) {
     init_test(cx);
@@ -215,12 +205,7 @@ async fn test_symlinks(cx: &mut gpui::TestAppContext) {
     )
     .unwrap();
 
-    let project = Project::test(
-        RealFs::new(None, cx.executor()),
-        [root_link_path.as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(RealFs::new(cx.executor()), [root_link_path.as_ref()], cx).await;
 
     project.update(cx, |project, cx| {
         let tree = project.worktrees(cx).next().unwrap().read(cx);
@@ -234,7 +219,6 @@ async fn test_symlinks(cx: &mut gpui::TestAppContext) {
     });
 }
 
-#[cfg(not(windows))]
 #[gpui::test]
 async fn test_resolve_abs_file_link_project_aliases(cx: &mut gpui::TestAppContext) {
     init_test(cx);
@@ -267,7 +251,7 @@ async fn test_resolve_abs_file_link_project_aliases(cx: &mut gpui::TestAppContex
     let outside_alias = directory.path().join("outside/alias.rs");
     os::unix::fs::symlink(&target, &outside_alias).unwrap();
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root.as_path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root.as_path()], cx).await;
     let alias = project.read_with(cx, |project, cx| {
         project
             .project_path_for_absolute_path(&root.join("link.rs"), cx)
@@ -357,7 +341,6 @@ async fn test_resolve_abs_file_link_project_aliases(cx: &mut gpui::TestAppContex
     });
 }
 
-#[cfg(target_os = "linux")]
 #[gpui::test]
 async fn test_resolve_abs_file_link_rejects_non_utf8_target(cx: &mut gpui::TestAppContext) {
     init_test(cx);
@@ -368,7 +351,7 @@ async fn test_resolve_abs_file_link_rejects_non_utf8_target(cx: &mut gpui::TestA
     std::fs::write(directory.path().join("�.rs"), "replacement-character decoy").unwrap();
     let alias = directory.path().join("alias.rs");
     os::unix::fs::symlink(&target, &alias).unwrap();
-    let project = Project::test(RealFs::new(None, cx.executor()), [], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [], cx).await;
     let error = project
         .update(cx, |project, cx| {
             project.resolve_abs_file_link(alias.to_str().unwrap(), cx)
@@ -7650,52 +7633,50 @@ async fn test_completions_with_edit_ranges(cx: &mut gpui::TestAppContext) {
     }
 
     // Test 2: When both text_edit and text_edit_text are None with default edit_range
-    {
-        buffer.update(cx, |buffer, cx| buffer.set_text(text, cx));
-        let completions = project.update(cx, |project, cx| {
-            project.completions(&buffer, text.len(), DEFAULT_COMPLETION_CONTEXT, cx)
-        });
+    buffer.update(cx, |buffer, cx| buffer.set_text(text, cx));
+    let completions = project.update(cx, |project, cx| {
+        project.completions(&buffer, text.len(), DEFAULT_COMPLETION_CONTEXT, cx)
+    });
 
-        fake_server
-            .set_request_handler::<lsp::request::Completion, _, _>(|_, _| async {
-                Ok(Some(lsp::CompletionResponse::List(lsp::CompletionList {
-                    is_incomplete: false,
-                    item_defaults: Some(lsp::CompletionListItemDefaults {
-                        edit_range: Some(lsp::CompletionListItemDefaultsEditRange::Range(
-                            lsp::Range::new(
-                                lsp::Position::new(0, text.len() as u32 - 3),
-                                lsp::Position::new(0, text.len() as u32),
-                            ),
-                        )),
-                        ..lsp::CompletionListItemDefaults::default()
-                    }),
-                    items: vec![lsp::CompletionItem {
-                        label: "labelText".into(),
-                        text_edit_text: None,
-                        insert_text: Some("irrelevant".into()),
-                        text_edit: None,
-                        ..lsp::CompletionItem::default()
-                    }],
-                })))
-            })
-            .next()
-            .await;
+    fake_server
+        .set_request_handler::<lsp::request::Completion, _, _>(|_, _| async {
+            Ok(Some(lsp::CompletionResponse::List(lsp::CompletionList {
+                is_incomplete: false,
+                item_defaults: Some(lsp::CompletionListItemDefaults {
+                    edit_range: Some(lsp::CompletionListItemDefaultsEditRange::Range(
+                        lsp::Range::new(
+                            lsp::Position::new(0, text.len() as u32 - 3),
+                            lsp::Position::new(0, text.len() as u32),
+                        ),
+                    )),
+                    ..lsp::CompletionListItemDefaults::default()
+                }),
+                items: vec![lsp::CompletionItem {
+                    label: "labelText".into(),
+                    text_edit_text: None,
+                    insert_text: Some("irrelevant".into()),
+                    text_edit: None,
+                    ..lsp::CompletionItem::default()
+                }],
+            })))
+        })
+        .next()
+        .await;
 
-        let completions = completions
-            .await
-            .unwrap()
-            .into_iter()
-            .flat_map(|response| response.completions)
-            .collect::<Vec<_>>();
-        let snapshot = buffer.update(cx, |buffer, _| buffer.snapshot());
+    let completions = completions
+        .await
+        .unwrap()
+        .into_iter()
+        .flat_map(|response| response.completions)
+        .collect::<Vec<_>>();
+    let snapshot = buffer.update(cx, |buffer, _| buffer.snapshot());
 
-        assert_eq!(completions.len(), 1);
-        assert_eq!(completions[0].new_text, "labelText");
-        assert_eq!(
-            completions[0].replace_range.to_offset(&snapshot),
-            text.len() - 3..text.len()
-        );
-    }
+    assert_eq!(completions.len(), 1);
+    assert_eq!(completions[0].new_text, "labelText");
+    assert_eq!(
+        completions[0].replace_range.to_offset(&snapshot),
+        text.len() - 3..text.len()
+    );
 }
 
 #[gpui::test]
@@ -8797,7 +8778,7 @@ async fn test_rescan_updates_entries_and_buffers(cx: &mut gpui::TestAppContext) 
         }
     }));
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [dir.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [dir.path()], cx).await;
 
     let buffer_for_path = |path: &'static str, cx: &mut gpui::TestAppContext| {
         let buffer = project.update(cx, |p, cx| p.open_local_buffer(dir.path().join(path), cx));
@@ -8897,14 +8878,13 @@ async fn test_rescan_updates_entries_and_buffers(cx: &mut gpui::TestAppContext) 
     });
 }
 
-#[cfg(target_os = "linux")]
 #[gpui::test(retries = 5)]
 async fn test_recreated_directory_receives_child_events(cx: &mut gpui::TestAppContext) {
     init_test(cx);
     cx.executor().allow_parking();
 
     let dir = TempTree::new(json!({}));
-    let project = Project::test(RealFs::new(None, cx.executor()), [dir.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [dir.path()], cx).await;
     let tree = project.update(cx, |project, cx| project.worktrees(cx).next().unwrap());
 
     tree.flush_fs_events(cx).await;
@@ -16874,9 +16854,7 @@ async fn test_single_file_diffs(cx: &mut gpui::TestAppContext) {
     });
 }
 
-// TODO: Should we test this on Windows also?
 #[gpui::test]
-#[cfg(not(windows))]
 async fn test_staging_hunk_preserve_executable_permission(cx: &mut gpui::TestAppContext) {
     use std::os::unix::fs::PermissionsExt;
     init_test(cx);
@@ -16899,7 +16877,7 @@ async fn test_staging_hunk_preserve_executable_permission(cx: &mut gpui::TestApp
     git_commit("Initial commit", &repo);
     std::fs::write(&file_path, file_contents).unwrap();
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root.path()], cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
@@ -17134,7 +17112,7 @@ async fn test_git_repository_status(cx: &mut gpui::TestAppContext) {
     std::fs::remove_file(work_dir.join("d.txt")).unwrap();
     std::fs::write(work_dir.join("a.txt"), "aa").unwrap();
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root.path()], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -17389,7 +17367,6 @@ async fn test_git_repository_status_removes_directory_descendants(cx: &mut gpui:
     });
 }
 
-#[cfg(target_os = "linux")]
 #[gpui::test(retries = 5)]
 async fn test_git_events_after_project_excludes_dot_git(cx: &mut gpui::TestAppContext) {
     init_test(cx);
@@ -17416,7 +17393,7 @@ async fn test_git_events_after_project_excludes_dot_git(cx: &mut gpui::TestAppCo
     git_commit("Initial commit", &repo);
     git_branch("other-branch", &repo);
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [work_dir.as_path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [work_dir.as_path()], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -17503,7 +17480,7 @@ async fn test_git_status_postprocessing(cx: &mut gpui::TestAppContext) {
     // `sub` is a nested git repository.
     let _sub = git_init(&work_dir.join("sub"));
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root.path()], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -18282,7 +18259,7 @@ async fn test_repository_subfolder_git_status(
     });
 }
 
-// TODO: this test is flaky (especially on Windows but at least sometimes on all platforms).
+// TODO: this test is flaky.
 #[cfg(any())]
 #[gpui::test]
 async fn test_conflicted_cherry_pick(cx: &mut gpui::TestAppContext) {
@@ -18301,7 +18278,7 @@ async fn test_conflicted_cherry_pick(cx: &mut gpui::TestAppContext) {
     git_add("a.txt", &repo);
     git_commit("init", &repo);
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root_path], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root_path], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -18430,14 +18407,7 @@ async fn test_update_gitignore(cx: &mut gpui::TestAppContext) {
     });
 }
 
-// NOTE:
-// This test always fails on Windows, because on Windows, unlike on Unix, you can't rename
-// a directory which some program has already open.
-// This is a limitation of the Windows.
-// See: https://stackoverflow.com/questions/41365318/access-is-denied-when-renaming-folder
-// See: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information
 #[gpui::test]
-#[cfg_attr(target_os = "windows", ignore)]
 async fn test_rename_work_directory(cx: &mut gpui::TestAppContext) {
     init_test(cx);
     cx.executor().allow_parking();
@@ -18457,7 +18427,7 @@ async fn test_rename_work_directory(cx: &mut gpui::TestAppContext) {
     git_commit("init", &repo);
     std::fs::write(root_path.join("projects/project1/a"), "aa").unwrap();
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root_path], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root_path], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -18526,13 +18496,7 @@ async fn test_rename_work_directory(cx: &mut gpui::TestAppContext) {
     });
 }
 
-// NOTE: This test always fails on Windows, because on Windows, unlike on Unix,
-// you can't rename a directory which some program has already open. This is a
-// limitation of the Windows. See:
-// See: https://stackoverflow.com/questions/41365318/access-is-denied-when-renaming-folder
-// See: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information
 #[gpui::test]
-#[cfg_attr(target_os = "windows", ignore)]
 async fn test_file_status(cx: &mut gpui::TestAppContext) {
     init_test(cx);
     cx.executor().allow_parking();
@@ -18572,7 +18536,7 @@ async fn test_file_status(cx: &mut gpui::TestAppContext) {
     git_add(DOTGITIGNORE, &repo);
     git_commit("Initial commit", &repo);
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root_path], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root_path], cx).await;
 
     let tree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
     tree.flush_fs_events(cx).await;
@@ -18855,7 +18819,7 @@ async fn test_ignored_dirs_events(cx: &mut gpui::TestAppContext) {
     git_add(".gitignore", &repo);
     git_commit("Initial commit", &repo);
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root_path], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root_path], cx).await;
     let repository_updates = Arc::new(Mutex::new(Vec::new()));
     let project_events = Arc::new(Mutex::new(Vec::new()));
     project.update(cx, |project, cx| {
@@ -20157,7 +20121,6 @@ fn git_reset(offset: usize, work_dir: &Path) {
     );
 }
 
-#[cfg(target_os = "linux")]
 #[allow(clippy::disallowed_methods)]
 #[track_caller]
 fn git_branch(name: &str, work_dir: &Path) {
@@ -20172,7 +20135,6 @@ fn git_branch(name: &str, work_dir: &Path) {
     );
 }
 
-#[cfg(target_os = "linux")]
 #[allow(clippy::disallowed_methods)]
 #[track_caller]
 fn git_checkout(name: &str, work_dir: &Path) {
@@ -20770,7 +20732,6 @@ async fn test_read_only_files_empty_setting(cx: &mut gpui::TestAppContext) {
 }
 
 #[gpui::test]
-#[cfg(not(windows))]
 async fn test_os_read_only_files_open_as_read_only(cx: &mut gpui::TestAppContext) {
     init_test(cx);
     cx.executor().allow_parking();
@@ -20785,7 +20746,7 @@ async fn test_os_read_only_files_open_as_read_only(cx: &mut gpui::TestAppContext
     permissions.set_readonly(true);
     std::fs::set_permissions(&file_path, permissions).unwrap();
 
-    let project = Project::test(RealFs::new(None, cx.executor()), [root.path()], cx).await;
+    let project = Project::test(RealFs::new(cx.executor()), [root.path()], cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {

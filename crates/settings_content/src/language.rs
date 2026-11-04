@@ -21,9 +21,7 @@ pub struct ModifiersContent {
     /// The shift key
     #[serde(default)]
     pub shift: bool,
-    /// The command key, on macos
-    /// the windows key, on windows
-    /// the super key, on linux
+    /// The super key
     #[serde(default)]
     pub platform: bool,
     /// The function key
@@ -277,8 +275,7 @@ pub struct LanguageSettingsContent {
     /// How line endings should be handled for new files and during format and
     /// save operations.
     ///
-    /// - `detect`: Detect existing line endings and otherwise use the platform
-    ///   default (`lf` on Unix, `crlf` on Windows).
+    /// - `detect`: Detect existing line endings and otherwise use `lf`.
     /// - `prefer_lf`: Prefer LF for new files and files with no existing line
     ///   ending.
     /// - `prefer_crlf`: Prefer CRLF for new files and files with no existing

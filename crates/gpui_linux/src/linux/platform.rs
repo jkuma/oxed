@@ -960,12 +960,6 @@ impl Platform for LinuxPlatform {
         self.with_common(|common| Some(common.menus.clone()))
     }
 
-    fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
-        Err(anyhow::Error::msg(
-            "Platform<LinuxPlatform>::path_for_auxiliary_executable is not implemented yet",
-        ))
-    }
-
     fn set_cursor_style(&self, style: CursorStyle) {
         self.connection.borrow().set_cursor_style(style)
     }

@@ -7,7 +7,6 @@ use git_ui_core::worktree_picker::WorktreePicker;
 pub use platform_title_bar::{self, PlatformTitleBar};
 use project::{linked_worktree_short_name, repo_identity_path, repo_identity_path_if_local};
 
-#[cfg(not(target_os = "macos"))]
 use crate::application_menu::{
     ActivateDirection, ActivateMenuLeft, ActivateMenuRight, OpenApplicationMenu,
 };
@@ -55,7 +54,6 @@ pub fn init(cx: &mut App) {
         let item = cx.new(|cx| TitleBar::new("title-bar", workspace, window, cx));
         workspace.set_titlebar_item(item.into(), window, cx);
 
-        #[cfg(not(target_os = "macos"))]
         workspace.register_action(|workspace, action: &OpenApplicationMenu, window, cx| {
             if let Some(titlebar) = workspace
                 .titlebar_item()
@@ -69,7 +67,6 @@ pub fn init(cx: &mut App) {
             }
         });
 
-        #[cfg(not(target_os = "macos"))]
         workspace.register_action(|workspace, _: &ActivateMenuRight, window, cx| {
             if let Some(titlebar) = workspace
                 .titlebar_item()
@@ -85,7 +82,6 @@ pub fn init(cx: &mut App) {
             }
         });
 
-        #[cfg(not(target_os = "macos"))]
         workspace.register_action(|workspace, _: &ActivateMenuLeft, window, cx| {
             if let Some(titlebar) = workspace
                 .titlebar_item()
@@ -290,19 +286,7 @@ impl TitleBar {
         let project = workspace.project().clone();
         let git_store = project.read(cx).git_store().clone();
 
-        let platform_style = PlatformStyle::platform();
-        let application_menu = match platform_style {
-            PlatformStyle::Mac => {
-                if option_env!("ZED_USE_CROSS_PLATFORM_MENU").is_some() {
-                    Some(cx.new(|cx| ApplicationMenu::new(window, cx)))
-                } else {
-                    None
-                }
-            }
-            PlatformStyle::Linux | PlatformStyle::Windows => {
-                Some(cx.new(|cx| ApplicationMenu::new(window, cx)))
-            }
-        };
+        let application_menu = Some(cx.new(|cx| ApplicationMenu::new(window, cx)));
 
         let mut subscriptions = Vec::new();
         subscriptions.push(

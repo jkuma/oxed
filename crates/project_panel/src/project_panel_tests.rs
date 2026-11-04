@@ -738,68 +738,65 @@ async fn test_auto_collapse_dir_paths(cx: &mut gpui::TestAppContext) {
     );
 
     // Test 2: Single worktree with auto_fold_dirs = true and hide_root = true
-    {
-        let project = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
-        let window =
-            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
-        let workspace = window
-            .read_with(cx, |mw, _| mw.workspace().clone())
-            .unwrap();
-        let cx = &mut VisualTestContext::from_window(window.into(), cx);
-        cx.update(|_, cx| {
-            let settings = *ProjectPanelSettings::get_global(cx);
-            ProjectPanelSettings::override_global(
-                ProjectPanelSettings {
-                    auto_fold_dirs: true,
-                    hide_root: true,
-                    ..settings
-                },
-                cx,
-            );
-        });
-        let panel = workspace.update_in(cx, ProjectPanel::new);
-        cx.run_until_parked();
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..10, cx),
-            &["> dir_1/nested_dir_1/nested_dir_2/nested_dir_3"],
-            "Single worktree with hide_root=true should hide root and show auto-folded paths"
-        );
-
-        toggle_expand_dir(
-            &panel,
-            "root1/dir_1/nested_dir_1/nested_dir_2/nested_dir_3",
+    let project = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
+    let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+    let workspace = window
+        .read_with(cx, |mw, _| mw.workspace().clone())
+        .unwrap();
+    let cx = &mut VisualTestContext::from_window(window.into(), cx);
+    cx.update(|_, cx| {
+        let settings = *ProjectPanelSettings::get_global(cx);
+        ProjectPanelSettings::override_global(
+            ProjectPanelSettings {
+                auto_fold_dirs: true,
+                hide_root: true,
+                ..settings
+            },
             cx,
         );
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..10, cx),
-            &[
-                "v dir_1/nested_dir_1/nested_dir_2/nested_dir_3  <== selected",
-                "    > nested_dir_4/nested_dir_5",
-                "      file_a.java",
-                "      file_b.java",
-                "      file_c.java",
-            ],
-            "Expanded auto-folded path with hidden root should show contents without root prefix"
-        );
+    });
+    let panel = workspace.update_in(cx, ProjectPanel::new);
+    cx.run_until_parked();
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..10, cx),
+        &["> dir_1/nested_dir_1/nested_dir_2/nested_dir_3"],
+        "Single worktree with hide_root=true should hide root and show auto-folded paths"
+    );
 
-        toggle_expand_dir(
-            &panel,
-            "root1/dir_1/nested_dir_1/nested_dir_2/nested_dir_3/nested_dir_4/nested_dir_5",
-            cx,
-        );
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..10, cx),
-            &[
-                "v dir_1/nested_dir_1/nested_dir_2/nested_dir_3",
-                "    v nested_dir_4/nested_dir_5  <== selected",
-                "          file_d.java",
-                "      file_a.java",
-                "      file_b.java",
-                "      file_c.java",
-            ],
-            "Nested expansion with hidden root should maintain proper indentation"
-        );
-    }
+    toggle_expand_dir(
+        &panel,
+        "root1/dir_1/nested_dir_1/nested_dir_2/nested_dir_3",
+        cx,
+    );
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..10, cx),
+        &[
+            "v dir_1/nested_dir_1/nested_dir_2/nested_dir_3  <== selected",
+            "    > nested_dir_4/nested_dir_5",
+            "      file_a.java",
+            "      file_b.java",
+            "      file_c.java",
+        ],
+        "Expanded auto-folded path with hidden root should show contents without root prefix"
+    );
+
+    toggle_expand_dir(
+        &panel,
+        "root1/dir_1/nested_dir_1/nested_dir_2/nested_dir_3/nested_dir_4/nested_dir_5",
+        cx,
+    );
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..10, cx),
+        &[
+            "v dir_1/nested_dir_1/nested_dir_2/nested_dir_3",
+            "    v nested_dir_4/nested_dir_5  <== selected",
+            "          file_d.java",
+            "      file_a.java",
+            "      file_b.java",
+            "      file_c.java",
+        ],
+        "Nested expansion with hidden root should maintain proper indentation"
+    );
 }
 
 #[gpui::test(iterations = 30)]
@@ -1542,33 +1539,6 @@ async fn test_adding_directory_via_file(cx: &mut gpui::TestAppContext) {
             "      .dockerignore",
         ]
     );
-
-    // Test filename ends with "\"
-    #[cfg(target_os = "windows")]
-    {
-        select_path(&panel, "root1", cx);
-        panel.update_in(cx, |panel, window, cx| panel.new_file(&NewFile, window, cx));
-        let confirm = panel.update_in(cx, |panel, window, cx| {
-            // If we want to create a subdirectory, there should be no prefix slash.
-            panel
-                .filename_editor
-                .update(cx, |editor, cx| editor.set_text("new_dir_3\\", window, cx));
-            panel.confirm_edit(true, window, cx).unwrap()
-        });
-        confirm.await.unwrap();
-        cx.run_until_parked();
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..10, cx),
-            &[
-                "v root1",
-                "    > .git",
-                "    v new dir 2",
-                "    v new_dir",
-                "    v new_dir_3  <== selected",
-                "      .dockerignore",
-            ]
-        );
-    }
 }
 
 #[gpui::test]
@@ -3086,11 +3056,7 @@ async fn test_create_duplicate_items(cx: &mut gpui::TestAppContext) {
     );
 }
 
-// NOTE: This test is skipped on Windows, because on Windows,
-// when it triggers the lsp store it converts `/src/test/first copy.txt` into an uri
-// but it fails with message `"/src\\test\\first copy.txt" is not parseable as an URI`
 #[gpui::test]
-#[cfg_attr(target_os = "windows", ignore)]
 async fn test_create_duplicate_items_and_check_history(cx: &mut gpui::TestAppContext) {
     init_test_with_editor(cx);
 
@@ -3352,11 +3318,7 @@ async fn test_create_duplicate_items_and_check_history(cx: &mut gpui::TestAppCon
     });
 }
 
-// NOTE: This test is skipped on Windows, because on Windows,
-// when it triggers the lsp store it converts `/src/test/first.txt` into an uri
-// but it fails with message `"/src\\test\\first.txt" is not parseable as an URI`
 #[gpui::test]
-#[cfg_attr(target_os = "windows", ignore)]
 async fn test_rename_item_and_check_history(cx: &mut gpui::TestAppContext) {
     init_test_with_editor(cx);
 
@@ -4718,14 +4680,7 @@ async fn test_new_file_move(cx: &mut gpui::TestAppContext) {
     );
 }
 
-// NOTE: This test is skipped on Windows, because on Windows, unlike on Unix,
-// you can't rename a directory which some program has already open. This is a
-// limitation of the Windows. Since Zed will have the root open, it will hold an open handle
-// to it, and thus renaming it will fail on Windows.
-// See: https://stackoverflow.com/questions/41365318/access-is-denied-when-renaming-folder
-// See: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information
 #[gpui::test]
-#[cfg_attr(target_os = "windows", ignore)]
 async fn test_rename_root_of_worktree(cx: &mut gpui::TestAppContext) {
     init_test_with_editor(cx);
 
@@ -4860,49 +4815,37 @@ async fn test_rename_with_hide_root(cx: &mut gpui::TestAppContext) {
     }
 
     // Test 2: Multiple worktrees, hide_root=true - rename should work
-    {
-        let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
-        let window =
-            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
-        let workspace = window
-            .read_with(cx, |mw, _| mw.workspace().clone())
-            .unwrap();
-        let cx = &mut VisualTestContext::from_window(window.into(), cx);
+    let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
+    let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+    let workspace = window
+        .read_with(cx, |mw, _| mw.workspace().clone())
+        .unwrap();
+    let cx = &mut VisualTestContext::from_window(window.into(), cx);
 
-        cx.update(|_, cx| {
-            let settings = *ProjectPanelSettings::get_global(cx);
-            ProjectPanelSettings::override_global(
-                ProjectPanelSettings {
-                    hide_root: true,
-                    ..settings
-                },
-                cx,
-            );
-        });
-
-        let panel = workspace.update_in(cx, ProjectPanel::new);
-        cx.run_until_parked();
-
-        select_path(&panel, "root1", cx);
-        panel.update_in(cx, |panel, window, cx| panel.rename(&Rename, window, cx));
-
-        #[cfg(target_os = "windows")]
-        assert!(
-            panel.read_with(cx, |panel, _| panel.state.edit_state.is_none()),
-            "Rename should be blocked on Windows even with multiple worktrees"
+    cx.update(|_, cx| {
+        let settings = *ProjectPanelSettings::get_global(cx);
+        ProjectPanelSettings::override_global(
+            ProjectPanelSettings {
+                hide_root: true,
+                ..settings
+            },
+            cx,
         );
+    });
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            assert!(
-                panel.read_with(cx, |panel, _| panel.state.edit_state.is_some()),
-                "Rename should work with multiple worktrees on non-Windows when hide_root=true"
-            );
-            panel.update_in(cx, |panel, window, cx| {
-                panel.cancel(&menu::Cancel, window, cx)
-            });
-        }
-    }
+    let panel = workspace.update_in(cx, ProjectPanel::new);
+    cx.run_until_parked();
+
+    select_path(&panel, "root1", cx);
+    panel.update_in(cx, |panel, window, cx| panel.rename(&Rename, window, cx));
+
+    assert!(
+        panel.read_with(cx, |panel, _| panel.state.edit_state.is_some()),
+        "Rename should work with multiple worktrees on non-Windows when hide_root=true"
+    );
+    panel.update_in(cx, |panel, window, cx| {
+        panel.cancel(&menu::Cancel, window, cx)
+    });
 }
 
 async fn setup_three_worktree_panel(
@@ -5856,8 +5799,7 @@ async fn test_range_selection_drag_moves_entire_folded_directories(cx: &mut Test
         extend_range_selection_to(&panel, range_selection, target_path, cx);
 
         cx.simulate_modifiers_change(Modifiers {
-            alt: copy && cfg!(target_os = "macos"),
-            control: copy && cfg!(not(target_os = "macos")),
+            control: copy,
             ..Modifiers::none()
         });
         drag_selection_to(&panel, "project", false, cx);
@@ -8815,61 +8757,59 @@ async fn test_collapse_all_for_entry(cx: &mut gpui::TestAppContext) {
     }
 
     // Test 3: With auto-fold disabled
-    {
-        cx.update(|_, cx| {
-            let settings = *ProjectPanelSettings::get_global(cx);
-            ProjectPanelSettings::override_global(
-                ProjectPanelSettings {
-                    auto_fold_dirs: false,
-                    ..settings
-                },
-                cx,
-            );
-        });
-
-        let panel = workspace.update_in(cx, ProjectPanel::new);
-        cx.run_until_parked();
-
-        toggle_expand_dir(&panel, "root/dir1", cx);
-        toggle_expand_dir(&panel, "root/dir1/subdir1", cx);
-        toggle_expand_dir(&panel, "root/dir1/subdir1/nested1", cx);
-
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..20, cx),
-            &[
-                "v root",
-                "    v dir1",
-                "        v subdir1",
-                "            v nested1  <== selected",
-                "                  file1.txt",
-                "                  file2.txt",
-                "        > subdir2",
-                "    > dir2",
-            ],
-            "Initial state with some dirs expanded and auto-fold disabled"
+    cx.update(|_, cx| {
+        let settings = *ProjectPanelSettings::get_global(cx);
+        ProjectPanelSettings::override_global(
+            ProjectPanelSettings {
+                auto_fold_dirs: false,
+                ..settings
+            },
+            cx,
         );
+    });
 
-        let entry_id = find_project_entry(&panel, "root/dir1", cx).unwrap();
-        panel.update(cx, |panel, cx| {
-            let project = panel.project.read(cx);
-            let worktree = project.worktrees(cx).next().unwrap().read(cx);
-            panel.collapse_all_for_entry(worktree.id(), entry_id, cx);
-        });
+    let panel = workspace.update_in(cx, ProjectPanel::new);
+    cx.run_until_parked();
 
-        toggle_expand_dir(&panel, "root/dir1", cx);
+    toggle_expand_dir(&panel, "root/dir1", cx);
+    toggle_expand_dir(&panel, "root/dir1/subdir1", cx);
+    toggle_expand_dir(&panel, "root/dir1/subdir1/nested1", cx);
 
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..20, cx),
-            &[
-                "v root",
-                "    v dir1  <== selected",
-                "        > subdir1",
-                "        > subdir2",
-                "    > dir2",
-            ],
-            "Subdirs should be collapsed but not folded with auto-fold disabled"
-        );
-    }
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..20, cx),
+        &[
+            "v root",
+            "    v dir1",
+            "        v subdir1",
+            "            v nested1  <== selected",
+            "                  file1.txt",
+            "                  file2.txt",
+            "        > subdir2",
+            "    > dir2",
+        ],
+        "Initial state with some dirs expanded and auto-fold disabled"
+    );
+
+    let entry_id = find_project_entry(&panel, "root/dir1", cx).unwrap();
+    panel.update(cx, |panel, cx| {
+        let project = panel.project.read(cx);
+        let worktree = project.worktrees(cx).next().unwrap().read(cx);
+        panel.collapse_all_for_entry(worktree.id(), entry_id, cx);
+    });
+
+    toggle_expand_dir(&panel, "root/dir1", cx);
+
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..20, cx),
+        &[
+            "v root",
+            "    v dir1  <== selected",
+            "        > subdir1",
+            "        > subdir2",
+            "    > dir2",
+        ],
+        "Subdirs should be collapsed but not folded with auto-fold disabled"
+    );
 }
 
 #[gpui::test]
@@ -9928,75 +9868,6 @@ async fn test_context_menu_new_file_in_empty_hidden_root(cx: &mut gpui::TestAppC
     );
 }
 
-#[cfg(windows)]
-#[gpui::test]
-async fn test_create_entry_with_trailing_dot_windows(cx: &mut gpui::TestAppContext) {
-    init_test(cx);
-
-    let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(
-        path!("/root"),
-        json!({
-            "dir1": {
-                "file1.txt": "",
-            },
-        }),
-    )
-    .await;
-
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
-    let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
-    let workspace = window
-        .read_with(cx, |mw, _| mw.workspace().clone())
-        .unwrap();
-    let cx = &mut VisualTestContext::from_window(window.into(), cx);
-
-    let panel = workspace.update_in(cx, |workspace, window, cx| {
-        let panel = ProjectPanel::new(workspace, window, cx);
-        workspace.add_panel(panel.clone(), window, cx);
-        panel
-    });
-    cx.run_until_parked();
-
-    #[rustfmt::skip]
-    assert_eq!(
-        visible_entries_as_strings(&panel, 0..20, cx),
-        &[
-            "v root",
-            "    > dir1",
-        ],
-        "Initial state with nothing selected"
-    );
-
-    panel.update_in(cx, |panel, window, cx| {
-        panel.new_file(&NewFile, window, cx);
-    });
-    cx.run_until_parked();
-    panel.update_in(cx, |panel, window, cx| {
-        assert!(panel.filename_editor.read(cx).is_focused(window));
-    });
-    panel
-        .update_in(cx, |panel, window, cx| {
-            panel
-                .filename_editor
-                .update(cx, |editor, cx| editor.set_text("foo.", window, cx));
-            panel.confirm_edit(true, window, cx).unwrap()
-        })
-        .await
-        .unwrap();
-    cx.run_until_parked();
-    #[rustfmt::skip]
-    assert_eq!(
-        visible_entries_as_strings(&panel, 0..20, cx),
-        &[
-            "v root",
-            "    > dir1",
-            "      foo  <== selected  <== marked",
-        ],
-        "A new file is created under the root directory without the trailing dot"
-    );
-}
-
 #[gpui::test]
 async fn test_highlight_entry_for_external_drag(cx: &mut gpui::TestAppContext) {
     init_test(cx);
@@ -10614,43 +10485,40 @@ async fn test_hide_root(cx: &mut gpui::TestAppContext) {
     }
 
     // Test 4: Multiple worktrees with hide_root = false
-    {
-        let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
-        let window =
-            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
-        let workspace = window
-            .read_with(cx, |mw, _| mw.workspace().clone())
-            .unwrap();
-        let cx = &mut VisualTestContext::from_window(window.into(), cx);
+    let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
+    let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+    let workspace = window
+        .read_with(cx, |mw, _| mw.workspace().clone())
+        .unwrap();
+    let cx = &mut VisualTestContext::from_window(window.into(), cx);
 
-        cx.update(|_, cx| {
-            let settings = *ProjectPanelSettings::get_global(cx);
-            ProjectPanelSettings::override_global(
-                ProjectPanelSettings {
-                    hide_root: false,
-                    ..settings
-                },
-                cx,
-            );
-        });
-
-        let panel = workspace.update_in(cx, ProjectPanel::new);
-        cx.run_until_parked();
-
-        assert_eq!(
-            visible_entries_as_strings(&panel, 0..10, cx),
-            &[
-                "v root1",
-                "    > dir1",
-                "    > dir2",
-                "      file4.txt",
-                "v root2",
-                "    > dir3",
-                "      file6.txt",
-            ],
-            "With hide_root=false and multiple worktrees, roots should be visible"
+    cx.update(|_, cx| {
+        let settings = *ProjectPanelSettings::get_global(cx);
+        ProjectPanelSettings::override_global(
+            ProjectPanelSettings {
+                hide_root: false,
+                ..settings
+            },
+            cx,
         );
-    }
+    });
+
+    let panel = workspace.update_in(cx, ProjectPanel::new);
+    cx.run_until_parked();
+
+    assert_eq!(
+        visible_entries_as_strings(&panel, 0..10, cx),
+        &[
+            "v root1",
+            "    > dir1",
+            "    > dir2",
+            "      file4.txt",
+            "v root2",
+            "    > dir3",
+            "      file6.txt",
+        ],
+        "With hide_root=false and multiple worktrees, roots should be visible"
+    );
 }
 
 #[gpui::test]
@@ -11446,9 +11314,6 @@ fn visible_entries_as_strings(
             } else {
                 "  "
             };
-            #[cfg(windows)]
-            let filename = details.filename.replace("\\", "/");
-            #[cfg(not(windows))]
             let filename = details.filename;
             let name = if details.is_editing {
                 format!("[EDITOR: '{}']", filename)

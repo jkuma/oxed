@@ -3839,8 +3839,7 @@ impl Pane {
         let item_id = dragged_tab.item.item_id();
         self.unpreview_item_if_preview(item_id);
 
-        let is_clone = cfg!(target_os = "macos") && window.modifiers().alt
-            || cfg!(not(target_os = "macos")) && window.modifiers().control;
+        let is_clone = window.modifiers().control;
 
         let from_pane = dragged_tab.pane.clone();
 

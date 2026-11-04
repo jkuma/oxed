@@ -721,23 +721,6 @@ fn test_glob_literal_prefix() {
         glob_literal_prefix(Path::new("foo/bar/baz.js")),
         Path::new("foo/bar/baz.js")
     );
-
-    #[cfg(target_os = "windows")]
-    {
-        assert_eq!(glob_literal_prefix(Path::new("**\\*.js")), Path::new(""));
-        assert_eq!(
-            glob_literal_prefix(Path::new("node_modules\\**/*.js")),
-            Path::new("node_modules")
-        );
-        assert_eq!(
-            glob_literal_prefix(Path::new("foo/{bar,baz}.js")),
-            Path::new("foo")
-        );
-        assert_eq!(
-            glob_literal_prefix(Path::new("foo\\bar\\baz.js")),
-            Path::new("foo/bar/baz.js")
-        );
-    }
 }
 
 #[test]

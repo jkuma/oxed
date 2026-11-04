@@ -179,19 +179,6 @@ fn general_page(cx: &App) -> SettingsPage {
                 files: USER,
             }),
             SettingsPageItem::SettingItem(SettingItem {
-                title: "Use System Prompts",
-                description: "Use native OS dialogs for confirmations.",
-                field: Box::new(SettingField {
-                    json_path: Some("use_system_prompts"),
-                    pick: |settings_content| settings_content.workspace.use_system_prompts.as_ref(),
-                    write: |settings_content, value, _| {
-                        settings_content.workspace.use_system_prompts = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
                 title: "Redact Private Values",
                 description: "Hide the values of variables in private files.",
                 field: Box::new(SettingField {

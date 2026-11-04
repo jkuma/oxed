@@ -4,22 +4,12 @@
 //! never fail just because diagnostics couldn't be collected.
 //!
 //! What we gather:
-//! - All transitive descendant processes of the current Zed process
-//!   (cross-platform via `sysinfo`).
-//! - On Linux: each descendant's `/proc/<pid>/wchan` (kernel function the
-//!   thread is currently sleeping in) and `State:` from `/proc/<pid>/status`.
-//! - On macOS: for any descendant whose executable name contains `git`, a
-//!   short `sample`-based user-space stack and `lsof` output. Both require
-//!   the corresponding system binaries; if they aren't present or the
-//!   invocation fails we skip them.
-//! - On Windows: just the process tree (no portable way to grab another
-//!   process's stack).
+//! - All transitive descendant processes of the current process.
+//! - Each descendant's `/proc/<pid>/wchan` (kernel function the thread is
+//!   currently sleeping in) and `State:` from `/proc/<pid>/status`.
 //!
 //! The output is a `serde_json::Value`. Callers merge it into whatever larger
 //! JSON payload they're producing.
-//!
-//! This is invoked from a developer-only "show git job queue" action, so it
-//! is acceptable for the macOS path to spend a few seconds sampling.
 
 use serde_json::{Map, Value};
 
@@ -35,7 +25,6 @@ pub async fn gather() -> Value {
         }
     }
 
-    #[cfg(target_os = "linux")]
     {
         match collect_linux_proc_info() {
             Ok(info) => {
@@ -43,22 +32,6 @@ pub async fn gather() -> Value {
             }
             Err(err) => {
                 log::warn!("git runtime diagnostics: failed to read /proc info: {err:#}");
-            }
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        match collect_macos_git_child_diagnostics().await {
-            Ok(info) => {
-                if !info.is_null() {
-                    diag.insert("macos_git_children".into(), info);
-                }
-            }
-            Err(err) => {
-                log::warn!(
-                    "git runtime diagnostics: failed to collect macOS git-child info: {err:#}"
-                );
             }
         }
     }
@@ -255,7 +228,6 @@ fn descendants_of(system: &sysinfo::System, root: sysinfo::Pid) -> Vec<sysinfo::
     out
 }
 
-#[cfg(target_os = "linux")]
 fn collect_linux_proc_info() -> anyhow::Result<Value> {
     use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 
@@ -299,117 +271,4 @@ fn collect_linux_proc_info() -> anyhow::Result<Value> {
     }
 
     Ok(serde_json::json!({ "descendants": entries }))
-}
-
-#[cfg(target_os = "macos")]
-async fn collect_macos_git_child_diagnostics() -> anyhow::Result<Value> {
-    use std::path::Path;
-    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
-
-    let sample_available = Path::new("/usr/bin/sample").exists();
-    let lsof_available =
-        Path::new("/usr/sbin/lsof").exists() || Path::new("/usr/bin/lsof").exists();
-    let lsof_path = if Path::new("/usr/sbin/lsof").exists() {
-        "/usr/sbin/lsof"
-    } else {
-        "/usr/bin/lsof"
-    };
-
-    if !sample_available && !lsof_available {
-        return Ok(Value::Null);
-    }
-
-    let current_pid = sysinfo::get_current_pid()
-        .map_err(|e| anyhow::anyhow!("sysinfo::get_current_pid failed: {e}"))?;
-
-    let refresh = ProcessRefreshKind::nothing().with_exe(UpdateKind::Always);
-    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(refresh));
-    system.refresh_processes_specifics(ProcessesToUpdate::All, true, refresh);
-
-    let descendants = descendants_of(&system, current_pid);
-
-    // Limit ourselves to git-flavored descendants. We don't want to spend
-    // several seconds sampling unrelated children (terminals, language
-    // servers, etc.). Match by name containing "git" — covers `git`,
-    // `git-remote-https`, `git-credential-osxkeychain`, hook subprocesses
-    // named with `git` in them, etc.
-    let git_descendants: Vec<u32> = descendants
-        .iter()
-        .filter_map(|pid| {
-            let process = system.process(*pid)?;
-            let name = process.name().to_string_lossy();
-            if name.contains("git") {
-                Some(pid.as_u32())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    if git_descendants.is_empty() {
-        return Ok(Value::Null);
-    }
-
-    let mut entries = Vec::new();
-    for pid in git_descendants {
-        let mut entry = Map::new();
-        entry.insert("pid".into(), Value::from(pid));
-
-        if sample_available {
-            match run_capturing("/usr/bin/sample", &[&pid.to_string(), "2", "-mayDie"]).await {
-                Ok(output) => {
-                    entry.insert("sample".into(), Value::String(truncate(output, 64 * 1024)));
-                }
-                Err(err) => {
-                    log::warn!("git runtime diagnostics: `sample {pid}` failed: {err}");
-                }
-            }
-        }
-
-        if lsof_available {
-            match run_capturing(lsof_path, &["-p", &pid.to_string()]).await {
-                Ok(output) => {
-                    entry.insert("lsof".into(), Value::String(truncate(output, 64 * 1024)));
-                }
-                Err(err) => {
-                    log::warn!("git runtime diagnostics: `lsof -p {pid}` failed: {err}");
-                }
-            }
-        }
-
-        entries.push(Value::Object(entry));
-    }
-
-    Ok(Value::Array(entries))
-}
-
-#[cfg(target_os = "macos")]
-async fn run_capturing(program: &str, args: &[&str]) -> anyhow::Result<String> {
-    let output = util::command::new_command(program)
-        .args(args)
-        .output()
-        .await?;
-    if !output.status.success() {
-        anyhow::bail!(
-            "{program} exited with status {:?}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
-#[cfg(target_os = "macos")]
-fn truncate(mut s: String, max_bytes: usize) -> String {
-    if s.len() <= max_bytes {
-        return s;
-    }
-    // Find a UTF-8 char boundary at or before `max_bytes`.
-    let mut cut = max_bytes;
-    while cut > 0 && !s.is_char_boundary(cut) {
-        cut -= 1;
-    }
-    s.truncate(cut);
-    s.push_str("\n…(truncated)");
-    s
 }

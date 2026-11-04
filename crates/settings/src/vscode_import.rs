@@ -890,7 +890,6 @@ impl VsCodeSettings {
             window_decorations: None,
             show_call_status_icon: None,
             use_system_path_prompts: self.read_bool("files.simpleDialog.enable").map(|b| !b),
-            use_system_prompts: None,
             window_title_format: self.read_window_title_format(),
             window_title_separator: self.read_string("window.titleSeparator"),
             when_closing_with_no_tabs: self.read_bool("window.closeWhenEmpty").map(|b| {

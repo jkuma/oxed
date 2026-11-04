@@ -25,6 +25,4 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 regex.workspace = true
 reqwest.workspace = true
 gpui_util.workspace = true
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
 http_client_tls.workspace = true

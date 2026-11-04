@@ -422,7 +422,6 @@ slotmap::new_key_type! { pub struct TrashId; }
 
 pub struct RealFs {
     this: std::sync::Weak<Self>,
-    bundled_git_binary_path: Option<PathBuf>,
     executor: BackgroundExecutor,
     native_watcher: Arc<fs_watcher::OsWatcher>,
     poll_watcher: Arc<fs_watcher::OsWatcher>,
@@ -455,10 +454,9 @@ impl FileHandle for std::fs::File {
 pub struct RealWatcher {}
 
 impl RealFs {
-    pub fn new(git_binary_path: Option<PathBuf>, executor: BackgroundExecutor) -> Arc<Self> {
+    pub fn new(executor: BackgroundExecutor) -> Arc<Self> {
         Arc::new_cyclic(|this| Self {
             this: this.clone(),
-            bundled_git_binary_path: git_binary_path,
             native_watcher: fs_watcher::OsWatcher::new(
                 fs_watcher::OsWatcherKind::Native,
                 executor.clone(),
@@ -946,7 +944,6 @@ impl Fs for RealFs {
     ) -> Result<Arc<dyn GitRepository>> {
         Ok(Arc::new(RealGitRepository::new(
             dotgit_path,
-            self.bundled_git_binary_path.clone(),
             system_git_binary_path.map(|path| path.to_path_buf()),
             self.executor.clone(),
         )?))

@@ -44,34 +44,6 @@ impl Menu {
     }
 }
 
-/// OS menus are menus that are recognized by the operating system
-/// This allows the operating system to provide specialized items for
-/// these menus
-pub struct OsMenu {
-    /// The name of the menu
-    pub name: SharedString,
-
-    /// The type of menu
-    pub menu_type: SystemMenuType,
-}
-
-impl OsMenu {
-    /// Create an OwnedOsMenu from this OsMenu
-    pub fn owned(self) -> OwnedOsMenu {
-        OwnedOsMenu {
-            name: self.name.to_string().into(),
-            menu_type: self.menu_type,
-        }
-    }
-}
-
-/// The type of system menu
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum SystemMenuType {
-    /// The 'Services' menu in the Application menu on macOS
-    Services,
-}
-
 /// The different kinds of items that can be in a menu
 pub enum MenuItem {
     /// A separator between items
@@ -80,9 +52,6 @@ pub enum MenuItem {
     /// A submenu
     Submenu(Menu),
 
-    /// A menu, managed by the system (for example, the Services menu on macOS)
-    SystemMenu(OsMenu),
-
     /// An action that can be performed
     Action {
         /// The name of this menu item
@@ -90,10 +59,6 @@ pub enum MenuItem {
 
         /// The action to perform when this menu item is selected
         action: Box<dyn Action>,
-
-        /// The OS Action that corresponds to this action, if any
-        /// See [`OsAction`] for more information
-        os_action: Option<OsAction>,
 
         /// Whether this action is checked
         checked: bool,
@@ -114,35 +79,11 @@ impl MenuItem {
         Self::Submenu(menu)
     }
 
-    /// Creates a new submenu that is populated by the OS
-    pub fn os_submenu(name: impl Into<SharedString>, menu_type: SystemMenuType) -> Self {
-        Self::SystemMenu(OsMenu {
-            name: name.into(),
-            menu_type,
-        })
-    }
-
     /// Creates a new menu item that invokes an action
     pub fn action(name: impl Into<SharedString>, action: impl Action) -> Self {
         Self::Action {
             name: name.into(),
             action: Box::new(action),
-            os_action: None,
-            checked: false,
-            disabled: false,
-        }
-    }
-
-    /// Creates a new menu item that invokes an action and has an OS action
-    pub fn os_action(
-        name: impl Into<SharedString>,
-        action: impl Action,
-        os_action: OsAction,
-    ) -> Self {
-        Self::Action {
-            name: name.into(),
-            action: Box::new(action),
-            os_action: Some(os_action),
             checked: false,
             disabled: false,
         }
@@ -156,17 +97,14 @@ impl MenuItem {
             MenuItem::Action {
                 name,
                 action,
-                os_action,
                 checked,
                 disabled,
             } => OwnedMenuItem::Action {
                 name: name.into(),
                 action,
-                os_action,
                 checked,
                 disabled,
             },
-            MenuItem::SystemMenu(os_menu) => OwnedMenuItem::SystemMenu(os_menu.owned()),
         }
     }
 
@@ -221,18 +159,6 @@ impl MenuItem {
     }
 }
 
-/// OS menus are menus that are recognized by the operating system
-/// This allows the operating system to provide specialized items for
-/// these menus
-#[derive(Clone)]
-pub struct OwnedOsMenu {
-    /// The name of the menu
-    pub name: SharedString,
-
-    /// The type of menu
-    pub menu_type: SystemMenuType,
-}
-
 /// A menu of the application, either a main menu or a submenu
 #[derive(Clone)]
 pub struct OwnedMenu {
@@ -254,9 +180,6 @@ pub enum OwnedMenuItem {
     /// A submenu
     Submenu(OwnedMenu),
 
-    /// A menu, managed by the system (for example, the Services menu on macOS)
-    SystemMenu(OwnedOsMenu),
-
     /// An action that can be performed
     Action {
         /// The name of this menu item
@@ -264,10 +187,6 @@ pub enum OwnedMenuItem {
 
         /// The action to perform when this menu item is selected
         action: Box<dyn Action>,
-
-        /// The OS Action that corresponds to this action, if any
-        /// See [`OsAction`] for more information
-        os_action: Option<OsAction>,
 
         /// Whether this action is checked
         checked: bool,
@@ -285,47 +204,16 @@ impl Clone for OwnedMenuItem {
             OwnedMenuItem::Action {
                 name,
                 action,
-                os_action,
                 checked,
                 disabled,
             } => OwnedMenuItem::Action {
                 name: name.clone(),
                 action: action.boxed_clone(),
-                os_action: *os_action,
                 checked: *checked,
                 disabled: *disabled,
             },
-            OwnedMenuItem::SystemMenu(os_menu) => OwnedMenuItem::SystemMenu(os_menu.clone()),
         }
     }
-}
-
-// TODO: As part of the global selections refactor, these should
-// be moved to GPUI-provided actions that make this association
-// without leaking the platform details to GPUI users
-
-/// OS actions are actions that are recognized by the operating system
-/// This allows the operating system to provide specialized behavior for
-/// these actions
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum OsAction {
-    /// The 'cut' action
-    Cut,
-
-    /// The 'copy' action
-    Copy,
-
-    /// The 'paste' action
-    Paste,
-
-    /// The 'select all' action
-    SelectAll,
-
-    /// The 'undo' action
-    Undo,
-
-    /// The 'redo' action
-    Redo,
 }
 
 pub(crate) fn init_app_menus(platform: &dyn Platform, cx: &App) {

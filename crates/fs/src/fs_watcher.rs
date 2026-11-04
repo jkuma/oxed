@@ -1485,7 +1485,7 @@ mod tests {
         let watcher = FsWatcher::new(
             OsWatcher::new(OsWatcherKind::Native, cx.executor()),
             OsWatcher::new(OsWatcherKind::Poll, cx.executor()),
-            crate::RealFs::new(None, cx.executor()),
+            crate::RealFs::new(cx.executor()),
             cx.executor(),
             tx,
             pending_path_events.clone(),

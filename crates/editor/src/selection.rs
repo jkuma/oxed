@@ -1490,7 +1490,6 @@ impl Editor {
         window.invalidate_character_coordinates();
 
         // Copy selections to primary selection buffer
-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         if local {
             let selections = self
                 .selections

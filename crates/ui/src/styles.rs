@@ -11,7 +11,6 @@ mod units;
 pub use appearance::*;
 pub use color::*;
 pub use elevation::*;
-pub use platform::*;
 pub use severity::*;
 pub use spacing::*;
 pub use typography::*;

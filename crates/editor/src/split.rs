@@ -494,7 +494,6 @@ impl RenderOnce for DiffStyleControls {
                                     .text_color(Color::Muted.color(cx))
                                     .children(render_modifiers(
                                         &gpui::Modifiers::secondary_key(),
-                                        PlatformStyle::platform(),
                                         None,
                                         Some(TextSize::Small.rems(cx).into()),
                                         false,

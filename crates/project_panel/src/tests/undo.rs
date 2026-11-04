@@ -29,19 +29,8 @@ struct TestContext {
 // ergonomic for our use case.
 fn path(path: impl AsRef<str>) -> String {
     let path = path.as_ref();
-    #[cfg(target_os = "windows")]
-    {
-        let mut path = path.replace("/", "\\");
-        if path.starts_with("\\") {
-            path = format!("C:{path}");
-        }
-        path
-    }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        path.to_string()
-    }
+    path.to_string()
 }
 
 impl TestContext {

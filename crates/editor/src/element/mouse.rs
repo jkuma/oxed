@@ -832,8 +832,7 @@ impl EditorElement {
                 if !point_for_position.intersects_selection(&selection_display)
                     && text_hitbox.is_hovered(window)
                 {
-                    let is_cut = !(cfg!(target_os = "macos") && event.modifiers.alt
-                        || cfg!(not(target_os = "macos")) && event.modifiers.control);
+                    let is_cut = !event.modifiers.control;
                     editor.move_selection_on_drop(
                         &selection.clone(),
                         point_for_position.nearest_valid,
@@ -856,19 +855,11 @@ impl EditorElement {
 
         if end_selection && pending_nonempty_selections {
             cx.stop_propagation();
-        } else if cfg!(any(target_os = "linux", target_os = "freebsd"))
-            && event.button == MouseButton::Middle
-        {
-            #[allow(
-                clippy::collapsible_if,
-                clippy::needless_return,
-                reason = "The cfg-block below makes this a false positive"
-            )]
+        } else if event.button == MouseButton::Middle {
             if !text_hitbox.is_hovered(window) || editor.read_only(cx) {
                 return;
             }
 
-            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             if EditorSettings::get_global(cx).middle_click_paste {
                 if let Some(text) = cx.read_from_primary().and_then(|item| item.text()) {
                     let point_for_position = position_map.point_for_position(event.position);
