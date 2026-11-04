@@ -3474,7 +3474,7 @@ fn is_buffer_stale(
             .read(cx)
             .buffer_store()
             .read(cx)
-            .is_shared(buffer.remote_id(), cx)
+            .is_shared(buffer.remote_id())
     } else {
         false
     }

@@ -469,8 +469,8 @@ impl LspLogView {
             if already_enabled {
                 return;
             }
-            let Some(generation) = self.log_store.update(cx, |log_store, cx| {
-                log_store.retain_view_log_stream(key, log_kind, cx)?;
+            let Some(generation) = self.log_store.update(cx, |log_store, _| {
+                log_store.retain_view_log_stream(key, log_kind)?;
                 Some(log_store.get_language_server_state(key)?.generation)
             }) else {
                 return;
@@ -493,8 +493,8 @@ impl LspLogView {
             if streams.log_kinds.is_empty() {
                 self.enabled_streams.remove(key);
             }
-            self.log_store.update(cx, |log_store, cx| {
-                log_store.release_view_log_stream(key, log_kind, cx);
+            self.log_store.update(cx, |log_store, _| {
+                log_store.release_view_log_stream(key, log_kind);
             });
         }
     }

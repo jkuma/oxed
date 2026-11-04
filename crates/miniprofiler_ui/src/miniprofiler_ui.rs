@@ -9,12 +9,10 @@ use command_palette_hooks::CommandPaletteFilter;
 use gpui::{
     App, AppContext, ClipboardItem, Context, Div, Entity, Hsla, InteractiveElement,
     ParentElement as _, ProfilingCollector, Render, SerializedLocation, SerializedTaskTiming,
-    SerializedThreadTaskTimings, SharedString, StatefulInteractiveElement, Styled, Task,
-    TasksIncluded, ThreadTimingsDelta, TitlebarOptions, UniformListScrollHandle, WeakEntity,
-    WindowBounds, WindowOptions, div, prelude::FluentBuilder, profiler, px, relative, size,
-    uniform_list,
+    SerializedThreadTaskTimings, SharedString, StatefulInteractiveElement, Styled, TasksIncluded,
+    ThreadTimingsDelta, TitlebarOptions, UniformListScrollHandle, WeakEntity, WindowBounds,
+    WindowOptions, div, prelude::FluentBuilder, profiler, px, relative, size, uniform_list,
 };
-use rpc::{AnyProtoClient, proto};
 use settings::{RegisterSetting, Settings, SettingsContent, SettingsStore};
 use std::any::TypeId;
 use util::ResultExt;
@@ -30,14 +28,11 @@ use zed_actions::OpenPerformanceProfiler;
 
 const NANOS_PER_MS: u128 = Duration::from_millis(1).as_nanos();
 const VISIBLE_WINDOW_NANOS: u128 = Duration::from_secs(10).as_nanos();
-const REMOTE_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProfileSource {
     Foreground,
     AllThreads,
-    RemoteForeground,
-    RemoteAllThreads,
 }
 
 impl ProfileSource {
@@ -45,23 +40,7 @@ impl ProfileSource {
         match self {
             ProfileSource::Foreground => "Foreground",
             ProfileSource::AllThreads => "All threads",
-            ProfileSource::RemoteForeground => "Remote: Foreground",
-            ProfileSource::RemoteAllThreads => "Remote: All threads",
         }
-    }
-
-    fn is_remote(&self) -> bool {
-        matches!(
-            self,
-            ProfileSource::RemoteForeground | ProfileSource::RemoteAllThreads
-        )
-    }
-
-    fn foreground_only(&self) -> bool {
-        matches!(
-            self,
-            ProfileSource::Foreground | ProfileSource::RemoteForeground
-        )
     }
 }
 
@@ -193,10 +172,6 @@ pub struct ProfilerWindow {
     autoscroll: bool,
     scroll_handle: UniformListScrollHandle,
     workspace: Option<WeakEntity<Workspace>>,
-    has_remote: bool,
-    remote_now_nanos: u128,
-    remote_received_at: Option<Instant>,
-    _remote_poll_task: Option<Task<()>>,
 }
 
 impl ProfilerWindow {
@@ -215,15 +190,10 @@ impl ProfilerWindow {
             autoscroll: true,
             scroll_handle: UniformListScrollHandle::default(),
             workspace: workspace_handle,
-            has_remote: false,
-            remote_now_nanos: 0,
-            remote_received_at: None,
-            _remote_poll_task: None,
         })
     }
 
-    fn poll_timings(&mut self, cx: &App) {
-        self.has_remote = self.remote_proto_client(cx).is_some();
+    fn poll_timings(&mut self) {
         match self.source {
             ProfileSource::Foreground => {
                 let current_thread =
@@ -235,9 +205,6 @@ impl ProfilerWindow {
                 let all_timings = gpui::profiler::get_all_timings(TasksIncluded::OnlyCompleted);
                 let deltas = self.collector.collect_unseen(all_timings);
                 self.apply_deltas(deltas);
-            }
-            ProfileSource::RemoteForeground | ProfileSource::RemoteAllThreads => {
-                // Remote timings arrive asynchronously via apply_remote_response.
             }
         }
         self.rebuild_display_timings();
@@ -259,20 +226,12 @@ impl ProfilerWindow {
     }
 
     fn now_nanos(&self) -> u128 {
-        if self.source.is_remote() {
-            let elapsed_since_poll = self
-                .remote_received_at
-                .map(|at| Instant::now().duration_since(at).as_nanos())
-                .unwrap_or(0);
-            self.remote_now_nanos + elapsed_since_poll
-        } else {
-            Instant::now()
-                .duration_since(self.collector.startup_time())
-                .as_nanos()
-        }
+        Instant::now()
+            .duration_since(self.collector.startup_time())
+            .as_nanos()
     }
 
-    fn set_source(&mut self, source: ProfileSource, cx: &mut Context<Self>) {
+    fn set_source(&mut self, source: ProfileSource) {
         if self.source == source {
             return;
         }
@@ -282,99 +241,6 @@ impl ProfilerWindow {
         self.timings.clear();
         self.collector.reset();
         self.display_timings = Rc::new(Vec::new());
-        self.remote_now_nanos = 0;
-        self.remote_received_at = None;
-        self.has_remote = self.remote_proto_client(cx).is_some();
-
-        if source.is_remote() {
-            self.start_remote_polling(cx);
-        } else {
-            self._remote_poll_task = None;
-        }
-    }
-
-    fn remote_proto_client(&self, cx: &App) -> Option<AnyProtoClient> {
-        let workspace = self.workspace.as_ref()?;
-        workspace
-            .read_with(cx, |workspace, cx| {
-                let project = workspace.project().read(cx);
-                let remote_client = project.remote_client()?;
-                Some(remote_client.read(cx).proto_client())
-            })
-            .log_err()
-            .flatten()
-    }
-
-    fn start_remote_polling(&mut self, cx: &mut Context<Self>) {
-        let Some(proto_client) = self.remote_proto_client(cx) else {
-            return;
-        };
-
-        let source_foreground_only = self.source.foreground_only();
-        let weak = cx.weak_entity();
-        self._remote_poll_task = Some(cx.spawn(async move |_this, cx| {
-            loop {
-                let response = proto_client
-                    .request(proto::GetRemoteProfilingData {
-                        project_id: proto::REMOTE_SERVER_PROJECT_ID,
-                        foreground_only: source_foreground_only,
-                    })
-                    .await;
-
-                match response {
-                    Ok(response) => {
-                        let ok = weak.update(&mut cx.clone(), |this, cx| {
-                            this.apply_remote_response(response);
-                            cx.notify();
-                        });
-                        if ok.is_err() {
-                            break;
-                        }
-                    }
-                    Err(error) => {
-                        Err::<(), _>(error).log_err();
-                    }
-                }
-
-                cx.background_executor().timer(REMOTE_POLL_INTERVAL).await;
-            }
-        }));
-    }
-
-    fn apply_remote_response(&mut self, response: proto::GetRemoteProfilingDataResponse) {
-        self.has_remote = true;
-        self.remote_now_nanos = response.now_nanos as u128;
-        self.remote_received_at = Some(Instant::now());
-        let deltas = response
-            .threads
-            .into_iter()
-            .map(|thread| {
-                let new_timings = thread
-                    .timings
-                    .into_iter()
-                    .map(|t| {
-                        let location = t.location.unwrap_or_default();
-                        SerializedTaskTiming {
-                            location: SerializedLocation {
-                                file: SharedString::from(location.file),
-                                line: location.line,
-                                column: location.column,
-                            },
-                            start: t.start_nanos as u128,
-                            duration: t.duration_nanos as u128,
-                        }
-                    })
-                    .collect();
-                ThreadTimingsDelta {
-                    thread_id: thread.thread_id,
-                    thread_name: thread.thread_name,
-                    new_timings,
-                }
-            })
-            .collect();
-
-        self.apply_deltas(deltas);
-        self.rebuild_display_timings();
     }
 
     fn apply_deltas(&mut self, deltas: Vec<ThreadTimingsDelta>) {
@@ -395,13 +261,7 @@ impl ProfilerWindow {
     ) -> DropdownMenu {
         let weak = cx.weak_entity();
         let current_source = self.source;
-        let has_remote = self.has_remote;
-
-        let mut sources = vec![ProfileSource::Foreground, ProfileSource::AllThreads];
-        if has_remote {
-            sources.push(ProfileSource::RemoteForeground);
-            sources.push(ProfileSource::RemoteAllThreads);
-        }
+        let sources = [ProfileSource::Foreground, ProfileSource::AllThreads];
 
         DropdownMenu::new(
             "profile-source",
@@ -412,7 +272,7 @@ impl ProfilerWindow {
                     let weak = weak.clone();
                     menu = menu.entry(source.label(), None, move |_, cx| {
                         weak.update(cx, |this, cx| {
-                            this.set_source(source, cx);
+                            this.set_source(source);
                             cx.notify();
                         })
                         .log_err();
@@ -514,7 +374,7 @@ impl Render for ProfilerWindow {
     ) -> impl gpui::IntoElement {
         let ui_font = theme_settings::setup_ui_font(window, cx);
         if !self.paused {
-            self.poll_timings(cx);
+            self.poll_timings();
             window.request_animation_frame();
         }
 
@@ -553,11 +413,6 @@ impl Render for ProfilerWindow {
                                 .on_click(cx.listener(
                                     |this, _, _window, cx| {
                                         this.paused = !this.paused;
-                                        if !this.paused && this.source.is_remote() {
-                                            this.start_remote_polling(cx);
-                                        } else if this.paused && this.source.is_remote() {
-                                            this._remote_poll_task = None;
-                                        }
                                         cx.notify();
                                     },
                                 )),
@@ -574,7 +429,8 @@ impl Render for ProfilerWindow {
                                             return;
                                         }
 
-                                        let serialized = if this.source.foreground_only() {
+                                        let serialized = if this.source == ProfileSource::Foreground
+                                        {
                                             let flat: Vec<&SerializedTaskTiming> = this
                                                 .timings
                                                 .iter()

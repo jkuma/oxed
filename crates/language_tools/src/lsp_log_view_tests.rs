@@ -226,7 +226,6 @@ async fn test_lsp_log_view_rpc_checkbox_tracks_view_ownership(cx: &mut TestAppCo
                     PeerId { owner_id: 1, id: 1 },
                     LogKind::Rpc,
                     true,
-                    cx,
                 ),
                 Some(())
             );

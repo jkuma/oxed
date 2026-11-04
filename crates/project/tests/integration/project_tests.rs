@@ -18055,66 +18055,11 @@ async fn test_repository_pending_ops_stage_all(
     });
 }
 
-#[gpui::test]
-async fn test_project_group_keys_remain_distinct_for_sibling_repo_subdirectories(
-    executor: gpui::BackgroundExecutor,
-    cx: &mut gpui::TestAppContext,
-) {
-    init_test(cx);
-
-    let fs = FakeFs::new(executor);
-    fs.insert_tree(
-        path!("/root"),
-        json!({
-            "my-repo": {
-                ".git": {},
-                "packages": {
-                    "a": { "file.txt": "a" },
-                    "b": { "file.txt": "b" },
-                },
-            },
-        }),
-    )
-    .await;
-
-    let project_a =
-        Project::test(fs.clone(), [path!("/root/my-repo/packages/a").as_ref()], cx).await;
-    let project_b = Project::test(fs, [path!("/root/my-repo/packages/b").as_ref()], cx).await;
-
-    project_a
-        .update(cx, |project, cx| project.git_scans_complete(cx))
-        .await;
-    project_b
-        .update(cx, |project, cx| project.git_scans_complete(cx))
-        .await;
-    cx.run_until_parked();
-
-    let key_a = project_a.read_with(cx, |project, cx| ProjectGroupKey::from_project(project, cx));
-    let key_b = project_b.read_with(cx, |project, cx| ProjectGroupKey::from_project(project, cx));
-
-    assert_ne!(key_a, key_b);
-    assert_eq!(
-        key_a
-            .path_list()
-            .ordered_paths()
-            .map(|path| path.as_path())
-            .collect::<Vec<_>>(),
-        vec![Path::new(path!("/root/my-repo/packages/a"))]
-    );
-    assert_eq!(
-        key_b
-            .path_list()
-            .ordered_paths()
-            .map(|path| path.as_path())
-            .collect::<Vec<_>>(),
-        vec![Path::new(path!("/root/my-repo/packages/b"))]
-    );
-}
-
-fn project_group_key_paths(project: &Entity<Project>, cx: &TestAppContext) -> Vec<PathBuf> {
+fn main_worktree_paths(project: &Entity<Project>, cx: &TestAppContext) -> Vec<PathBuf> {
     project.read_with(cx, |project, cx| {
-        ProjectGroupKey::from_project(project, cx)
-            .path_list()
+        project
+            .worktree_paths(cx)
+            .main_worktree_path_list()
             .ordered_paths()
             .cloned()
             .collect()
@@ -18139,7 +18084,7 @@ fn project_worktree_paths(
 }
 
 #[gpui::test]
-async fn test_project_group_keys_match_for_bare_repo_linked_worktrees(
+async fn test_main_worktree_paths_match_for_bare_repo_linked_worktrees(
     executor: gpui::BackgroundExecutor,
     cx: &mut gpui::TestAppContext,
 ) {
@@ -18206,7 +18151,7 @@ async fn test_project_group_keys_match_for_bare_repo_linked_worktrees(
 
     for project in [&project_root, &project_main, &project_a, &project_b] {
         assert_eq!(
-            project_group_key_paths(project, cx),
+            main_worktree_paths(project, cx),
             vec![PathBuf::from(path!("/root/monty"))]
         );
     }
@@ -18242,7 +18187,7 @@ async fn test_project_group_keys_match_for_bare_repo_linked_worktrees(
 }
 
 #[gpui::test]
-async fn test_project_group_key_groups_nested_linked_worktree_under_main_repo(
+async fn test_main_worktree_paths_group_nested_linked_worktree_under_main_repo(
     executor: gpui::BackgroundExecutor,
     cx: &mut gpui::TestAppContext,
 ) {
@@ -18281,7 +18226,7 @@ async fn test_project_group_key_groups_nested_linked_worktree_under_main_repo(
     cx.run_until_parked();
 
     assert_eq!(
-        project_group_key_paths(&project, cx),
+        main_worktree_paths(&project, cx),
         vec![PathBuf::from(path!("/root/my-repo"))]
     );
     assert_eq!(

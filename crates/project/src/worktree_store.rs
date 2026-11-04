@@ -18,14 +18,13 @@ use gpui::{
 use itertools::Either;
 use postage::{prelude::Stream as _, watch};
 use rpc::{
-    AnyProtoClient, ErrorExt, TypedEnvelope,
+    AnyProtoClient, ErrorExt,
     proto::{self, REMOTE_SERVER_PROJECT_ID},
 };
-use text::ReplicaId;
 use util::{
     ResultExt,
     path_list::PathList,
-    paths::{PathStyle, RemotePathBuf, SanitizedPath},
+    paths::{PathStyle, SanitizedPath},
     rel_path::RelPath,
 };
 use worktree::{
@@ -150,17 +149,6 @@ impl WorktreePaths {
     }
 }
 
-enum WorktreeStoreState {
-    Local {
-        fs: Arc<dyn Fs>,
-    },
-    Remote {
-        upstream_client: AnyProtoClient,
-        upstream_project_id: u64,
-        path_style: PathStyle,
-    },
-}
-
 #[derive(Clone)]
 pub struct WorktreeIdCounter(Arc<AtomicU64>);
 
@@ -215,7 +203,7 @@ pub struct WorktreeStore {
     loading_worktrees:
         HashMap<Arc<SanitizedPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
     initial_scan_complete: (watch::Sender<bool>, watch::Receiver<bool>),
-    state: WorktreeStoreState,
+    fs: Arc<dyn Fs>,
 }
 
 #[derive(Debug)]
@@ -234,20 +222,6 @@ pub enum WorktreeStoreEvent {
 impl EventEmitter<WorktreeStoreEvent> for WorktreeStore {}
 
 impl WorktreeStore {
-    pub fn init(client: &AnyProtoClient) {
-        client.add_entity_request_handler(Self::handle_create_project_entry);
-        client.add_entity_request_handler(Self::handle_copy_project_entry);
-        client.add_entity_request_handler(Self::handle_delete_project_entry);
-        client.add_entity_request_handler(Self::handle_trash_project_entry);
-        client.add_entity_request_handler(Self::handle_restore_project_entry);
-        client.add_entity_request_handler(Self::handle_expand_project_entry);
-        client.add_entity_request_handler(Self::handle_expand_all_for_project_entry);
-    }
-
-    pub fn init_remote(client: &AnyProtoClient) {
-        client.add_entity_request_handler(Self::handle_allocate_worktree_id);
-    }
-
     pub fn local(
         retain_worktrees: bool,
         fs: Arc<dyn Fs>,
@@ -262,44 +236,15 @@ impl WorktreeStore {
             scanning_enabled: true,
             retain_worktrees,
             initial_scan_complete: watch::channel_with(true),
-            state: WorktreeStoreState::Local { fs },
-        }
-    }
-
-    pub fn remote(
-        retain_worktrees: bool,
-        upstream_client: AnyProtoClient,
-        upstream_project_id: u64,
-        path_style: PathStyle,
-        next_worktree_id: WorktreeIdCounter,
-    ) -> Self {
-        Self {
-            next_entry_id: Default::default(),
-            next_worktree_id,
-            loading_worktrees: Default::default(),
-            downstream_client: None,
-            worktrees: Vec::new(),
-            scanning_enabled: true,
-            retain_worktrees,
-            initial_scan_complete: watch::channel_with(true),
-            state: WorktreeStoreState::Remote {
-                upstream_client,
-                upstream_project_id,
-                path_style,
-            },
+            fs,
         }
     }
 
     pub fn next_worktree_id(&self) -> impl Future<Output = Result<WorktreeId>> + use<> {
-        let strategy = match (&self.state, &self.downstream_client) {
+        let strategy = match &self.downstream_client {
             // we are a remote server, the client is in charge of assigning worktree ids
-            (WorktreeStoreState::Local { .. }, Some((client, REMOTE_SERVER_PROJECT_ID))) => {
-                Either::Left(client.clone())
-            }
-            // we are just a local zed project, we can assign ids
-            (WorktreeStoreState::Local { .. }, _) => Either::Right(self.next_worktree_id.next()),
-            // we are connected to a remote server, we are in charge of assigning worktree ids
-            (WorktreeStoreState::Remote { .. }, _) => Either::Right(self.next_worktree_id.next()),
+            Some((client, REMOTE_SERVER_PROJECT_ID)) => Either::Left(client.clone()),
+            _ => Either::Right(self.next_worktree_id.next()),
         };
         async move {
             match strategy {
@@ -493,10 +438,7 @@ impl WorktreeStore {
     }
 
     pub fn path_style(&self) -> PathStyle {
-        match &self.state {
-            WorktreeStoreState::Local { .. } => PathStyle::local(),
-            WorktreeStoreState::Remote { path_style, .. } => *path_style,
-        }
+        PathStyle::local()
     }
 
     pub fn find_or_create_worktree(
@@ -554,63 +496,30 @@ impl WorktreeStore {
             return Task::ready(Err(anyhow!("no such worktree")));
         };
 
-        match &self.state {
-            WorktreeStoreState::Local { fs } => {
-                let old_abs_path = old_worktree.read(cx).absolutize(&old_entry.path);
-                let new_abs_path = new_worktree.read(cx).absolutize(&new_project_path.path);
-                let fs = fs.clone();
-                let copy = cx.background_spawn(async move {
-                    copy_recursive(
-                        fs.as_ref(),
-                        &old_abs_path,
-                        &new_abs_path,
-                        Default::default(),
-                    )
-                    .await
-                });
+        let fs = &self.fs;
+        let old_abs_path = old_worktree.read(cx).absolutize(&old_entry.path);
+        let new_abs_path = new_worktree.read(cx).absolutize(&new_project_path.path);
+        let fs = fs.clone();
+        let copy = cx.background_spawn(async move {
+            copy_recursive(
+                fs.as_ref(),
+                &old_abs_path,
+                &new_abs_path,
+                Default::default(),
+            )
+            .await
+        });
 
-                cx.spawn(async move |_, cx| {
-                    copy.await?;
-                    new_worktree
-                        .update(cx, |this, cx| {
-                            this.as_local_mut().unwrap().refresh_entry(
-                                new_project_path.path,
-                                None,
-                                cx,
-                            )
-                        })
-                        .await
+        cx.spawn(async move |_, cx| {
+            copy.await?;
+            new_worktree
+                .update(cx, |this, cx| {
+                    this.as_local_mut()
+                        .unwrap()
+                        .refresh_entry(new_project_path.path, None, cx)
                 })
-            }
-            WorktreeStoreState::Remote {
-                upstream_client,
-                upstream_project_id,
-                ..
-            } => {
-                let response = upstream_client.request(proto::CopyProjectEntry {
-                    project_id: *upstream_project_id,
-                    entry_id: entry_id.to_proto(),
-                    new_path: new_project_path.path.as_unix_str().to_owned(),
-                    new_worktree_id: new_project_path.worktree_id.to_proto(),
-                });
-                cx.spawn(async move |_, cx| {
-                    let response = response.await?;
-                    match response.entry {
-                        Some(entry) => new_worktree
-                            .update(cx, |worktree, cx| {
-                                worktree.as_remote_mut().unwrap().insert_entry(
-                                    entry,
-                                    response.worktree_scan_id as usize,
-                                    cx,
-                                )
-                            })
-                            .await
-                            .map(Some),
-                        None => Ok(None),
-                    }
-                })
-            }
-        }
+                .await
+        })
     }
 
     pub fn rename_entry(
@@ -629,148 +538,100 @@ impl WorktreeStore {
             return Task::ready(Err(anyhow!("no such worktree")));
         };
 
-        match &self.state {
-            WorktreeStoreState::Local { fs } => {
-                let abs_old_path = old_worktree.read(cx).absolutize(&old_entry.path);
-                let new_worktree_ref = new_worktree.read(cx);
-                let is_root_entry = new_worktree_ref
-                    .root_entry()
-                    .is_some_and(|e| e.id == entry_id);
-                let abs_new_path = if is_root_entry {
-                    let abs_path = new_worktree_ref.abs_path();
-                    let Some(root_parent_path) = abs_path.parent() else {
-                        return Task::ready(Err(anyhow!("no parent for path {:?}", abs_path)));
-                    };
-                    root_parent_path.join(new_project_path.path.as_std_path())
-                } else {
-                    new_worktree_ref.absolutize(&new_project_path.path)
-                };
+        let fs = &self.fs;
+        let abs_old_path = old_worktree.read(cx).absolutize(&old_entry.path);
+        let new_worktree_ref = new_worktree.read(cx);
+        let is_root_entry = new_worktree_ref
+            .root_entry()
+            .is_some_and(|e| e.id == entry_id);
+        let abs_new_path = if is_root_entry {
+            let abs_path = new_worktree_ref.abs_path();
+            let Some(root_parent_path) = abs_path.parent() else {
+                return Task::ready(Err(anyhow!("no parent for path {:?}", abs_path)));
+            };
+            root_parent_path.join(new_project_path.path.as_std_path())
+        } else {
+            new_worktree_ref.absolutize(&new_project_path.path)
+        };
 
-                let fs = fs.clone();
-                let case_sensitive = new_worktree
-                    .read(cx)
-                    .as_local()
-                    .unwrap()
-                    .fs_is_case_sensitive();
+        let fs = fs.clone();
+        let case_sensitive = new_worktree
+            .read(cx)
+            .as_local()
+            .unwrap()
+            .fs_is_case_sensitive();
 
-                let do_rename =
-                    async move |fs: &dyn Fs, old_path: &Path, new_path: &Path, overwrite| {
-                        fs.rename(
-                            &old_path,
-                            &new_path,
-                            fs::RenameOptions {
-                                overwrite,
-                                ..fs::RenameOptions::default()
-                            },
-                        )
-                        .await
-                        .with_context(|| format!("renaming {old_path:?} into {new_path:?}"))
-                    };
+        let do_rename = async move |fs: &dyn Fs, old_path: &Path, new_path: &Path, overwrite| {
+            fs.rename(
+                &old_path,
+                &new_path,
+                fs::RenameOptions {
+                    overwrite,
+                    ..fs::RenameOptions::default()
+                },
+            )
+            .await
+            .with_context(|| format!("renaming {old_path:?} into {new_path:?}"))
+        };
 
-                let rename = cx.background_spawn({
-                    let abs_new_path = abs_new_path.clone();
-                    async move {
-                        // If we're on a case-insensitive FS and we're doing a case-only rename (i.e. `foobar` to `FOOBAR`)
-                        // we want to overwrite, because otherwise we run into a file-already-exists error.
-                        let overwrite = !case_sensitive
-                            && abs_old_path != abs_new_path
-                            && abs_old_path.to_str().map(|p| p.to_lowercase())
-                                == abs_new_path.to_str().map(|p| p.to_lowercase());
+        let rename = cx.background_spawn({
+            let abs_new_path = abs_new_path.clone();
+            async move {
+                // If we're on a case-insensitive FS and we're doing a case-only rename (i.e. `foobar` to `FOOBAR`)
+                // we want to overwrite, because otherwise we run into a file-already-exists error.
+                let overwrite = !case_sensitive
+                    && abs_old_path != abs_new_path
+                    && abs_old_path.to_str().map(|p| p.to_lowercase())
+                        == abs_new_path.to_str().map(|p| p.to_lowercase());
 
-                        // The directory we're renaming into might not exist yet
-                        if let Err(e) =
-                            do_rename(fs.as_ref(), &abs_old_path, &abs_new_path, overwrite).await
-                        {
-                            if let Some(err) = e.downcast_ref::<std::io::Error>()
-                                && err.kind() == std::io::ErrorKind::NotFound
-                            {
-                                if let Some(parent) = abs_new_path.parent() {
-                                    fs.create_dir(parent).await.with_context(|| {
-                                        format!("creating parent directory {parent:?}")
-                                    })?;
-                                    return do_rename(
-                                        fs.as_ref(),
-                                        &abs_old_path,
-                                        &abs_new_path,
-                                        overwrite,
-                                    )
-                                    .await;
-                                }
-                            }
-                            return Err(e);
-                        }
-                        Ok(())
-                    }
-                });
-
-                cx.spawn(async move |_, cx| {
-                    rename.await?;
-                    Ok(new_worktree
-                        .update(cx, |this, cx| {
-                            let local = this.as_local_mut().unwrap();
-                            if is_root_entry {
-                                // We eagerly update `abs_path` and refresh this worktree.
-                                // Otherwise, the FS watcher would do it on the `RootUpdated` event,
-                                // but with a noticeable delay, so we handle it proactively.
-                                local.update_abs_path_and_refresh(
-                                    SanitizedPath::new_arc(&abs_new_path),
-                                    cx,
-                                );
-                                Task::ready(Ok(this.root_entry().cloned()))
-                            } else {
-                                // First refresh the parent directory (in case it was newly created)
-                                if let Some(parent) = new_project_path.path.parent() {
-                                    let _ = local.refresh_entries_for_paths(vec![parent.into()]);
-                                }
-                                // Then refresh the new path
-                                local.refresh_entry(
-                                    new_project_path.path.clone(),
-                                    Some(old_entry.path),
-                                    cx,
-                                )
-                            }
-                        })
-                        .await?
-                        .map(CreatedEntry::Included)
-                        .unwrap_or_else(|| CreatedEntry::Excluded {
-                            abs_path: abs_new_path,
-                        }))
-                })
-            }
-            WorktreeStoreState::Remote {
-                upstream_client,
-                upstream_project_id,
-                ..
-            } => {
-                let response = upstream_client.request(proto::RenameProjectEntry {
-                    project_id: *upstream_project_id,
-                    entry_id: entry_id.to_proto(),
-                    new_path: new_project_path.path.as_unix_str().to_owned(),
-                    new_worktree_id: new_project_path.worktree_id.to_proto(),
-                });
-                cx.spawn(async move |_, cx| {
-                    let response = response.await?;
-                    match response.entry {
-                        Some(entry) => new_worktree
-                            .update(cx, |worktree, cx| {
-                                worktree.as_remote_mut().unwrap().insert_entry(
-                                    entry,
-                                    response.worktree_scan_id as usize,
-                                    cx,
-                                )
-                            })
-                            .await
-                            .map(CreatedEntry::Included),
-                        None => {
-                            let abs_path = new_worktree.read_with(cx, |worktree, _| {
-                                worktree.absolutize(&new_project_path.path)
-                            });
-                            Ok(CreatedEntry::Excluded { abs_path })
+                // The directory we're renaming into might not exist yet
+                if let Err(e) =
+                    do_rename(fs.as_ref(), &abs_old_path, &abs_new_path, overwrite).await
+                {
+                    if let Some(err) = e.downcast_ref::<std::io::Error>()
+                        && err.kind() == std::io::ErrorKind::NotFound
+                    {
+                        if let Some(parent) = abs_new_path.parent() {
+                            fs.create_dir(parent)
+                                .await
+                                .with_context(|| format!("creating parent directory {parent:?}"))?;
+                            return do_rename(fs.as_ref(), &abs_old_path, &abs_new_path, overwrite)
+                                .await;
                         }
                     }
-                })
+                    return Err(e);
+                }
+                Ok(())
             }
-        }
+        });
+
+        cx.spawn(async move |_, cx| {
+            rename.await?;
+            Ok(new_worktree
+                .update(cx, |this, cx| {
+                    let local = this.as_local_mut().unwrap();
+                    if is_root_entry {
+                        // We eagerly update `abs_path` and refresh this worktree.
+                        // Otherwise, the FS watcher would do it on the `RootUpdated` event,
+                        // but with a noticeable delay, so we handle it proactively.
+                        local
+                            .update_abs_path_and_refresh(SanitizedPath::new_arc(&abs_new_path), cx);
+                        Task::ready(Ok(this.root_entry().cloned()))
+                    } else {
+                        // First refresh the parent directory (in case it was newly created)
+                        if let Some(parent) = new_project_path.path.parent() {
+                            let _ = local.refresh_entries_for_paths(vec![parent.into()]);
+                        }
+                        // Then refresh the new path
+                        local.refresh_entry(new_project_path.path.clone(), Some(old_entry.path), cx)
+                    }
+                })
+                .await?
+                .map(CreatedEntry::Included)
+                .unwrap_or_else(|| CreatedEntry::Excluded {
+                    abs_path: abs_new_path,
+                }))
+        })
     }
     pub fn create_worktree(
         &mut self,
@@ -779,25 +640,8 @@ impl WorktreeStore {
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>>> {
         let abs_path: Arc<SanitizedPath> = SanitizedPath::new_arc(&abs_path);
-        let is_via_collab = matches!(&self.state, WorktreeStoreState::Remote { upstream_client, .. } if upstream_client.is_via_collab());
         if !self.loading_worktrees.contains_key(&abs_path) {
-            let task = match &self.state {
-                WorktreeStoreState::Remote {
-                    upstream_client,
-                    path_style,
-                    ..
-                } => {
-                    if upstream_client.is_via_collab() {
-                        Task::ready(Err(Arc::new(anyhow!("cannot create worktrees via collab"))))
-                    } else {
-                        let abs_path = RemotePathBuf::new(abs_path.to_string(), *path_style);
-                        self.create_remote_worktree(upstream_client.clone(), abs_path, visible, cx)
-                    }
-                }
-                WorktreeStoreState::Local { fs } => {
-                    self.create_local_worktree(fs.clone(), abs_path.clone(), visible, cx)
-                }
-            };
+            let task = self.create_local_worktree(self.fs.clone(), abs_path.clone(), visible, cx);
 
             let loading_task = cx.spawn({
                 let abs_path = abs_path.clone();
@@ -811,9 +655,7 @@ impl WorktreeStore {
                     })
                     .ok();
 
-                    if let Ok(worktree) = &result
-                        && !is_via_collab
-                    {
+                    if let Ok(worktree) = &result {
                         if let Some((trusted_worktrees, worktree_store)) = this
                             .update(cx, |_, cx| {
                                 TrustedWorktrees::try_get_global(cx).zip(Some(cx.entity()))
@@ -851,75 +693,6 @@ impl WorktreeStore {
         }
         let task = self.loading_worktrees.get(&abs_path).unwrap().clone();
         cx.background_spawn(async move { task.await.map_err(|error| (*error).cloned()) })
-    }
-
-    fn create_remote_worktree(
-        &mut self,
-        client: AnyProtoClient,
-        abs_path: RemotePathBuf,
-        visible: bool,
-        cx: &mut Context<Self>,
-    ) -> Task<Result<Entity<Worktree>, Arc<anyhow::Error>>> {
-        let path_style = abs_path.path_style();
-        let mut abs_path = abs_path.to_string();
-        // If we start with `/~` that means the ssh path was something like `ssh://user@host/~/home-dir-folder/`
-        // in which case want to strip the leading the `/`.
-        // On the host-side, the `~` will get expanded.
-        // That's what git does too: https://github.com/libgit2/libgit2/issues/3345#issuecomment-127050850
-        if abs_path.starts_with("/~") {
-            abs_path = abs_path[1..].to_string();
-        }
-        if abs_path.is_empty() {
-            abs_path = "~/".to_string();
-        }
-
-        cx.spawn(async move |this, cx| {
-            let this = this.upgrade().context("Dropped worktree store")?;
-
-            let path = RemotePathBuf::new(abs_path, path_style);
-            let response = client
-                .request(proto::AddWorktree {
-                    project_id: REMOTE_SERVER_PROJECT_ID,
-                    path: path.to_proto(),
-                    visible,
-                })
-                .await?;
-
-            if let Some(existing_worktree) = this.read_with(cx, |this, cx| {
-                this.worktree_for_id(WorktreeId::from_proto(response.worktree_id), cx)
-            }) {
-                return Ok(existing_worktree);
-            }
-
-            let root_path_buf = PathBuf::from(response.canonicalized_path.clone());
-            let root_name = root_path_buf
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or(root_path_buf.to_string_lossy().into_owned());
-
-            let worktree = cx.update(|cx| {
-                Worktree::remote(
-                    REMOTE_SERVER_PROJECT_ID,
-                    ReplicaId::REMOTE_SERVER,
-                    proto::WorktreeMetadata {
-                        id: response.worktree_id,
-                        root_name,
-                        visible,
-                        abs_path: response.canonicalized_path,
-                        root_repo_common_dir: response.root_repo_common_dir,
-                        root_repo_is_linked_worktree: response.root_repo_is_linked_worktree,
-                    },
-                    client,
-                    path_style,
-                    cx,
-                )
-            });
-
-            this.update(cx, |this, cx| {
-                this.add(&worktree, cx);
-            });
-            Ok(worktree)
-        })
     }
 
     fn create_local_worktree(
@@ -1052,65 +825,6 @@ impl WorktreeStore {
                 worktree.abs_path().as_ref() == path
             }
         })
-    }
-
-    fn upstream_client(&self) -> Option<(AnyProtoClient, u64)> {
-        match &self.state {
-            WorktreeStoreState::Remote {
-                upstream_client,
-                upstream_project_id,
-                ..
-            } => Some((upstream_client.clone(), *upstream_project_id)),
-            WorktreeStoreState::Local { .. } => None,
-        }
-    }
-
-    pub fn set_worktrees_from_proto(
-        &mut self,
-        worktrees: Vec<proto::WorktreeMetadata>,
-        replica_id: ReplicaId,
-        cx: &mut Context<Self>,
-    ) -> Result<()> {
-        let mut old_worktrees_by_id = self
-            .worktrees
-            .drain(..)
-            .filter_map(|worktree| {
-                let worktree = worktree.upgrade()?;
-                Some((worktree.read(cx).id(), worktree))
-            })
-            .collect::<HashMap<_, _>>();
-
-        let (client, project_id) = self.upstream_client().context("invalid project")?;
-
-        for worktree in worktrees {
-            if let Some(old_worktree) =
-                old_worktrees_by_id.remove(&WorktreeId::from_proto(worktree.id))
-            {
-                let push_strong_handle =
-                    self.retain_worktrees || old_worktree.read(cx).is_visible();
-                let handle = if push_strong_handle {
-                    WorktreeHandle::Strong(old_worktree.clone())
-                } else {
-                    WorktreeHandle::Weak(old_worktree.downgrade())
-                };
-                self.worktrees.push(handle);
-            } else {
-                self.add(
-                    &Worktree::remote(
-                        project_id,
-                        replica_id,
-                        worktree,
-                        client.clone(),
-                        self.path_style(),
-                        cx,
-                    ),
-                    cx,
-                );
-            }
-        }
-        self.send_project_updates(cx);
-
-        Ok(())
     }
 
     pub fn move_worktree(
@@ -1289,116 +1003,6 @@ impl WorktreeStore {
         }
     }
 
-    pub async fn handle_create_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::CreateProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::ProjectEntryResponse> {
-        let worktree = this.update(&mut cx, |this, cx| {
-            let worktree_id = WorktreeId::from_proto(envelope.payload.worktree_id);
-            this.worktree_for_id(worktree_id, cx)
-                .context("worktree not found")
-        })?;
-        Worktree::handle_create_entry(worktree, envelope.payload, cx).await
-    }
-
-    pub async fn handle_copy_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::CopyProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::ProjectEntryResponse> {
-        let entry_id = ProjectEntryId::from_proto(envelope.payload.entry_id);
-        let new_worktree_id = WorktreeId::from_proto(envelope.payload.new_worktree_id);
-        let new_project_path = (
-            new_worktree_id,
-            RelPath::from_unix_str(&envelope.payload.new_path)?,
-        );
-        let (scan_id, entry) = this.update(&mut cx, |this, cx| {
-            let Some((_, project_id)) = this.downstream_client else {
-                bail!("no downstream client")
-            };
-            let Some(entry) = this.entry_for_id(entry_id, cx) else {
-                bail!("no such entry");
-            };
-            if entry.is_private && project_id != REMOTE_SERVER_PROJECT_ID {
-                bail!("entry is private")
-            }
-
-            let new_worktree = this
-                .worktree_for_id(new_worktree_id, cx)
-                .context("no such worktree")?;
-            let scan_id = new_worktree.read(cx).scan_id();
-            anyhow::Ok((
-                scan_id,
-                this.copy_entry(entry_id, new_project_path.into(), cx),
-            ))
-        })?;
-        let entry = entry.await?;
-        Ok(proto::ProjectEntryResponse {
-            entry: entry.as_ref().map(|entry| entry.into()),
-            worktree_scan_id: scan_id as u64,
-        })
-    }
-
-    pub async fn handle_trash_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::TrashProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::TrashProjectEntryResponse> {
-        let entry_id = ProjectEntryId::from_proto(envelope.payload.entry_id);
-        let worktree = this.update(&mut cx, |this, cx| {
-            let Some((_, project_id)) = this.downstream_client else {
-                bail!("no downstream client")
-            };
-            let Some(entry) = this.entry_for_id(entry_id, cx) else {
-                bail!("no entry")
-            };
-            if entry.is_private && project_id != REMOTE_SERVER_PROJECT_ID {
-                bail!("entry is private")
-            }
-            this.worktree_for_entry(entry_id, cx)
-                .context("worktree not found")
-        })?;
-        Worktree::handle_trash_entry(worktree, envelope.payload, cx).await
-    }
-
-    pub async fn handle_delete_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::DeleteProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::ProjectEntryResponse> {
-        let entry_id = ProjectEntryId::from_proto(envelope.payload.entry_id);
-        let worktree = this.update(&mut cx, |this, cx| {
-            let Some((_, project_id)) = this.downstream_client else {
-                bail!("no downstream client")
-            };
-            let Some(entry) = this.entry_for_id(entry_id, cx) else {
-                bail!("no entry")
-            };
-            if entry.is_private && project_id != REMOTE_SERVER_PROJECT_ID {
-                bail!("entry is private")
-            }
-            this.worktree_for_entry(entry_id, cx)
-                .context("worktree not found")
-        })?;
-        Worktree::handle_delete_entry(worktree, envelope.payload, cx).await
-    }
-
-    pub async fn handle_restore_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::RestoreProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::RestoreProjectEntryResponse> {
-        let worktree_id = WorktreeId::from_proto(envelope.payload.worktree_id);
-
-        let worktree = this.update(&mut cx, |this, cx| {
-            this.worktree_for_id(worktree_id, cx)
-                .context("worktree not found")
-        })?;
-
-        Worktree::handle_restore_entry(worktree, envelope.payload, cx).await
-    }
-
     pub async fn handle_rename_project_entry(
         this: Entity<Self>,
         request: proto::RenameProjectEntry,
@@ -1438,46 +1042,6 @@ impl WorktreeStore {
             },
             worktree_scan_id: scan_id as u64,
         })
-    }
-
-    pub async fn handle_expand_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::ExpandProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::ExpandProjectEntryResponse> {
-        let entry_id = ProjectEntryId::from_proto(envelope.payload.entry_id);
-        let worktree = this
-            .update(&mut cx, |this, cx| this.worktree_for_entry(entry_id, cx))
-            .context("invalid request")?;
-        Worktree::handle_expand_entry(worktree, envelope.payload, cx).await
-    }
-
-    pub async fn handle_expand_all_for_project_entry(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::ExpandAllForProjectEntry>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::ExpandAllForProjectEntryResponse> {
-        let entry_id = ProjectEntryId::from_proto(envelope.payload.entry_id);
-        let worktree = this
-            .update(&mut cx, |this, cx| this.worktree_for_entry(entry_id, cx))
-            .context("invalid request")?;
-        Worktree::handle_expand_all_for_entry(worktree, envelope.payload, cx).await
-    }
-
-    pub async fn handle_allocate_worktree_id(
-        _this: Entity<Self>,
-        _envelope: TypedEnvelope<proto::AllocateWorktreeId>,
-        cx: AsyncApp,
-    ) -> Result<proto::AllocateWorktreeIdResponse> {
-        let worktree_id = cx.update(|cx| WorktreeIdCounter::get(cx).next());
-        Ok(proto::AllocateWorktreeIdResponse { worktree_id })
-    }
-
-    pub fn fs(&self) -> Option<Arc<dyn Fs>> {
-        match &self.state {
-            WorktreeStoreState::Local { fs } => Some(fs.clone()),
-            WorktreeStoreState::Remote { .. } => None,
-        }
     }
 
     pub fn paths(&self, cx: &App) -> WorktreePaths {

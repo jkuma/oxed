@@ -8221,7 +8221,6 @@ dependencies = [
  "rand 0.9.4",
  "regex",
  "release_channel",
- "remote",
  "rpc",
  "schemars",
  "semver",
@@ -8985,35 +8984,6 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "semver",
-]
-
-[[package]]
-name = "remote"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "askpass",
- "async-trait",
- "base64",
- "collections",
- "fs",
- "futures",
- "gpui",
- "log",
- "parking_lot",
- "paths",
- "release_channel",
- "rpc",
- "schemars",
- "semver",
- "serde",
- "serde_json",
- "smol",
- "tempfile",
- "thiserror 2.0.17",
- "urlencoding",
- "util",
- "which",
 ]
 
 [[package]]
@@ -13943,7 +13913,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "release_channel",
- "remote",
  "rpc",
  "schemars",
  "serde",

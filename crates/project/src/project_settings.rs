@@ -1,14 +1,9 @@
-use anyhow::Context as _;
 use collections::HashMap;
 use fs::Fs;
 use git::repository::DEFAULT_WORKTREE_DIRECTORY;
-use gpui::{AsyncApp, BorrowAppContext, Context, Entity, EventEmitter, Subscription};
+use gpui::{BorrowAppContext, Context, Entity, EventEmitter, Subscription};
 use lsp::{DEFAULT_LSP_REQUEST_TIMEOUT_SECS, LanguageServerName};
 use paths::{EDITORCONFIG_NAME, local_settings_file_relative_path};
-use rpc::{
-    AnyProtoClient, TypedEnvelope,
-    proto::{self, REMOTE_SERVER_PROJECT_ID},
-};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub use settings::BinarySettings;
@@ -607,11 +602,6 @@ impl Settings for ProjectSettings {
     }
 }
 
-pub enum SettingsObserverMode {
-    Local(Arc<dyn Fs>),
-    Remote { via_collab: bool },
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum SettingsObserverEvent {
     LocalSettingsUpdated(Result<PathBuf, InvalidSettingsError>),
@@ -620,26 +610,17 @@ pub enum SettingsObserverEvent {
 impl EventEmitter<SettingsObserverEvent> for SettingsObserver {}
 
 pub struct SettingsObserver {
-    mode: SettingsObserverMode,
-    downstream_client: Option<AnyProtoClient>,
+    fs: Arc<dyn Fs>,
     worktree_store: Entity<WorktreeStore>,
-    project_id: u64,
     pending_local_settings:
         HashMap<PathTrust, BTreeMap<(WorktreeId, Arc<RelPath>), Option<String>>>,
     _trusted_worktrees_watcher: Option<Subscription>,
-    _user_settings_watcher: Option<Subscription>,
     _editorconfig_watcher: Option<Subscription>,
 }
 
-/// SettingsObserver observers changes to .oxed/settings.json files in local worktrees
-/// (or the equivalent protobuf messages from upstream) and updates local settings
-/// and sends notifications downstream.
+/// SettingsObserver observes changes to .oxed/settings.json files in local worktrees and
+/// updates local settings.
 impl SettingsObserver {
-    pub fn init(client: &AnyProtoClient) {
-        client.add_entity_message_handler(Self::handle_update_worktree_settings);
-        client.add_entity_message_handler(Self::handle_update_user_settings);
-    }
-
     pub fn new_local(
         fs: Arc<dyn Fs>,
         worktree_store: Entity<WorktreeStore>,
@@ -666,30 +647,11 @@ impl SettingsObserver {
                                             LocalSettingsPath::InWorktree(directory_path.clone());
                                         apply_local_settings(
                                             worktree_id,
-                                            path.clone(),
+                                            path,
                                             LocalSettingsKind::Settings,
                                             &settings_contents,
                                             cx,
                                         );
-                                        if let Some(downstream_client) =
-                                            &settings_observer.downstream_client
-                                        {
-                                            downstream_client
-                                                .send(proto::UpdateWorktreeSettings {
-                                                    project_id: settings_observer.project_id,
-                                                    worktree_id: worktree_id.to_proto(),
-                                                    path: path.to_proto(),
-                                                    content: settings_contents,
-                                                    kind: Some(
-                                                        local_settings_kind_to_proto(
-                                                            LocalSettingsKind::Settings,
-                                                        )
-                                                        .into(),
-                                                    ),
-                                                    outside_worktree: Some(false),
-                                                })
-                                                .log_err();
-                                        }
                                     }
                                 }
                             }
@@ -721,7 +683,6 @@ impl SettingsObserver {
                                 LocalSettingsKind::Editorconfig,
                                 content.clone(),
                             )],
-                            false,
                             cx,
                         );
                     }
@@ -731,167 +692,11 @@ impl SettingsObserver {
 
         Self {
             worktree_store,
-            mode: SettingsObserverMode::Local(fs),
-            downstream_client: None,
+            fs,
             _trusted_worktrees_watcher,
             pending_local_settings: HashMap::default(),
-            _user_settings_watcher: None,
             _editorconfig_watcher: Some(_editorconfig_watcher),
-            project_id: REMOTE_SERVER_PROJECT_ID,
         }
-    }
-
-    pub fn new_remote(
-        worktree_store: Entity<WorktreeStore>,
-        upstream_client: Option<AnyProtoClient>,
-        via_collab: bool,
-        cx: &mut Context<Self>,
-    ) -> Self {
-        let mut user_settings_watcher = None;
-        if cx.try_global::<SettingsStore>().is_some() {
-            if let Some(upstream_client) = upstream_client {
-                let mut user_settings = None;
-                user_settings_watcher = Some(cx.observe_global::<SettingsStore>(move |_, cx| {
-                    if let Some(new_settings) = cx.global::<SettingsStore>().raw_user_settings() {
-                        if Some(new_settings) != user_settings.as_ref() {
-                            if let Some(new_settings_string) =
-                                serde_json::to_string(new_settings).ok()
-                            {
-                                user_settings = Some(new_settings.clone());
-                                upstream_client
-                                    .send(proto::UpdateUserSettings {
-                                        project_id: REMOTE_SERVER_PROJECT_ID,
-                                        contents: new_settings_string,
-                                    })
-                                    .log_err();
-                            }
-                        }
-                    }
-                }));
-            }
-        };
-
-        Self {
-            worktree_store,
-            mode: SettingsObserverMode::Remote { via_collab },
-            downstream_client: None,
-            project_id: REMOTE_SERVER_PROJECT_ID,
-            _trusted_worktrees_watcher: None,
-            pending_local_settings: HashMap::default(),
-            _user_settings_watcher: user_settings_watcher,
-            _editorconfig_watcher: None,
-        }
-    }
-
-    pub fn shared(
-        &mut self,
-        project_id: u64,
-        downstream_client: AnyProtoClient,
-        cx: &mut Context<Self>,
-    ) {
-        self.project_id = project_id;
-        self.downstream_client = Some(downstream_client.clone());
-
-        let store = cx.global::<SettingsStore>();
-        for worktree in self.worktree_store.read(cx).worktrees() {
-            let worktree_id = worktree.read(cx).id().to_proto();
-            for (path, content) in store.local_settings(worktree.read(cx).id()) {
-                let content = serde_json::to_string(&content).unwrap();
-                downstream_client
-                    .send(proto::UpdateWorktreeSettings {
-                        project_id,
-                        worktree_id,
-                        path: path.as_unix_str().to_owned(),
-                        content: Some(content),
-                        kind: Some(
-                            local_settings_kind_to_proto(LocalSettingsKind::Settings).into(),
-                        ),
-                        outside_worktree: Some(false),
-                    })
-                    .log_err();
-            }
-            for (path, content, _) in store
-                .editorconfig_store
-                .read(cx)
-                .local_editorconfig_settings(worktree.read(cx).id())
-            {
-                downstream_client
-                    .send(proto::UpdateWorktreeSettings {
-                        project_id,
-                        worktree_id,
-                        path: path.to_proto(),
-                        content: Some(content.to_owned()),
-                        kind: Some(
-                            local_settings_kind_to_proto(LocalSettingsKind::Editorconfig).into(),
-                        ),
-                        outside_worktree: Some(path.is_outside_worktree()),
-                    })
-                    .log_err();
-            }
-        }
-    }
-
-    pub fn unshared(&mut self, _: &mut Context<Self>) {
-        self.downstream_client = None;
-    }
-
-    async fn handle_update_worktree_settings(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::UpdateWorktreeSettings>,
-        mut cx: AsyncApp,
-    ) -> anyhow::Result<()> {
-        let kind = match envelope.payload.kind {
-            Some(kind) => proto::LocalSettingsKind::try_from(kind)
-                .ok()
-                .with_context(|| format!("unknown kind {kind}"))?,
-            None => proto::LocalSettingsKind::Settings,
-        };
-        let Some(kind) = local_settings_kind_from_proto(kind) else {
-            return Ok(());
-        };
-
-        let path = LocalSettingsPath::from_proto(
-            &envelope.payload.path,
-            envelope.payload.outside_worktree.unwrap_or(false),
-        )?;
-
-        this.update(&mut cx, |this, cx| {
-            let is_via_collab = match &this.mode {
-                SettingsObserverMode::Local(..) => false,
-                SettingsObserverMode::Remote { via_collab } => *via_collab,
-            };
-            let worktree_id = WorktreeId::from_proto(envelope.payload.worktree_id);
-            let Some(worktree) = this
-                .worktree_store
-                .read(cx)
-                .worktree_for_id(worktree_id, cx)
-            else {
-                return;
-            };
-
-            this.update_settings(
-                worktree,
-                [(path, kind, envelope.payload.content)],
-                is_via_collab,
-                cx,
-            );
-        });
-        Ok(())
-    }
-
-    async fn handle_update_user_settings(
-        _: Entity<Self>,
-        envelope: TypedEnvelope<proto::UpdateUserSettings>,
-        cx: AsyncApp,
-    ) -> anyhow::Result<()> {
-        cx.update_global(|settings_store: &mut SettingsStore, cx| {
-            settings_store
-                .set_user_settings(&envelope.payload.contents, cx)
-                .result()
-                .context("setting new user settings")?;
-            anyhow::Ok(())
-        })?;
-        Ok(())
     }
 
     fn on_worktree_store_event(
@@ -923,9 +728,7 @@ impl SettingsObserver {
         changes: &UpdatedEntriesSet,
         cx: &mut Context<Self>,
     ) {
-        let SettingsObserverMode::Local(fs) = &self.mode else {
-            return;
-        };
+        let fs = &self.fs;
 
         let mut settings_contents = Vec::new();
         for (path, _, change) in changes.iter() {
@@ -997,7 +800,6 @@ impl SettingsObserver {
                                 content.and_then(|c| c.log_err()),
                             )
                         }),
-                        false,
                         cx,
                     )
                 })
@@ -1012,18 +814,11 @@ impl SettingsObserver {
         settings_contents: impl IntoIterator<
             Item = (LocalSettingsPath, LocalSettingsKind, Option<String>),
         >,
-        is_via_collab: bool,
         cx: &mut Context<Self>,
     ) {
         let worktree_id = worktree.read(cx).id();
-        let remote_worktree_id = worktree.read(cx).id();
-        let can_trust_worktree = if is_via_collab {
-            OnceCell::from(true)
-        } else {
-            OnceCell::new()
-        };
+        let can_trust_worktree = OnceCell::new();
         for (directory_path, kind, file_content) in settings_contents {
-            let mut applied = true;
             match (&directory_path, kind) {
                 (LocalSettingsPath::InWorktree(directory), LocalSettingsKind::Settings) => {
                     if *can_trust_worktree.get_or_init(|| {
@@ -1043,7 +838,6 @@ impl SettingsObserver {
                             cx,
                         )
                     } else {
-                        applied = false;
                         self.pending_local_settings
                             .entry(PathTrust::Worktree(worktree_id))
                             .or_default()
@@ -1062,21 +856,6 @@ impl SettingsObserver {
                     continue;
                 }
             };
-
-            if applied {
-                if let Some(downstream_client) = &self.downstream_client {
-                    downstream_client
-                        .send(proto::UpdateWorktreeSettings {
-                            project_id: self.project_id,
-                            worktree_id: remote_worktree_id.to_proto(),
-                            path: directory_path.to_proto(),
-                            content: file_content.clone(),
-                            kind: Some(local_settings_kind_to_proto(kind).into()),
-                            outside_worktree: Some(directory_path.is_outside_worktree()),
-                        })
-                        .log_err();
-                }
-            }
         }
     }
 }
@@ -1113,19 +892,4 @@ fn apply_local_settings(
             }
         }
     })
-}
-
-pub fn local_settings_kind_from_proto(kind: proto::LocalSettingsKind) -> Option<LocalSettingsKind> {
-    match kind {
-        proto::LocalSettingsKind::Settings => Some(LocalSettingsKind::Settings),
-        proto::LocalSettingsKind::Editorconfig => Some(LocalSettingsKind::Editorconfig),
-        proto::LocalSettingsKind::Tasks | proto::LocalSettingsKind::Debug => None,
-    }
-}
-
-pub fn local_settings_kind_to_proto(kind: LocalSettingsKind) -> proto::LocalSettingsKind {
-    match kind {
-        LocalSettingsKind::Settings => proto::LocalSettingsKind::Settings,
-        LocalSettingsKind::Editorconfig => proto::LocalSettingsKind::Editorconfig,
-    }
 }

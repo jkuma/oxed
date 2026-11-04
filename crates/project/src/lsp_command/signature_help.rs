@@ -11,7 +11,6 @@ use util::maybe;
 pub struct SignatureHelp {
     pub active_signature: usize,
     pub signatures: Vec<SignatureHelpData>,
-    pub(super) original_data: lsp::SignatureHelp,
 }
 
 #[derive(Debug, Clone)]
@@ -128,7 +127,6 @@ impl SignatureHelp {
         Some(Self {
             signatures,
             active_signature,
-            original_data: help,
         })
     }
 }

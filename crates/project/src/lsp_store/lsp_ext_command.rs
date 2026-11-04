@@ -1,20 +1,17 @@
 use crate::{
     LocationLink,
-    lsp_command::{
-        LspCommand, location_links_from_lsp, location_links_from_proto, location_links_to_proto,
-    },
+    lsp_command::{LspCommand, location_links_from_lsp},
     lsp_store::{LanguageServerToQuery, LspStore},
     make_lsp_text_document_position, make_text_document_identifier,
 };
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use gpui::{App, AsyncApp, Entity};
-use language::{Buffer, point_to_lsp, proto::deserialize_anchor};
+use language::{Buffer, point_to_lsp};
 use lsp::{AdapterServerCapabilities, LanguageServer, LanguageServerId};
-use rpc::proto::{self, PeerId};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc};
-use text::{BufferId, PointUtf16, ToPointUtf16};
+use text::PointUtf16;
 
 pub enum LspExtExpandMacro {}
 
@@ -53,7 +50,6 @@ pub struct ExpandMacro {
 impl LspCommand for ExpandMacro {
     type Response = ExpandedMacro;
     type LspRequest = LspExtExpandMacro;
-    type ProtoRequest = proto::LspExtExpandMacro;
 
     fn display_name(&self) -> &str {
         "Expand macro"
@@ -95,63 +91,6 @@ impl LspCommand for ExpandMacro {
             })
             .unwrap_or_default())
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::LspExtExpandMacro {
-        proto::LspExtExpandMacro {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            server_id: self.server_id.to_proto(),
-        }
-    }
-
-    async fn from_proto(
-        message: Self::ProtoRequest,
-        _: Entity<LspStore>,
-        buffer: Entity<Buffer>,
-        cx: AsyncApp,
-    ) -> anyhow::Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .context("invalid position")?;
-        Ok(Self {
-            position: buffer.read_with(&cx, |buffer, _| position.to_point_utf16(buffer)),
-            server_id: LanguageServerId::from_proto(message.server_id),
-        })
-    }
-
-    fn response_to_proto(
-        response: ExpandedMacro,
-        _: &mut LspStore,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut App,
-    ) -> proto::LspExtExpandMacroResponse {
-        proto::LspExtExpandMacroResponse {
-            name: response.name,
-            expansion: response.expansion,
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::LspExtExpandMacroResponse,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> anyhow::Result<ExpandedMacro> {
-        Ok(ExpandedMacro {
-            name: message.name,
-            expansion: message.expansion,
-        })
-    }
-
-    fn buffer_id_from_proto(message: &proto::LspExtExpandMacro) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 pub enum LspOpenDocs {}
@@ -192,7 +131,6 @@ pub struct OpenDocs {
 impl LspCommand for OpenDocs {
     type Response = DocsUrls;
     type LspRequest = LspOpenDocs;
-    type ProtoRequest = proto::LspExtOpenDocs;
 
     fn display_name(&self) -> &str {
         "Open docs"
@@ -236,63 +174,6 @@ impl LspCommand for OpenDocs {
             })
             .unwrap_or_default())
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::LspExtOpenDocs {
-        proto::LspExtOpenDocs {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            server_id: self.server_id.to_proto(),
-        }
-    }
-
-    async fn from_proto(
-        message: Self::ProtoRequest,
-        _: Entity<LspStore>,
-        buffer: Entity<Buffer>,
-        cx: AsyncApp,
-    ) -> anyhow::Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .context("invalid position")?;
-        Ok(Self {
-            position: buffer.read_with(&cx, |buffer, _| position.to_point_utf16(buffer)),
-            server_id: LanguageServerId::from_proto(message.server_id),
-        })
-    }
-
-    fn response_to_proto(
-        response: DocsUrls,
-        _: &mut LspStore,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut App,
-    ) -> proto::LspExtOpenDocsResponse {
-        proto::LspExtOpenDocsResponse {
-            web: response.web,
-            local: response.local,
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::LspExtOpenDocsResponse,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> anyhow::Result<DocsUrls> {
-        Ok(DocsUrls {
-            web: message.web,
-            local: message.local,
-        })
-    }
-
-    fn buffer_id_from_proto(message: &proto::LspExtOpenDocs) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 pub enum LspSwitchSourceHeader {}
@@ -334,7 +215,6 @@ impl lsp::request::Request for LspGoToParentModule {
 impl LspCommand for SwitchSourceHeader {
     type Response = SwitchSourceHeaderResult;
     type LspRequest = LspSwitchSourceHeader;
-    type ProtoRequest = proto::LspExtSwitchSourceHeader;
 
     fn display_name(&self) -> &str {
         "Switch source header"
@@ -372,58 +252,12 @@ impl LspCommand for SwitchSourceHeader {
             .map(|message| SwitchSourceHeaderResult(message.0))
             .unwrap_or_default())
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::LspExtSwitchSourceHeader {
-        proto::LspExtSwitchSourceHeader {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            server_id: self.server_id.to_proto(),
-        }
-    }
-
-    async fn from_proto(
-        message: Self::ProtoRequest,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
-            server_id: LanguageServerId::from_proto(message.server_id),
-        })
-    }
-
-    fn response_to_proto(
-        response: SwitchSourceHeaderResult,
-        _: &mut LspStore,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut App,
-    ) -> proto::LspExtSwitchSourceHeaderResponse {
-        proto::LspExtSwitchSourceHeaderResponse {
-            target_file: response.0,
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::LspExtSwitchSourceHeaderResponse,
-        _: Entity<LspStore>,
-        _: Entity<Buffer>,
-        _: AsyncApp,
-    ) -> anyhow::Result<SwitchSourceHeaderResult> {
-        Ok(SwitchSourceHeaderResult(message.target_file))
-    }
-
-    fn buffer_id_from_proto(message: &proto::LspExtSwitchSourceHeader) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GoToParentModule {
     type Response = Vec<LocationLink>;
     type LspRequest = LspGoToParentModule;
-    type ProtoRequest = proto::LspExtGoToParentModule;
 
     fn display_name(&self) -> &str {
         "Go to parent module"
@@ -463,59 +297,6 @@ impl LspCommand for GoToParentModule {
             cx,
         )
         .await
-    }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::LspExtGoToParentModule {
-        proto::LspExtGoToParentModule {
-            project_id,
-            buffer_id: buffer.remote_id().to_proto(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            server_id: self.server_id.to_proto(),
-        }
-    }
-
-    async fn from_proto(
-        request: Self::ProtoRequest,
-        _: Entity<LspStore>,
-        buffer: Entity<Buffer>,
-        cx: AsyncApp,
-    ) -> anyhow::Result<Self> {
-        let position = request
-            .position
-            .and_then(deserialize_anchor)
-            .context("bad request with bad position")?;
-        Ok(Self {
-            position: buffer.read_with(&cx, |buffer, _| position.to_point_utf16(buffer)),
-            server_id: LanguageServerId::from_proto(request.server_id),
-        })
-    }
-
-    fn response_to_proto(
-        links: Vec<LocationLink>,
-        lsp_store: &mut LspStore,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut App,
-    ) -> proto::LspExtGoToParentModuleResponse {
-        proto::LspExtGoToParentModuleResponse {
-            links: location_links_to_proto(links, lsp_store, peer_id, cx),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::LspExtGoToParentModuleResponse,
-        lsp_store: Entity<LspStore>,
-        _: Entity<Buffer>,
-        cx: AsyncApp,
-    ) -> anyhow::Result<Vec<LocationLink>> {
-        location_links_from_proto(message.links, lsp_store, cx).await
-    }
-
-    fn buffer_id_from_proto(message: &proto::LspExtGoToParentModule) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
     }
 }
 

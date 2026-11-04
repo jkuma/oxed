@@ -366,7 +366,7 @@ fn main() {
             Ok(trusted_paths) => trusted_paths,
             Err(e) => {
                 log::error!("Failed to do initial trusted worktrees fetch: {e:#}");
-                HashMap::default()
+                Default::default()
             }
         };
         trusted_worktrees::init(db_trusted_paths, cx);

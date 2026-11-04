@@ -13,7 +13,7 @@ use gpui::{
 
 use project::{
     WorktreeId,
-    trusted_worktrees::{PathTrust, RemoteHostLocation, TrustedWorktrees},
+    trusted_worktrees::{PathTrust, TrustedWorktrees},
     worktree_store::WorktreeStore,
 };
 use smallvec::SmallVec;
@@ -34,7 +34,6 @@ pub struct SecurityModal {
     _home_dir_task: Task<()>,
     trust_parents: bool,
     worktree_store: WeakEntity<WorktreeStore>,
-    remote_host: Option<RemoteHostLocation>,
     focus_handle: FocusHandle,
     project_list_scroll_handle: ScrollHandle,
     trusted: Option<bool>,
@@ -47,7 +46,6 @@ pub struct SecurityModal {
 struct RestrictedPath {
     abs_path: Arc<Path>,
     is_file: bool,
-    host: Option<RemoteHostLocation>,
 }
 
 impl Focusable for SecurityModal {
@@ -140,29 +138,10 @@ impl Render for SecurityModal {
                                                 } else {
                                                     Some(restricted_path.abs_path.as_ref())
                                                 }?;
-                                                let label = match &restricted_path.host {
-                                                    Some(remote_host) => {
-                                                        match &remote_host.user_name {
-                                                            Some(user_name) => format!(
-                                                                "{} ({}@{})",
-                                                                self.shorten_path(abs_path, path_style)
-                                                                    .display(),
-                                                                user_name,
-                                                                remote_host.host_identifier
-                                                            ),
-                                                            None => format!(
-                                                                "{} ({})",
-                                                                self.shorten_path(abs_path, path_style)
-                                                                    .display(),
-                                                                remote_host.host_identifier
-                                                            ),
-                                                        }
-                                                    }
-                                                    None => self
-                                                        .shorten_path(abs_path, path_style)
-                                                        .display()
-                                                        .to_string(),
-                                                };
+                                                let label = self
+                                                    .shorten_path(abs_path, path_style)
+                                                    .display()
+                                                    .to_string();
                                                 Some(
                                                     h_flex()
                                                         .pl(
@@ -306,7 +285,6 @@ impl Render for SecurityModal {
 impl SecurityModal {
     pub fn new(
         worktree_store: WeakEntity<WorktreeStore>,
-        remote_host: Option<impl Into<RemoteHostLocation>>,
         home_dir_task: Task<Option<PathBuf>>,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -322,7 +300,6 @@ impl SecurityModal {
         });
         let mut this = Self {
             worktree_store,
-            remote_host: remote_host.map(|host| host.into()),
             restricted_paths: HashMap::default(),
             focus_handle: cx.focus_handle(),
             project_list_scroll_handle: ScrollHandle::new(),
@@ -492,7 +469,6 @@ impl SecurityModal {
                             RestrictedPath {
                                 abs_path,
                                 is_file: worktree.read(cx).is_single_file(),
-                                host: self.remote_host.clone(),
                             },
                         ))
                     })

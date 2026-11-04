@@ -16,7 +16,6 @@ use lsp::{
 use rpc::proto;
 use serde::Deserialize;
 use settings::WorktreeId;
-use util::ResultExt as _;
 
 use crate::{LanguageServerLogType, LspStore, Project, ProjectItem as _};
 
@@ -465,15 +464,6 @@ impl LogKind {
             LanguageServerLogType::Log(_) => Self::Logs,
             LanguageServerLogType::Trace { .. } => Self::Trace,
             LanguageServerLogType::Rpc { .. } => Self::Rpc,
-        }
-    }
-
-    fn to_proto(self) -> Option<proto::toggle_lsp_logs::LogType> {
-        match self {
-            Self::Rpc => Some(proto::toggle_lsp_logs::LogType::Rpc),
-            Self::Trace => Some(proto::toggle_lsp_logs::LogType::Trace),
-            Self::Logs => Some(proto::toggle_lsp_logs::LogType::Log),
-            Self::ServerInfo => None,
         }
     }
 }
@@ -1022,36 +1012,26 @@ impl LogStore {
         &mut self,
         key: &LanguageServerLogKey,
         log_kind: LogKind,
-        cx: &mut Context<Self>,
     ) -> Option<()> {
-        self.update_log_stream_ownership(
-            key,
-            log_kind,
-            |state| {
-                *state.view_log_stream_refcounts.entry(log_kind).or_default() += 1;
-            },
-            cx,
-        )
+        self.update_log_stream_ownership(key, log_kind, |state| {
+            *state.view_log_stream_refcounts.entry(log_kind).or_default() += 1;
+        })
     }
 
     pub fn release_view_log_stream(
         &mut self,
         key: &LanguageServerLogKey,
         log_kind: LogKind,
-        cx: &mut Context<Self>,
     ) -> Option<()> {
-        self.update_log_stream_ownership(
-            key,
-            log_kind,
-            |state| match state.view_log_stream_refcounts.get_mut(&log_kind) {
+        self.update_log_stream_ownership(key, log_kind, |state| {
+            match state.view_log_stream_refcounts.get_mut(&log_kind) {
                 Some(refcount) if *refcount > 1 => *refcount -= 1,
                 Some(_) => {
                     state.view_log_stream_refcounts.remove(&log_kind);
                 }
                 None => {}
-            },
-            cx,
-        )
+            }
+        })
     }
 
     pub fn set_downstream_log_stream(
@@ -1060,27 +1040,21 @@ impl LogStore {
         peer_id: proto::PeerId,
         log_kind: LogKind,
         enabled: bool,
-        cx: &mut Context<Self>,
     ) -> Option<()> {
-        self.update_log_stream_ownership(
-            key,
-            log_kind,
-            |state| {
-                if enabled {
-                    state
-                        .downstream_log_streams
-                        .entry(peer_id)
-                        .or_default()
-                        .insert(log_kind);
-                } else if let Some(log_kinds) = state.downstream_log_streams.get_mut(&peer_id) {
-                    log_kinds.remove(&log_kind);
-                    if log_kinds.is_empty() {
-                        state.downstream_log_streams.remove(&peer_id);
-                    }
+        self.update_log_stream_ownership(key, log_kind, |state| {
+            if enabled {
+                state
+                    .downstream_log_streams
+                    .entry(peer_id)
+                    .or_default()
+                    .insert(log_kind);
+            } else if let Some(log_kinds) = state.downstream_log_streams.get_mut(&peer_id) {
+                log_kinds.remove(&log_kind);
+                if log_kinds.is_empty() {
+                    state.downstream_log_streams.remove(&peer_id);
                 }
-            },
-            cx,
-        )
+            }
+        })
     }
 
     fn update_log_stream_ownership(
@@ -1088,51 +1062,12 @@ impl LogStore {
         key: &LanguageServerLogKey,
         log_kind: LogKind,
         update: impl FnOnce(&mut LanguageServerState),
-        cx: &mut Context<Self>,
     ) -> Option<()> {
-        let (was_enabled, is_enabled) = {
-            let state = self.get_language_server_state(key)?;
-            let was_enabled = state.has_log_stream(log_kind);
-            update(state);
-            let is_enabled = state.has_log_stream(log_kind);
-            if log_kind == LogKind::Rpc {
-                state.synchronize_rpc_state();
-            }
-            (was_enabled, is_enabled)
-        };
-
-        if was_enabled != is_enabled {
-            Self::send_toggle_log_message(key, is_enabled, log_kind, cx);
+        let state = self.get_language_server_state(key)?;
+        update(state);
+        if log_kind == LogKind::Rpc {
+            state.synchronize_rpc_state();
         }
         Some(())
-    }
-
-    fn send_toggle_log_message(
-        key: &LanguageServerLogKey,
-        enabled: bool,
-        log_kind: LogKind,
-        cx: &mut App,
-    ) {
-        let LanguageServerKind::Remote { project } = &key.kind else {
-            return;
-        };
-        let Some(log_type) = log_kind.to_proto() else {
-            return;
-        };
-        let Some(project) = project.upgrade() else {
-            return;
-        };
-        let lsp_store = project.read(cx).lsp_store();
-        let Some((client, project_id)) = lsp_store.read(cx).upstream_client() else {
-            return;
-        };
-        client
-            .send(proto::ToggleLspLogs {
-                project_id,
-                log_type: log_type as i32,
-                server_id: key.server_id.to_proto(),
-                enabled,
-            })
-            .log_err();
     }
 }

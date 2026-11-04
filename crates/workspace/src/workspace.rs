@@ -79,10 +79,9 @@ use project::{
     git_store::{GitStoreEvent, RepositoryEvent},
     project_settings::ProjectSettings,
     toolchain_store::ToolchainStoreEvent,
-    trusted_worktrees::{RemoteHostLocation, TrustedWorktrees, TrustedWorktreesEvent},
+    trusted_worktrees::{TrustedWorktrees, TrustedWorktreesEvent},
 };
 use release_channel::ReleaseChannel;
-use remote::RemoteConnectionOptions;
 use rpc::{
     ErrorExt,
     proto::{ErrorCode, PanelId},
@@ -156,7 +155,6 @@ struct WindowTitleNeeds {
     file_path: bool,
     relative_path: bool,
     file_stem: bool,
-    remote: bool,
     app_name: bool,
     branch: bool,
 }
@@ -167,7 +165,6 @@ impl WindowTitleNeeds {
             file_path: template.contains("${filePath}"),
             relative_path: template.contains("${relativePath}"),
             file_stem: template.contains("${fileStem}"),
-            remote: template.contains("${remoteName}") || template.contains("${remoteHost}"),
             app_name: template.contains("${appName}"),
             branch: template.contains("${branch}"),
         }
@@ -181,8 +178,6 @@ struct WindowTitleContext {
     file_path: Option<String>,
     relative_path: Option<String>,
     file_stem: Option<String>,
-    remote_name: Option<String>,
-    remote_host: Option<String>,
     app_name: &'static str,
     branch: Option<String>,
 }
@@ -201,8 +196,6 @@ impl WindowTitleContext {
             "filePath" => self.file_path.as_deref(),
             "relativePath" => self.relative_path.as_deref(),
             "fileStem" => self.file_stem.as_deref(),
-            "remoteName" => self.remote_name.as_deref(),
-            "remoteHost" => self.remote_host.as_deref(),
             "appName" => Some(self.app_name),
             "branch" => self.branch.as_deref(),
             // Unknown placeholders collapse like missing values so imported and
@@ -5812,16 +5805,6 @@ impl Workspace {
             })
             .unwrap_or((None, None, None, None));
 
-        let remote_options = if needs.remote {
-            project.remote_connection_options(cx)
-        } else {
-            None
-        };
-        let remote_name = remote_options
-            .as_ref()
-            .map(RemoteConnectionOptions::display_name);
-        let remote_host = remote_options.as_ref().map(RemoteConnectionOptions::host);
-
         let branch = if needs.branch {
             project
                 .active_repository(cx)
@@ -5836,8 +5819,6 @@ impl Workspace {
             file_path,
             relative_path,
             file_stem,
-            remote_name,
-            remote_host,
             app_name: if needs.app_name {
                 ReleaseChannel::try_global(cx)
                     .unwrap_or(ReleaseChannel::Stable)
@@ -6203,8 +6184,8 @@ impl Workspace {
                 let identity_paths_hint = self
                     .project
                     .read(cx)
-                    .project_group_key(cx)
-                    .path_list()
+                    .worktree_paths(cx)
+                    .main_worktree_path_list()
                     .clone();
                 let recent_navigation_history = self.persisted_recent_navigation_history.clone();
 
@@ -7471,25 +7452,10 @@ impl Workspace {
                 cx,
             );
             if has_restricted_worktrees {
-                let project = self.project().read(cx);
-                let remote_host = project
-                    .remote_connection_options(cx)
-                    .map(RemoteHostLocation::from);
-                let worktree_store = project.worktree_store().downgrade();
-                let home_dir_task = if project.is_local() {
-                    Task::ready(std::env::home_dir())
-                } else {
-                    let resolve_task = project.resolve_abs_path("~", cx);
-                    cx.spawn(async |_, _| {
-                        let resolved_path = resolve_task
-                            .await
-                            .and_then(|path| path.into_abs_path())
-                            .map(PathBuf::from);
-                        resolved_path
-                    })
-                };
+                let worktree_store = self.project().read(cx).worktree_store().downgrade();
+                let home_dir_task = Task::ready(std::env::home_dir());
                 self.toggle_modal(window, cx, |window, cx| {
-                    SecurityModal::new(worktree_store, remote_host, home_dir_task, window, cx)
+                    SecurityModal::new(worktree_store, home_dir_task, window, cx)
                 });
             }
         }
@@ -9638,43 +9604,41 @@ mod tests {
             file_path: Some("/tmp/project/src/main.rs".to_string()),
             relative_path: Some("src/main.rs".to_string()),
             file_stem: Some("main".to_string()),
-            remote_name: Some("nickname".to_string()),
-            remote_host: Some("example.com".to_string()),
             app_name: "Zed",
-            branch: Some("main".to_string()),
+            branch: Some("feature".to_string()),
         };
 
         assert_eq!(
             render_window_title_format(
-                "${projectName}${separator}${fileName}${separator}${remoteHost}",
+                "${projectName}${separator}${fileName}${separator}${branch}",
                 " — ",
                 &context,
             ),
-            "project — example.com"
+            "project — feature"
         );
         assert_eq!(
             render_window_title_format(
-                "${fileName}${separator}${projectName}${separator}${remoteName}",
+                "${fileName}${separator}${projectName}${separator}${fileStem}",
                 " — ",
                 &context,
             ),
-            "project — nickname"
+            "project — main"
         );
         assert_eq!(
             render_window_title_format(
-                "${projectName}${separator}${relativePath}${separator}${remoteName}${separator}${remoteHost}",
+                "${projectName}${separator}${relativePath}${separator}${fileStem}${separator}${branch}",
                 " — ",
                 &context,
             ),
-            "project — src/main.rs — nickname — example.com"
+            "project — src/main.rs — main — feature"
         );
         assert_eq!(
             render_window_title_format(
-                "${projectName}${separator}${remoteHost}${separator}${fileName}",
+                "${projectName}${separator}${branch}${separator}${fileName}",
                 " | ",
                 &context,
             ),
-            "project | example.com"
+            "project | feature"
         );
         assert_eq!(
             render_window_title_format("${projectName}${separator}", " — ", &context),
@@ -9694,8 +9658,6 @@ mod tests {
             file_path: Some("/tmp/project/src/main.rs".to_string()),
             relative_path: Some("src/main.rs".to_string()),
             file_stem: Some("main".to_string()),
-            remote_name: None,
-            remote_host: None,
             app_name: "Zed",
             branch: None,
         };
@@ -9739,31 +9701,22 @@ mod tests {
         assert!(!default.file_path);
         assert!(!default.relative_path);
         assert!(!default.file_stem);
-        assert!(!default.remote);
         assert!(!default.app_name);
         assert!(!default.branch);
 
         let all = WindowTitleNeeds::from_template(
-            "${filePath} ${relativePath} ${fileStem} ${remoteName} ${remoteHost} ${appName} ${branch}",
+            "${filePath} ${relativePath} ${fileStem} ${appName} ${branch}",
         );
         assert!(all.file_path);
         assert!(all.relative_path);
         assert!(all.file_stem);
-        assert!(all.remote);
         assert!(all.app_name);
         assert!(all.branch);
 
-        // `remote` is shared between the two remote-* placeholders; either one
-        // flips the flag on its own.
-        assert!(WindowTitleNeeds::from_template("${remoteName}").remote);
-        assert!(WindowTitleNeeds::from_template("${remoteHost}").remote);
-        assert!(!WindowTitleNeeds::from_template("${projectName}").remote);
-
         // Substrings and unrelated text must not trigger the expensive path.
-        let noise = WindowTitleNeeds::from_template("filePath relativePath remote ${projectName}");
+        let noise = WindowTitleNeeds::from_template("filePath relativePath ${projectName}");
         assert!(!noise.file_path);
         assert!(!noise.relative_path);
-        assert!(!noise.remote);
         assert!(!noise.branch);
     }
 
