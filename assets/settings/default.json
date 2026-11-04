@@ -160,7 +160,7 @@
   // an explicit `-e` (existing window) or `-n` (new window) flag.
   //
   // May take 2 values:
-  //  1. Open directories as a new workspace in the current Zed window's sidebar
+  //  1. Open files in the current window, and directories in a new window unless they are already open
   //         "cli_default_open_behavior": "existing_window"
   //  2. Open paths in a new window, unless they are subpaths of an existing project
   //         "cli_default_open_behavior": "new_window"
@@ -168,7 +168,7 @@
   // The default behavior when opening projects from the UI.
   //
   // May take 2 values:
-  //  1. Open projects as a new workspace in the current Zed window's sidebar
+  //  1. Open projects in the current window, replacing its project
   //         "default_open_behavior": "existing_window"
   //  2. Open projects in a new window
   //         "default_open_behavior": "new_window"

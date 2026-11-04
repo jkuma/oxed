@@ -343,9 +343,9 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     })
     .detach();
 
-    // AI, multi-workspace, terminal, tasks and debugger are not available.
+    // Terminal, tasks and debugger are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
-        for namespace in ["debugger", "multi_workspace", "terminal"] {
+        for namespace in ["debugger", "terminal"] {
             filter.hide_namespace(namespace);
         }
         filter.hide_action_types(&[
@@ -993,14 +993,13 @@ fn register_actions(
             }
         })
         .register_action({
-            move |workspace, _: &CloseProject, window, cx| {
+            move |_, _: &CloseProject, window, cx| {
                 let Some(window_handle) = window.window_handle().downcast::<MultiWorkspace>() else {
                     return;
                 };
-                let old_group_key = workspace.project_group_key(cx);
                 cx.spawn_in(window, async move |_, cx| {
                     let task = window_handle.update(cx, |multi_workspace, window, cx| {
-                        multi_workspace.remove_project_group(&old_group_key, window, cx)
+                        multi_workspace.close_project(window, cx)
                     })?;
                     task.await?;
                     anyhow::Ok(())
@@ -4866,7 +4865,6 @@ mod tests {
                 "lsp_tool",
                 "markdown",
                 "menu",
-                "multi_workspace",
                 "onboarding",
                 "outline",
                 "outline_panel",
@@ -5384,20 +5382,16 @@ mod tests {
             cx.windows()
                 .into_iter()
                 .filter_map(|window| window.downcast::<MultiWorkspace>())
-                .flat_map(|window| {
-                    let mut roots = Vec::new();
-                    if let Ok(multi_workspace) = window.read(cx) {
-                        for workspace in multi_workspace.workspaces() {
-                            roots.push(
-                                workspace
-                                    .read(cx)
-                                    .worktrees(cx)
-                                    .map(|worktree| worktree.read(cx).abs_path().to_path_buf())
-                                    .collect::<Vec<_>>(),
-                            );
-                        }
-                    }
-                    roots
+                .filter_map(|window| {
+                    let multi_workspace = window.read(cx).ok()?;
+                    Some(
+                        multi_workspace
+                            .workspace()
+                            .read(cx)
+                            .worktrees(cx)
+                            .map(|worktree| worktree.read(cx).abs_path().to_path_buf())
+                            .collect::<Vec<_>>(),
+                    )
                 })
                 .collect::<Vec<_>>()
         });
@@ -5547,9 +5541,8 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_close_project_removes_project_group(cx: &mut TestAppContext) {
-        use util::path_list::PathList;
-        use workspace::{OpenMode, ProjectGroupKey};
+    async fn test_close_project_leaves_an_empty_workspace(cx: &mut TestAppContext) {
+        use workspace::OpenMode;
 
         let app_state = init_test(cx);
         app_state
@@ -5572,28 +5565,17 @@ mod tests {
             })
             .await
             .unwrap();
-
-        window.update(cx, |mw, _, cx| mw.open_sidebar(cx)).unwrap();
         cx.background_executor.run_until_parked();
 
-        let project_key = ProjectGroupKey::new(None, PathList::new(&[path!("/my-project")]));
-        let keys = window
-            .read_with(cx, |mw, _| mw.project_group_keys())
+        cx.dispatch_action(window.into(), CloseProject);
+        cx.background_executor.run_until_parked();
+
+        let worktree_count = window
+            .read_with(cx, |mw, cx| mw.workspace().read(cx).worktrees(cx).count())
             .unwrap();
         assert_eq!(
-            keys,
-            vec![project_key],
-            "project group should exist before CloseProject: {keys:?}"
-        );
-
-        cx.dispatch_action(window.into(), CloseProject);
-
-        let keys = window
-            .read_with(cx, |mw, _| mw.project_group_keys())
-            .unwrap();
-        assert!(
-            keys.is_empty(),
-            "project group should be removed after CloseProject: {keys:?}"
+            worktree_count, 0,
+            "CloseProject should replace the project with an empty workspace"
         );
     }
 

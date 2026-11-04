@@ -1067,7 +1067,7 @@ pub(crate) async fn restore_or_create_workspace(
 async fn restorable_workspaces(
     cx: &mut AsyncApp,
     app_state: &Arc<AppState>,
-) -> Option<Vec<workspace::SerializedMultiWorkspace>> {
+) -> Option<Vec<SessionWorkspace>> {
     let locations = restorable_workspace_locations(cx, app_state).await?;
     Some(cx.update(|cx| workspace::read_serialized_multi_workspaces(locations, cx)))
 }

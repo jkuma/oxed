@@ -1,7 +1,7 @@
-use crate::{ItemHandle, MultiWorkspace, Pane, SidebarSide};
+use crate::{ItemHandle, Pane};
 use gpui::{
     AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
-    Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
+    Render, Role, SharedString, Styled, Subscription, Window,
 };
 use settings::{SettingsContent, update_settings_file};
 use std::{any::TypeId, sync::Arc};
@@ -67,34 +67,10 @@ trait StatusItemViewHandle: Send {
     fn hide_setting(&self, cx: &App) -> Option<HideStatusItem>;
 }
 
-#[derive(Default)]
-struct SidebarStatus {
-    open: bool,
-    side: SidebarSide,
-}
-
-impl SidebarStatus {
-    fn query(multi_workspace: &Option<WeakEntity<MultiWorkspace>>, cx: &App) -> Self {
-        multi_workspace
-            .as_ref()
-            .and_then(|mw| mw.upgrade())
-            .map(|mw| {
-                let mw = mw.read(cx);
-                let enabled = mw.multi_workspace_enabled(cx);
-                Self {
-                    open: mw.sidebar_open() && enabled,
-                    side: mw.sidebar_side(cx),
-                }
-            })
-            .unwrap_or_default()
-    }
-}
-
 pub struct StatusBar {
     left_items: Vec<Box<dyn StatusItemViewHandle>>,
     right_items: Vec<Box<dyn StatusItemViewHandle>>,
     active_pane: Entity<Pane>,
-    multi_workspace: Option<WeakEntity<MultiWorkspace>>,
     focus_handle: FocusHandle,
     _observe_active_pane: Subscription,
 }
@@ -107,8 +83,6 @@ impl Focusable for StatusBar {
 
 impl Render for StatusBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let sidebar = SidebarStatus::query(&self.multi_workspace, cx);
-
         h_flex()
             .id("status-bar")
             .track_focus(&self.focus_handle)
@@ -148,16 +122,12 @@ impl Render for StatusBar {
             .map(|el| match window.window_decorations() {
                 Decorations::Server => el,
                 Decorations::Client { tiling, .. } => el
-                    .when(
-                        !(tiling.bottom || tiling.right)
-                            && !(sidebar.open && sidebar.side == SidebarSide::Right),
-                        |el| el.rounded_br(CLIENT_SIDE_DECORATION_ROUNDING),
-                    )
-                    .when(
-                        !(tiling.bottom || tiling.left)
-                            && !(sidebar.open && sidebar.side == SidebarSide::Left),
-                        |el| el.rounded_bl(CLIENT_SIDE_DECORATION_ROUNDING),
-                    )
+                    .when(!(tiling.bottom || tiling.right), |el| {
+                        el.rounded_br(CLIENT_SIDE_DECORATION_ROUNDING)
+                    })
+                    .when(!(tiling.bottom || tiling.left), |el| {
+                        el.rounded_bl(CLIENT_SIDE_DECORATION_ROUNDING)
+                    })
                     // This border is to avoid a transparent gap in the rounded corners
                     .mb(px(-1.))
                     .mt({
@@ -240,17 +210,11 @@ pub fn add_hide_button_entry(menu: ContextMenu, hide: HideStatusItem) -> Context
 }
 
 impl StatusBar {
-    pub fn new(
-        active_pane: &Entity<Pane>,
-        multi_workspace: Option<WeakEntity<MultiWorkspace>>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Self {
+    pub fn new(active_pane: &Entity<Pane>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut this = Self {
             left_items: Default::default(),
             right_items: Default::default(),
             active_pane: active_pane.clone(),
-            multi_workspace,
             focus_handle: cx.focus_handle(),
             _observe_active_pane: cx.observe_in(active_pane, window, |this, _, window, cx| {
                 this.update_active_pane_item(window, cx)
@@ -258,15 +222,6 @@ impl StatusBar {
         };
         this.update_active_pane_item(window, cx);
         this
-    }
-
-    pub fn set_multi_workspace(
-        &mut self,
-        multi_workspace: WeakEntity<MultiWorkspace>,
-        cx: &mut Context<Self>,
-    ) {
-        self.multi_workspace = Some(multi_workspace);
-        cx.notify();
     }
 
     pub fn add_left_item<T>(&mut self, item: Entity<T>, window: &mut Window, cx: &mut Context<Self>)

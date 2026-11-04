@@ -521,14 +521,12 @@ async fn resolve_open_behavior(
             for window in cx.windows() {
                 if let Some(multi_workspace) = window.downcast::<MultiWorkspace>() {
                     if let Ok(multi_workspace) = multi_workspace.read(cx) {
-                        for workspace in multi_workspace.workspaces() {
-                            let project = workspace.read(cx).project().read(cx);
-                            if project
-                                .visibility_for_paths(&paths_as_pathbufs, false, cx)
-                                .is_some()
-                            {
-                                return true;
-                            }
+                        let project = multi_workspace.workspace().read(cx).project().read(cx);
+                        if project
+                            .visibility_for_paths(&paths_as_pathbufs, false, cx)
+                            .is_some()
+                        {
+                            return true;
                         }
                     }
                 }
@@ -623,10 +621,6 @@ pub(crate) fn open_options_for_behavior(
             cli::OpenBehavior::PreferNewWindow => workspace::WorkspaceMatching::MatchSubpaths,
             cli::OpenBehavior::Add => workspace::WorkspaceMatching::MatchSubdirectory,
             _ => workspace::WorkspaceMatching::MatchExact,
-        },
-        add_dirs_to_sidebar: match open_behavior {
-            cli::OpenBehavior::ExistingWindow => true,
-            _ => false,
         },
         requesting_window,
         ..Default::default()
@@ -1051,7 +1045,6 @@ mod tests {
             options.workspace_matching,
             workspace::WorkspaceMatching::None
         );
-        assert!(!options.add_dirs_to_sidebar);
         assert!(options.requesting_window.is_none());
     }
 
@@ -1077,7 +1070,6 @@ mod tests {
             options.workspace_matching,
             workspace::WorkspaceMatching::MatchSubpaths
         );
-        assert!(!options.add_dirs_to_sidebar);
 
         cx.update(|cx| {
             settings::SettingsStore::update_global(cx, |store, cx| {
@@ -1092,7 +1084,6 @@ mod tests {
             options.workspace_matching,
             workspace::WorkspaceMatching::MatchExact
         );
-        assert!(options.add_dirs_to_sidebar);
     }
 
     #[gpui::test]

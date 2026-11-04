@@ -473,7 +473,7 @@ impl CloseWindowWhenNoItems {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum CliDefaultOpenBehavior {
-    /// Open directories as a new workspace in the current Zed window's sidebar.
+    /// Open files in the current window, and directories in a new window unless they are already open.
     #[default]
     #[strum(serialize = "Add to Existing Window")]
     ExistingWindow,

@@ -1,7 +1,7 @@
 use super::{SerializedAxis, SerializedWindowBounds};
 use crate::{
     Member, Pane, PaneAxis, SerializableItemRegistry, Workspace, WorkspaceId, item::ItemHandle,
-    multi_workspace::SerializedProjectGroupState, path_list::PathList,
+    path_list::PathList,
 };
 use anyhow::{Context, Result};
 use async_recursion::async_recursion;
@@ -14,8 +14,7 @@ use gpui::{AsyncWindowContext, Entity, WeakEntity, WindowId};
 
 use language::{Toolchain, ToolchainScope};
 use project::{
-    Project, ProjectGroupKey, bookmark_store::SerializedBookmark,
-    debugger::breakpoint_store::SourceBreakpoint,
+    Project, bookmark_store::SerializedBookmark, debugger::breakpoint_store::SourceBreakpoint,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,7 +22,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use util::{ResultExt, path_list::SerializedPathList};
+use util::ResultExt;
 use uuid::Uuid;
 
 /// A workspace entry from a previous session, containing all the info needed
@@ -35,58 +34,10 @@ pub struct SessionWorkspace {
     pub window_id: Option<WindowId>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SerializedProjectGroup {
-    pub path_list: SerializedPathList,
-    #[serde(default = "default_expanded")]
-    pub expanded: bool,
-}
-
-fn default_expanded() -> bool {
-    true
-}
-
-impl SerializedProjectGroup {
-    pub fn from_group(key: &ProjectGroupKey, expanded: bool) -> Self {
-        Self {
-            path_list: key.path_list().serialize(),
-            expanded,
-        }
-    }
-
-    pub fn into_restored_state(self) -> SerializedProjectGroupState {
-        let path_list = PathList::deserialize(&self.path_list);
-        SerializedProjectGroupState {
-            key: ProjectGroupKey::new(None, path_list),
-            expanded: self.expanded,
-        }
-    }
-}
-
-impl From<SerializedProjectGroup> for ProjectGroupKey {
-    fn from(value: SerializedProjectGroup) -> Self {
-        value.into_restored_state().key
-    }
-}
-
 /// Per-window state for a MultiWorkspace, persisted to KVP.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct MultiWorkspaceState {
     pub active_workspace_id: Option<WorkspaceId>,
-    pub sidebar_open: bool,
-    #[serde(alias = "project_group_keys")]
-    pub project_groups: Vec<SerializedProjectGroup>,
-    #[serde(default)]
-    pub sidebar_state: Option<String>,
-}
-
-/// The serialized state of a single MultiWorkspace window from a previous session:
-/// the active workspace to restore plus window-level state (project group keys,
-/// sidebar).
-#[derive(Debug, Clone)]
-pub struct SerializedMultiWorkspace {
-    pub active_workspace: SessionWorkspace,
-    pub state: MultiWorkspaceState,
 }
 
 #[derive(Debug, PartialEq, Clone)]

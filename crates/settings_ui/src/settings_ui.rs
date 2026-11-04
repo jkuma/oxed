@@ -4321,12 +4321,7 @@ pub(crate) fn all_projects(
             window
                 .and_then(|handle| handle.read(cx).ok())
                 .into_iter()
-                .flat_map(|multi_workspace| {
-                    multi_workspace
-                        .workspaces()
-                        .map(|workspace| workspace.read(cx).project().clone())
-                        .collect::<Vec<_>>()
-                }),
+                .map(|multi_workspace| multi_workspace.workspace().read(cx).project().clone()),
         )
         .filter(move |project| seen_project_ids.insert(project.entity_id()))
 }
