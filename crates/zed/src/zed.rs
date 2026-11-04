@@ -343,21 +343,15 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     })
     .detach();
 
-    // Terminal, tasks and debugger are not available.
+    // Tasks and debugger are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
-        for namespace in ["debugger", "terminal"] {
-            filter.hide_namespace(namespace);
-        }
+        filter.hide_namespace("debugger");
         filter.hide_action_types(&[
             TypeId::of::<editor::actions::DisableBreakpoint>(),
             TypeId::of::<editor::actions::EditLogBreakpoint>(),
             TypeId::of::<editor::actions::EnableBreakpoint>(),
             TypeId::of::<editor::actions::SpawnNearestTask>(),
             TypeId::of::<editor::actions::ToggleBreakpoint>(),
-            TypeId::of::<workspace::NewCenterTerminal>(),
-            TypeId::of::<workspace::NewTerminal>(),
-            TypeId::of::<workspace::OpenInTerminal>(),
-            TypeId::of::<workspace::OpenTerminal>(),
             TypeId::of::<workspace::ShutdownDebugAdapters>(),
         ]);
     });
@@ -4884,7 +4878,6 @@ mod tests {
                 "syntax_tree_view",
                 "tab_switcher",
                 "tabular_data",
-                "terminal",
                 "text_finder",
                 "theme",
                 "theme_selector",

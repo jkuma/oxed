@@ -138,30 +138,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alacritty_terminal"
-version = "0.26.1-dev"
-source = "git+https://github.com/zed-industries/alacritty?rev=4c129667ce56611becdc82de6e28218c80e2e88f#4c129667ce56611becdc82de6e28218c80e2e88f"
-dependencies = [
- "base64",
- "bitflags 2.13.1",
- "home",
- "libc",
- "log",
- "miow",
- "parking_lot",
- "piper",
- "polling",
- "regex-automata",
- "rustix",
- "rustix-openpty",
- "serde",
- "signal-hook",
- "unicode-width 0.2.2",
- "vte",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "aligned"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -920,9 +896,6 @@ name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
-dependencies = [
- "serde_core",
-]
 
 [[package]]
 name = "bitstream-io"
@@ -3752,7 +3725,6 @@ dependencies = [
  "strum",
  "sysinfo 0.39.6",
  "task",
- "terminal",
  "theme",
  "theme_settings",
  "time",
@@ -3794,12 +3766,12 @@ dependencies = [
  "serde_json",
  "settings",
  "task",
- "terminal",
  "theme",
  "theme_settings",
  "ui",
  "unindent",
  "util",
+ "vte",
  "watch",
  "workspace",
  "zed_actions",
@@ -4310,15 +4282,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest",
-]
-
-[[package]]
-name = "home"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
-dependencies = [
- "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5502,7 +5465,6 @@ dependencies = [
  "snippet",
  "task",
  "tempfile",
- "terminal",
  "theme",
  "tree-sitter",
  "tree-sitter-bash",
@@ -6358,15 +6320,6 @@ dependencies = [
  "libc",
  "log",
  "wasi",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "miow"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "536bfad37a309d62069485248eeaba1e8d9853aaf951caaeaed0585a95346f08"
-dependencies = [
  "windows-sys 0.61.2",
 ]
 
@@ -8344,7 +8297,6 @@ dependencies = [
  "sum_tree",
  "task",
  "tempfile",
- "terminal",
  "text",
  "toml 0.9.8",
  "unindent",
@@ -9371,17 +9323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustix-openpty"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1de16c7c59892b870a6336f185dc10943517f1327447096bbb7bb32cd85e2393"
-dependencies = [
- "errno 0.3.14",
- "libc",
- "rustix",
-]
-
-[[package]]
 name = "rustls"
 version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10059,16 +10000,6 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
-
-[[package]]
-name = "signal-hook"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2a0c28ca5908dbdbcd52e6fdaa00358ab88637f8ab33e1f188dd510eb44b53d"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
 
 [[package]]
 name = "signal-hook-registry"
@@ -10879,41 +10810,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "terminal"
-version = "0.1.0"
-dependencies = [
- "alacritty_terminal",
- "anyhow",
- "async-channel 2.5.0",
- "collections",
- "futures",
- "futures-lite",
- "gpui",
- "itertools 0.14.0",
- "libc",
- "log",
- "parking_lot",
- "percent-encoding",
- "rand 0.9.4",
- "regex",
- "release_channel",
- "schemars",
- "serde",
- "settings",
- "sysinfo 0.39.6",
- "task",
- "theme",
- "theme_settings",
- "thiserror 2.0.17",
- "url",
- "urlencoding",
- "util",
- "util_macros",
- "vte",
- "windows 0.62.2",
 ]
 
 [[package]]
@@ -12233,7 +12129,6 @@ dependencies = [
  "cursor-icon",
  "log",
  "memchr",
- "serde",
 ]
 
 [[package]]

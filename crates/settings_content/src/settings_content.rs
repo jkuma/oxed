@@ -6,7 +6,6 @@ mod language;
 pub mod merge_from;
 mod project;
 mod serde_helper;
-mod terminal;
 mod theme;
 mod title_bar;
 mod workspace;
@@ -24,7 +23,6 @@ pub use serde_helper::{
     serialize_f32_with_two_decimal_places, serialize_optional_f32_with_two_decimal_places,
 };
 use settings_json::parse_json_with_comments;
-pub use terminal::*;
 pub use theme::*;
 pub use title_bar::*;
 pub use workspace::*;
@@ -259,9 +257,6 @@ pub struct SettingsContent {
     /// Configuration for session-related features
     pub session: Option<SessionSettingsContent>,
 
-    /// Configuration of the terminal in Zed.
-    pub terminal: Option<TerminalSettingsContent>,
-
     pub title_bar: Option<TitleBarSettingsContent>,
 
     /// Settings for the which-key popup.
@@ -316,7 +311,7 @@ fallible_options::flattened_deserialize!(SettingsContent {
         git,
         global_lsp_settings, image_viewer, markdown_preview, repl, hide_mouse,
         journal, log, line_indicator_format, outline_panel, project_panel,
-        node, proxy, reduce_motion, session, terminal,
+        node, proxy, reduce_motion, session,
         title_bar, which_key, modeline_lines,
         instrumentation,
     },

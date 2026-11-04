@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-const KNOWN_SHADOWED_KEYS: &[(&str, &str, &str)] = &[("SettingsContent", "terminal", "project")];
+const KNOWN_SHADOWED_KEYS: &[(&str, &str, &str)] = &[];
 
 #[test]
 fn no_key_collisions_between_named_fields_and_flattened_sections() {
@@ -37,13 +37,6 @@ fn no_key_collisions_between_named_fields_and_flattened_sections() {
         settings_content::AllLanguageSettingsContent::NAMED_DESERIALIZE_KEYS,
         vec![section::<settings_content::LanguageSettingsContent>(
             "defaults",
-        )],
-    );
-    check(
-        "TerminalSettingsContent",
-        settings_content::TerminalSettingsContent::NAMED_DESERIALIZE_KEYS,
-        vec![section::<settings_content::ProjectTerminalSettingsContent>(
-            "project",
         )],
     );
 }

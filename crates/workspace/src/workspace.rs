@@ -405,8 +405,6 @@ actions!(
         NewWindow,
         /// Opens multiple files.
         OpenFiles,
-        /// Opens the current location in terminal.
-        OpenInTerminal,
         /// Opens the component preview.
         OpenComponentPreview,
         /// Reloads the active item.
@@ -583,26 +581,6 @@ pub struct ToggleFileFinder {
     pub separate_history: bool,
     #[serde(default)]
     pub include_ignored: Option<bool>,
-}
-
-/// Opens a new terminal in the center.
-#[derive(Default, PartialEq, Eq, Clone, Deserialize, JsonSchema, Action)]
-#[action(namespace = workspace)]
-#[serde(deny_unknown_fields)]
-pub struct NewCenterTerminal {
-    /// If true, creates a local terminal even in remote projects.
-    #[serde(default)]
-    pub local: bool,
-}
-
-/// Opens a new terminal.
-#[derive(Default, PartialEq, Eq, Clone, Deserialize, JsonSchema, Action)]
-#[action(namespace = workspace)]
-#[serde(deny_unknown_fields)]
-pub struct NewTerminal {
-    /// If true, creates a local terminal even in remote projects.
-    #[serde(default)]
-    pub local: bool,
 }
 
 /// Increases size of a currently focused dock by a given amount of pixels.
@@ -795,17 +773,6 @@ impl PartialEq for Toast {
             && self.message == other.message
             && self.on_click.is_some() == other.on_click.is_some()
     }
-}
-
-/// Opens a new terminal with the specified working directory.
-#[derive(Debug, Default, Clone, Deserialize, PartialEq, JsonSchema, Action)]
-#[action(namespace = workspace)]
-#[serde(deny_unknown_fields)]
-pub struct OpenTerminal {
-    pub working_directory: PathBuf,
-    /// If true, creates a local terminal even in remote projects.
-    #[serde(default)]
-    pub local: bool,
 }
 
 #[derive(

@@ -222,7 +222,6 @@ impl VsCodeSettings {
             tab_bar: self.tab_bar_settings_content(),
             tab_switcher: None,
             tabs: self.item_settings_content(),
-            terminal: self.terminal_settings_content(),
             theme: Box::new(self.theme_settings_content()),
             title_bar: None,
             workspace: self.workspace_settings_content(),
@@ -514,7 +513,6 @@ impl VsCodeSettings {
             },
             worktree: self.worktree_settings_content(),
             lsp: Default::default(),
-            terminal: None,
             dap: Default::default(),
             load_direnv: None,
             git_hosting_providers: None,
@@ -820,103 +818,6 @@ impl VsCodeSettings {
         }
 
         skip_default(project_panel_settings)
-    }
-
-    fn terminal_settings_content(&self) -> Option<TerminalSettingsContent> {
-        let (font_family, font_fallbacks) = self.read_fonts("terminal.integrated.fontFamily");
-        skip_default(TerminalSettingsContent {
-            alternate_scroll: None,
-            blinking: self
-                .read_bool("terminal.integrated.cursorBlinking")
-                .map(|b| {
-                    if b {
-                        TerminalBlink::On
-                    } else {
-                        TerminalBlink::Off
-                    }
-                }),
-            button: None,
-            copy_on_select: self.read_bool("terminal.integrated.copyOnSelection"),
-            cursor_shape: self.read_enum("terminal.integrated.cursorStyle", |s| match s {
-                "block" => Some(CursorShapeContent::Block),
-                "line" => Some(CursorShapeContent::Bar),
-                "underline" => Some(CursorShapeContent::Underline),
-                _ => None,
-            }),
-            default_height: None,
-            default_width: None,
-            dock: None,
-            starts_open: None,
-            font_fallbacks,
-            font_family,
-            font_features: None,
-            font_size: self
-                .read_f32("terminal.integrated.fontSize")
-                .map(FontSize::from),
-            font_weight: None,
-            keep_selection_on_copy: None,
-            open_links_in_mouse_mode: None,
-            line_height: self
-                .read_f32("terminal.integrated.lineHeight")
-                .map(|lh| TerminalLineHeight::Custom(lh)),
-            max_scroll_history_lines: self.read_usize("terminal.integrated.scrollback"),
-            bell: self
-                .read_value("accessibility.signals.terminalBell")
-                .and_then(|v| Some(v.get("sound")?.as_str()? == "on"))
-                .or_else(|| {
-                    // Older deprecated setting, might as well still support it:
-                    self.read_value("terminal.integrated.enableBell")
-                        .map(|v| v.as_bool() == Some(true) || v.as_str() == Some("both"))
-                })
-                .map(|enabled| {
-                    if enabled {
-                        TerminalBell::System
-                    } else {
-                        TerminalBell::Off
-                    }
-                }),
-            minimum_contrast: None,
-            option_as_meta: self.read_bool("terminal.integrated.macOptionIsMeta"),
-            project: self.project_terminal_settings_content(),
-            scrollbar: None,
-            scroll_multiplier: None,
-            toolbar: None,
-            show_count_badge: None,
-            flexible: None,
-        })
-    }
-
-    fn project_terminal_settings_content(&self) -> ProjectTerminalSettingsContent {
-        #[cfg(target_os = "windows")]
-        let platform = "windows";
-        #[cfg(target_os = "linux")]
-        let platform = "linux";
-        #[cfg(target_os = "macos")]
-        let platform = "osx";
-        #[cfg(target_os = "freebsd")]
-        let platform = "freebsd";
-        let env = self
-            .read_value(&format!("terminal.integrated.env.{platform}"))
-            .and_then(|v| v.as_object())
-            .map(|v| {
-                v.iter()
-                    .map(|(k, v)| (k.clone(), v.to_string()))
-                    // zed does not support substitutions, so this can break env vars
-                    .filter(|(_, v)| !v.contains('$'))
-                    .collect()
-            });
-
-        ProjectTerminalSettingsContent {
-            // TODO: handle arguments
-            shell: self
-                .read_string(&format!("terminal.integrated.{platform}Exec"))
-                .map(|s| Shell::Program(s)),
-            working_directory: None,
-            env,
-            detect_venv: None,
-            path_hyperlink_regexes: None,
-            path_hyperlink_timeout_ms: None,
-        }
     }
 
     fn theme_settings_content(&self) -> ThemeSettingsContent {

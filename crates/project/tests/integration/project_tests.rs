@@ -86,7 +86,7 @@ use std::{
 #[cfg(target_os = "linux")]
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt as _};
 use sum_tree::SumTree;
-use task::{ResolvedTask, ShellKind, TaskContext};
+use task::{ResolvedTask, TaskContext};
 use text::{Anchor, PointUtf16, ReplicaId, ToOffset, Unclipped};
 use unindent::Unindent as _;
 use util::{
@@ -20379,14 +20379,6 @@ fn python_lang(fs: Arc<FakeFs>) -> Arc<Language> {
                 ),
                 manifest_name: ManifestName::from(SharedString::new_static("pyproject.toml")),
             }
-        }
-        fn activation_script(
-            &self,
-            _: &Toolchain,
-            _: ShellKind,
-            _: &gpui::App,
-        ) -> futures::future::BoxFuture<'static, Vec<String>> {
-            Box::pin(async { vec![] })
         }
     }
     Arc::new(

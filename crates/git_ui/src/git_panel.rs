@@ -13434,20 +13434,6 @@ mod tests {
     }
 
     #[test]
-    fn test_git_output_handler_strips_ansi_codes() {
-        let cases = [
-            ("no escape codes here\n", "no escape codes here\n"),
-            ("\x1b[31mhello\x1b[0m", "hello"),
-            ("\x1b[1;32mfoo\x1b[0m bar", "foo bar"),
-            ("progress 10%\rprogress 100%\n", "progress 100%\n"),
-        ];
-
-        for (input, expected) in cases {
-            assert_eq!(terminal::strip_ansi_text(input.as_bytes()), expected);
-        }
-    }
-
-    #[test]
     fn test_commit_title_exceeds_limit() {
         // ASCII only
         let within_ascii = "abcde";

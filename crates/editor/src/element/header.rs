@@ -6,10 +6,10 @@ use collections::HashMap;
 use file_icons::FileIcons;
 use git::status::FileStatus;
 use gpui::{
-    Action, AnyElement, App, AvailableSpace, Bounds, ClickEvent, ClipboardItem, ContentMask,
-    CursorStyle, DefiniteLength, Entity, Focusable as _, Hitbox, HitboxBehavior, Hsla, IntoElement,
-    Length, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Pixels,
-    ShapedLine, SharedString, Styled, TextAlign, Window, WindowBackgroundAppearance, div, fill,
+    AnyElement, App, AvailableSpace, Bounds, ClickEvent, ClipboardItem, ContentMask, CursorStyle,
+    DefiniteLength, Entity, Focusable as _, Hitbox, HitboxBehavior, Hsla, IntoElement, Length,
+    Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, ShapedLine,
+    SharedString, Styled, TextAlign, Window, WindowBackgroundAppearance, div, fill,
     linear_color_stop, linear_gradient, point, px, size,
 };
 use language::language_settings::ShowWhitespaceSetting;
@@ -25,7 +25,7 @@ use ui::{
     right_click_menu, text_for_keystroke, utils::WithRemSize,
 };
 use util::ResultExt;
-use workspace::{ItemHandle, ItemSettings, OpenInTerminal, OpenTerminal, RevealInProjectPanel};
+use workspace::{ItemHandle, ItemSettings, RevealInProjectPanel};
 
 use super::{
     BlockLayout, EditorElement, EditorLayout, LineWithInvisibles, layout_line,
@@ -1005,7 +1005,6 @@ pub(crate) fn render_buffer_header(
             let editor = editor.clone();
             let file = file.clone();
             let buffer_snapshot = buffer_snapshot.clone();
-            let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
             ContextMenu::build(window, cx, move |mut menu, window, cx| {
                 if let Some(file) = file
                     && let Some(project) = editor.read(cx).project()
@@ -1023,10 +1022,6 @@ pub(crate) fn render_buffer_header(
                     });
                     let has_relative_path = worktree.root_entry().is_some_and(Entry::is_dir);
 
-                    let parent_abs_path = abs_path
-                        .as_ref()
-                        .filter(|_| open_in_terminal)
-                        .and_then(|abs_path| Some(abs_path.parent()?.to_path_buf()));
                     let relative_path = has_relative_path
                         .then_some(relative_path)
                         .map(ToOwned::to_owned);
@@ -1058,10 +1053,7 @@ pub(crate) fn render_buffer_header(
                                 }),
                             )
                         })
-                        .when(
-                            reveal_in_project_panel.is_some() || parent_abs_path.is_some(),
-                            |menu| menu.separator(),
-                        )
+                        .when(reveal_in_project_panel.is_some(), |menu| menu.separator())
                         .when_some(reveal_in_project_panel, |menu, entry_id| {
                             menu.entry(
                                 "Reveal In Project Panel",
@@ -1072,22 +1064,6 @@ pub(crate) fn render_buffer_header(
                                             cx.emit(project::Event::RevealInProjectPanel(entry_id))
                                         });
                                     }
-                                }),
-                            )
-                        })
-                        .when_some(parent_abs_path, |menu, parent_abs_path| {
-                            menu.entry(
-                                "Open in Terminal",
-                                Some(Box::new(OpenInTerminal)),
-                                window.handler_for(&editor, move |_, window, cx| {
-                                    window.dispatch_action(
-                                        OpenTerminal {
-                                            working_directory: parent_abs_path.clone(),
-                                            local: false,
-                                        }
-                                        .boxed_clone(),
-                                        cx,
-                                    );
                                 }),
                             )
                         });

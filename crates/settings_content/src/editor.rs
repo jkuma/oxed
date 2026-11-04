@@ -6,9 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings_macros::{MergeFrom, with_fallible_options};
 
-use crate::{
-    DelayMs, DiagnosticSeverityContent, ShowScrollbar, serialize_f32_with_two_decimal_places,
-};
+use crate::{DelayMs, DiagnosticSeverityContent, serialize_f32_with_two_decimal_places};
 
 #[with_fallible_options]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
@@ -1227,4 +1225,46 @@ impl schemars::JsonSchema for CenteredPaddingSettings {
             "description": "Centered layout related setting (left/right)."
         })
     }
+}
+
+#[with_fallible_options]
+#[derive(
+    Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq, Eq, Default,
+)]
+pub struct ScrollbarSettingsContent {
+    /// When to show the scrollbar.
+    ///
+    /// Default: inherits editor scrollbar settings
+    pub show: Option<ShowScrollbar>,
+}
+
+/// When to show the scrollbar.
+///
+/// Default: auto
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ShowScrollbar {
+    /// Show the scrollbar if there's important information or
+    /// follow the system's configured behavior.
+    #[default]
+    Auto,
+    /// Match the system's configured behavior.
+    System,
+    /// Always show the scrollbar.
+    Always,
+    /// Never show the scrollbar.
+    Never,
 }

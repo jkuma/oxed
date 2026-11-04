@@ -1,7 +1,6 @@
 use crate::{
-    CloseWindow, NewCenterTerminal, NewFile, NewTerminal, OpenInTerminal, OpenOptions,
-    OpenTerminal, OpenVisible, SplitDirection, ToggleFileFinder, ToggleProjectSymbols, ToggleZoom,
-    Workspace, WorkspaceItemBuilder, ZoomIn, ZoomOut,
+    CloseWindow, NewFile, OpenOptions, OpenVisible, SplitDirection, ToggleFileFinder,
+    ToggleProjectSymbols, ToggleZoom, Workspace, WorkspaceItemBuilder, ZoomIn, ZoomOut,
     focus_follows_mouse::FocusFollowsMouse as _,
     invalid_item_view::InvalidItemView,
     item::{
@@ -3099,7 +3098,6 @@ impl Pane {
                 let pane = pane.clone();
                 let menu_context = menu_context.clone();
                 let extra_actions = item_handle.tab_extra_context_menu_actions(window, cx);
-                let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
                 ContextMenu::build(window, cx, move |mut menu, window, cx| {
                     let close_active_item_action = CloseActiveItem {
                         save_intent: None,
@@ -3280,10 +3278,6 @@ impl Pane {
 
                             let entry_abs_path = pane.read(cx).entry_abs_path(entry, cx);
                             let reveal_path = entry_abs_path.clone();
-                            let parent_abs_path = entry_abs_path
-                                .as_deref()
-                                .filter(|_| open_in_terminal)
-                                .and_then(|abs_path| Some(abs_path.parent()?.to_path_buf()));
                             let has_git_repo = project_path.as_ref().is_some_and(|project_path| {
                                 pane.read(cx).project.upgrade().is_some_and(|project| {
                                     project
@@ -3422,22 +3416,6 @@ impl Pane {
                                                     ))
                                                 })
                                                 .ok();
-                                        }),
-                                    )
-                                })
-                                .when_some(parent_abs_path, |menu, parent_abs_path| {
-                                    menu.entry(
-                                        "Open in Terminal",
-                                        Some(Box::new(OpenInTerminal)),
-                                        window.handler_for(&pane, move |_, window, cx| {
-                                            window.dispatch_action(
-                                                OpenTerminal {
-                                                    working_directory: parent_abs_path.clone(),
-                                                    local: false,
-                                                }
-                                                .boxed_clone(),
-                                                cx,
-                                            );
                                         }),
                                     )
                                 });
@@ -4288,12 +4266,6 @@ fn default_render_tab_bar_buttons(
                             .separator()
                             .action("Search Project", DeploySearch::default().boxed_clone())
                             .action("Search Symbols", ToggleProjectSymbols.boxed_clone())
-                            .separator()
-                            .action("New Terminal", NewTerminal::default().boxed_clone())
-                            .action(
-                                "New Center Terminal",
-                                NewCenterTerminal::default().boxed_clone(),
-                            )
                     }))
                 }),
         )

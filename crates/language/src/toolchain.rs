@@ -9,10 +9,8 @@ use std::{path::PathBuf, sync::Arc};
 use async_trait::async_trait;
 use collections::HashMap;
 
-use futures::future::BoxFuture;
-use gpui::{App, AsyncApp};
+use gpui::AsyncApp;
 use settings::WorktreeId;
-use task::ShellKind;
 use util::rel_path::RelPath;
 
 use crate::LanguageName;
@@ -37,13 +35,6 @@ pub trait ToolchainLister: Send + Sync + 'static {
         path: PathBuf,
         project_env: Option<HashMap<String, String>>,
     ) -> anyhow::Result<Toolchain>;
-
-    fn activation_script(
-        &self,
-        toolchain: &Toolchain,
-        shell: ShellKind,
-        cx: &App,
-    ) -> BoxFuture<'static, Vec<String>>;
 
     /// Returns various "static" bits of information about this toolchain lister. This function should be pure.
     fn meta(&self) -> ToolchainMetadata;

@@ -73,9 +73,8 @@ use util::{
     rel_path::{RelPath, RelPathBuf},
 };
 use workspace::{
-    DraggedSelection, OpenInTerminal, OpenMode, OpenOptions, OpenTerminal, OpenVisible,
-    PreviewTabsSettings, SelectedEntry, SplitDirection, Workspace, WorkspaceSettings,
-    copy_file_permalink,
+    DraggedSelection, OpenMode, OpenOptions, OpenVisible, PreviewTabsSettings, SelectedEntry,
+    SplitDirection, Workspace, WorkspaceSettings, copy_file_permalink,
     dock::{DockPosition, Panel, PanelEvent},
     focus_follows_mouse::FocusFollowsMouse as _,
     notifications::{DetachAndPromptErr, NotifyResultExt, NotifyTaskExt},
@@ -1154,7 +1153,6 @@ impl ProjectPanel {
                 && (cfg!(target_os = "windows")
                     || (settings.hide_root && visible_worktrees_count == 1));
             let should_show_compare = !is_dir && self.file_abs_paths_to_diff(cx).is_some();
-            let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
 
             let (has_git_repo, has_history) = {
                 let project_path = project::ProjectPath {
@@ -1197,9 +1195,6 @@ impl ProjectPanel {
                             })
                             .when(is_local, |menu| {
                                 menu.action("Open in Default App", Box::new(OpenWithSystem))
-                            })
-                            .when(open_in_terminal, |menu| {
-                                menu.action("Open in Terminal", Box::new(OpenInTerminal))
                             })
                             .when(is_markdown, |menu| {
                                 menu.action("Open Markdown Preview", Box::new(OpenMarkdownPreview))
@@ -4160,36 +4155,6 @@ impl ProjectPanel {
         if let Some((worktree, entry)) = self.selected_entry(cx) {
             let abs_path = worktree.absolutize(&entry.path);
             cx.open_with_system(&abs_path);
-        }
-    }
-
-    fn open_in_terminal(
-        &mut self,
-        _: &OpenInTerminal,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if let Some((worktree, entry)) = self.selected_sub_entry(cx) {
-            let abs_path = match &entry.canonical_path {
-                Some(canonical_path) => canonical_path.to_path_buf(),
-                None => worktree.read(cx).absolutize(&entry.path),
-            };
-
-            let working_directory = if entry.is_dir() {
-                Some(abs_path)
-            } else {
-                abs_path.parent().map(|path| path.to_path_buf())
-            };
-            if let Some(working_directory) = working_directory {
-                window.dispatch_action(
-                    workspace::OpenTerminal {
-                        working_directory,
-                        local: false,
-                    }
-                    .boxed_clone(),
-                    cx,
-                )
-            }
         }
     }
 
@@ -7642,11 +7607,9 @@ impl Render for ProjectPanel {
                 .when(project.is_local(), |el| {
                     el.on_action(cx.listener(Self::reveal_in_finder))
                         .on_action(cx.listener(Self::open_system))
-                        .on_action(cx.listener(Self::open_in_terminal))
                 })
                 .when(project.is_via_remote_server(), |el| {
-                    el.on_action(cx.listener(Self::open_in_terminal))
-                        .on_action(cx.listener(Self::download_from_remote))
+                    el.on_action(cx.listener(Self::download_from_remote))
                 })
                 .track_focus(&self.focus_handle(cx))
                 .child(

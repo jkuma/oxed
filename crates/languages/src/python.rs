@@ -2,7 +2,6 @@ use anyhow::Result;
 use anyhow::{Context as _, ensure};
 use async_trait::async_trait;
 use collections::HashMap;
-use futures::future::BoxFuture;
 use futures::lock::OwnedMutexGuard;
 use futures::{AsyncBufReadExt, StreamExt as _};
 use gpui::{App, AsyncApp, Entity, SharedString, Task};
@@ -26,8 +25,7 @@ use project::lsp_store::language_server_settings;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use settings::{SemanticTokenRules, Settings};
-use terminal::terminal_settings::TerminalSettings;
+use settings::SemanticTokenRules;
 
 use smol::lock::OnceCell;
 use std::cmp::{Ordering, Reverse};
@@ -49,7 +47,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use task::{ShellKind, TaskTemplate, TaskTemplates, VariableName};
+use task::{TaskTemplate, TaskTemplates, VariableName};
 use util::{ResultExt, maybe};
 
 pub(crate) fn semantic_token_rules() -> SemanticTokenRules {
@@ -64,8 +62,6 @@ pub(crate) fn semantic_token_rules() -> SemanticTokenRules {
 pub(crate) struct PythonToolchainData {
     #[serde(flatten)]
     environment: PythonEnvironment,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    activation_scripts: Option<HashMap<ShellKind, PathBuf>>,
 }
 
 pub(crate) struct PyprojectTomlManifestProvider;
@@ -1191,15 +1187,7 @@ fn python_env_kind_display(k: &PythonEnvironmentKind) -> &'static str {
     }
 }
 
-pub(crate) struct PythonToolchainProvider {
-    fs: Arc<dyn Fs>,
-}
-
-impl PythonToolchainProvider {
-    pub fn new(fs: Arc<dyn Fs>) -> Self {
-        Self { fs }
-    }
-}
+pub(crate) struct PythonToolchainProvider;
 
 static ENV_PRIORITY_LIST: &[PythonEnvironmentKind] = &[
     // Prioritize non-Conda environments.
@@ -1295,18 +1283,6 @@ fn wr_distance(
     }
 }
 
-fn micromamba_shell_name(kind: ShellKind) -> &'static str {
-    match kind {
-        ShellKind::Csh => "csh",
-        ShellKind::Fish => "fish",
-        ShellKind::Nushell => "nu",
-        ShellKind::PowerShell | ShellKind::Pwsh => "powershell",
-        ShellKind::Cmd => "cmd.exe",
-        // default / catch-all:
-        _ => "posix",
-    }
-}
-
 #[async_trait]
 impl ToolchainLister for PythonToolchainProvider {
     async fn list(
@@ -1315,7 +1291,6 @@ impl ToolchainLister for PythonToolchainProvider {
         subroot_relative_path: Arc<RelPath>,
         project_env: Option<HashMap<String, String>>,
     ) -> ToolchainList {
-        let fs = &*self.fs;
         let env = project_env.unwrap_or_default();
         let environment = EnvironmentApi::from_env(&env);
         let locators = pet::locators::create_locators(
@@ -1420,7 +1395,7 @@ impl ToolchainLister for PythonToolchainProvider {
 
         let mut out_toolchains = Vec::new();
         for toolchain in toolchains {
-            let Some(toolchain) = venv_to_toolchain(toolchain, fs).await else {
+            let Some(toolchain) = venv_to_toolchain(toolchain).await else {
                 continue;
             };
             out_toolchains.push(toolchain);
@@ -1447,7 +1422,6 @@ impl ToolchainLister for PythonToolchainProvider {
         path: PathBuf,
         env: Option<HashMap<String, String>>,
     ) -> anyhow::Result<Toolchain> {
-        let fs = &*self.fs;
         let env = env.unwrap_or_default();
         let environment = EnvironmentApi::from_env(&env);
         let locators = pet::locators::create_locators(
@@ -1458,137 +1432,13 @@ impl ToolchainLister for PythonToolchainProvider {
         let toolchain = pet::resolve::resolve_environment(&path, &locators, &environment)
             .context("Could not find a virtual environment in provided path")?;
         let venv = toolchain.resolved.unwrap_or(toolchain.discovered);
-        venv_to_toolchain(venv, fs)
+        venv_to_toolchain(venv)
             .await
             .context("Could not convert a venv into a toolchain")
     }
-
-    fn activation_script(
-        &self,
-        toolchain: &Toolchain,
-        shell: ShellKind,
-        cx: &App,
-    ) -> BoxFuture<'static, Vec<String>> {
-        let settings = TerminalSettings::get_global(cx);
-        let conda_manager = settings
-            .detect_venv
-            .as_option()
-            .map(|venv| venv.conda_manager)
-            .unwrap_or(settings::CondaManager::Auto);
-
-        let toolchain_clone = toolchain.clone();
-        Box::pin(async move {
-            let Ok(toolchain) =
-                serde_json::from_value::<PythonToolchainData>(toolchain_clone.as_json.clone())
-            else {
-                return vec![];
-            };
-
-            log::debug!("(Python) Composing activation script for toolchain {toolchain:?}");
-
-            let mut activation_script = vec![];
-
-            match toolchain.environment.kind {
-                Some(PythonEnvironmentKind::Conda) => {
-                    if toolchain.environment.manager.is_none() {
-                        return vec![];
-                    };
-
-                    let manager = match conda_manager {
-                        settings::CondaManager::Conda => "conda",
-                        settings::CondaManager::Mamba => "mamba",
-                        settings::CondaManager::Micromamba => "micromamba",
-                        settings::CondaManager::Auto => toolchain
-                            .environment
-                            .manager
-                            .as_ref()
-                            .and_then(|m| m.executable.file_name())
-                            .and_then(|name| name.to_str())
-                            .filter(|name| matches!(*name, "conda" | "mamba" | "micromamba"))
-                            .unwrap_or("conda"),
-                    };
-
-                    // Activate micromamba shell in the child shell
-                    // [required for micromamba]
-                    if manager == "micromamba" {
-                        match shell {
-                            ShellKind::PowerShell | ShellKind::Pwsh => {
-                                activation_script.push(format!(r#"(& {manager} shell hook --shell powershell) | Out-String | Invoke-Expression"#));
-                            }
-                            _ => {
-                                let shell_name = micromamba_shell_name(shell);
-                                activation_script.push(format!(
-                                    r#"eval "$({manager} shell hook --shell {shell_name})""#
-                                ));
-                            }
-                        }
-                    }
-
-                    // Only inject `{manager} activate <name>` when we have a
-                    // safely-quotable name. Never silently fall back to
-                    // `activate base`: a user with miniforge installed but a
-                    // local uv/venv project should not have their terminal
-                    // hijacked just because we couldn't resolve a name.
-                    if let Some(name) = &toolchain.environment.name {
-                        if let Some(quoted_name) = shell.try_quote(name) {
-                            activation_script.push(format!("{manager} activate {quoted_name}"));
-                        } else {
-                            log::warn!(
-                                "Conda environment name {:?} could not be safely quoted; \
-                                 skipping terminal activation",
-                                name
-                            );
-                        }
-                    } else {
-                        log::warn!("Conda toolchain has no name; skipping terminal activation");
-                    }
-                }
-                Some(
-                    PythonEnvironmentKind::Venv
-                    | PythonEnvironmentKind::VirtualEnv
-                    | PythonEnvironmentKind::Uv
-                    | PythonEnvironmentKind::UvWorkspace
-                    | PythonEnvironmentKind::Poetry,
-                ) => {
-                    if let Some(activation_scripts) = &toolchain.activation_scripts {
-                        if let Some(activate_script_path) = activation_scripts.get(&shell) {
-                            let activate_keyword = shell.activate_keyword();
-                            if let Some(quoted) =
-                                shell.try_quote(&activate_script_path.to_string_lossy())
-                            {
-                                activation_script.push(format!("{activate_keyword} {quoted}"));
-                            }
-                        }
-                    }
-                }
-                Some(PythonEnvironmentKind::Pyenv) => {
-                    let Some(manager) = &toolchain.environment.manager else {
-                        return vec![];
-                    };
-                    let version = toolchain.environment.version.as_deref().unwrap_or("system");
-                    let pyenv = &manager.executable;
-                    let pyenv = pyenv.display();
-                    activation_script.extend(match shell {
-                        ShellKind::Fish => Some(format!("\"{pyenv}\" shell - fish {version}")),
-                        ShellKind::Posix => Some(format!("\"{pyenv}\" shell - sh {version}")),
-                        ShellKind::Nushell => Some(format!("^\"{pyenv}\" shell - nu {version}")),
-                        ShellKind::PowerShell | ShellKind::Pwsh => None,
-                        ShellKind::Csh => None,
-                        ShellKind::Tcsh => None,
-                        ShellKind::Cmd => None,
-                        ShellKind::Rc => None,
-                        ShellKind::Xonsh => None,
-                        ShellKind::Elvish => None,
-                    })
-                }
-                _ => {}
-            }
-            activation_script
-        })
-    }
 }
 
-async fn venv_to_toolchain(venv: PythonEnvironment, fs: &dyn Fs) -> Option<Toolchain> {
+async fn venv_to_toolchain(venv: PythonEnvironment) -> Option<Toolchain> {
     let mut name = String::from("Python");
     if let Some(ref version) = venv.version {
         _ = write!(name, " {version}");
@@ -1605,21 +1455,7 @@ async fn venv_to_toolchain(venv: PythonEnvironment, fs: &dyn Fs) -> Option<Toolc
         _ = write!(name, " {nk}");
     }
 
-    let mut activation_scripts = HashMap::default();
-    match venv.kind {
-        Some(
-            PythonEnvironmentKind::Venv
-            | PythonEnvironmentKind::VirtualEnv
-            | PythonEnvironmentKind::Uv
-            | PythonEnvironmentKind::UvWorkspace
-            | PythonEnvironmentKind::Poetry,
-        ) => resolve_venv_activation_scripts(&venv, fs, &mut activation_scripts).await,
-        _ => {}
-    }
-    let data = PythonToolchainData {
-        environment: venv,
-        activation_scripts: Some(activation_scripts),
-    };
+    let data = PythonToolchainData { environment: venv };
 
     Some(Toolchain {
         name: name.into(),
@@ -1633,36 +1469,6 @@ async fn venv_to_toolchain(venv: PythonEnvironment, fs: &dyn Fs) -> Option<Toolc
         language_name: LanguageName::new_static("Python"),
         as_json: serde_json::to_value(data).ok()?,
     })
-}
-
-async fn resolve_venv_activation_scripts(
-    venv: &PythonEnvironment,
-    fs: &dyn Fs,
-    activation_scripts: &mut HashMap<ShellKind, PathBuf>,
-) {
-    log::debug!("(Python) Resolving activation scripts for venv toolchain {venv:?}");
-    if let Some(prefix) = &venv.prefix {
-        for (shell_kind, script_name) in &[
-            (ShellKind::Posix, "activate"),
-            (ShellKind::Rc, "activate"),
-            (ShellKind::Csh, "activate.csh"),
-            (ShellKind::Tcsh, "activate.csh"),
-            (ShellKind::Fish, "activate.fish"),
-            (ShellKind::Nushell, "activate.nu"),
-            (ShellKind::PowerShell, "activate.ps1"),
-            (ShellKind::Pwsh, "activate.ps1"),
-            (ShellKind::Cmd, "activate.bat"),
-            (ShellKind::Xonsh, "activate.xsh"),
-        ] {
-            let path = prefix.join(BINARY_DIR).join(script_name);
-
-            log::debug!("Trying path: {}", path.display());
-
-            if fs.is_file(&path).await {
-                activation_scripts.insert(*shell_kind, path);
-            }
-        }
-    }
 }
 
 pub struct EnvironmentApi<'a> {
@@ -3151,214 +2957,6 @@ mod tests {
                     "typeCheckingMode": "basic"
                 }
             })
-        );
-    }
-
-    #[gpui::test]
-    async fn test_conda_activation_script_injection(cx: &mut TestAppContext) {
-        use language::{LanguageName, Toolchain, ToolchainLister};
-        use settings::{CondaManager, VenvSettings};
-        use task::ShellKind;
-
-        use crate::python::PythonToolchainProvider;
-
-        cx.executor().allow_parking();
-
-        cx.update(|cx| {
-            let test_settings = SettingsStore::test(cx);
-            cx.set_global(test_settings);
-            cx.update_global::<SettingsStore, _>(|store, cx| {
-                store.update_user_settings(cx, |s| {
-                    s.terminal
-                        .get_or_insert_with(Default::default)
-                        .project
-                        .detect_venv = Some(VenvSettings::On {
-                        activate_script: None,
-                        venv_name: None,
-                        directories: None,
-                        conda_manager: Some(CondaManager::Conda),
-                    });
-                });
-            });
-        });
-
-        let fs = project::FakeFs::new(cx.executor());
-        let provider = PythonToolchainProvider::new(fs);
-        let malicious_name = "foo; rm -rf /";
-
-        let manager_executable = std::env::current_exe().unwrap();
-
-        let data = serde_json::json!({
-            "name": malicious_name,
-            "kind": "Conda",
-            "executable": "/tmp/conda/bin/python",
-            "version": serde_json::Value::Null,
-            "prefix": serde_json::Value::Null,
-            "arch": serde_json::Value::Null,
-            "displayName": serde_json::Value::Null,
-            "project": serde_json::Value::Null,
-            "symlinks": serde_json::Value::Null,
-            "manager": {
-                "executable": manager_executable,
-                "version": serde_json::Value::Null,
-                "tool": "Conda",
-            },
-        });
-
-        let toolchain = Toolchain {
-            name: "test".into(),
-            path: "/tmp/conda".into(),
-            language_name: LanguageName::new_static("Python"),
-            as_json: data,
-        };
-
-        let script = cx
-            .update(|cx| provider.activation_script(&toolchain, ShellKind::Posix, cx))
-            .await;
-
-        assert!(
-            script
-                .iter()
-                .any(|s| s.contains("conda activate 'foo; rm -rf /'")),
-            "Script should contain quoted malicious name, actual: {:?}",
-            script
-        );
-    }
-
-    #[gpui::test]
-    async fn test_conda_activation_skips_when_name_missing(cx: &mut TestAppContext) {
-        use language::{LanguageName, Toolchain, ToolchainLister};
-        use settings::{CondaManager, VenvSettings};
-        use task::ShellKind;
-
-        use crate::python::PythonToolchainProvider;
-
-        cx.executor().allow_parking();
-
-        cx.update(|cx| {
-            let test_settings = SettingsStore::test(cx);
-            cx.set_global(test_settings);
-            cx.update_global::<SettingsStore, _>(|store, cx| {
-                store.update_user_settings(cx, |s| {
-                    s.terminal
-                        .get_or_insert_with(Default::default)
-                        .project
-                        .detect_venv = Some(VenvSettings::On {
-                        activate_script: None,
-                        venv_name: None,
-                        directories: None,
-                        conda_manager: Some(CondaManager::Conda),
-                    });
-                });
-            });
-        });
-
-        let fs = project::FakeFs::new(cx.executor());
-        let provider = PythonToolchainProvider::new(fs);
-        let manager_executable = std::env::current_exe().unwrap();
-
-        let data = serde_json::json!({
-            "name": serde_json::Value::Null,
-            "kind": "Conda",
-            "executable": "/tmp/conda/bin/python",
-            "version": serde_json::Value::Null,
-            "prefix": serde_json::Value::Null,
-            "arch": serde_json::Value::Null,
-            "displayName": serde_json::Value::Null,
-            "project": serde_json::Value::Null,
-            "symlinks": serde_json::Value::Null,
-            "manager": {
-                "executable": manager_executable,
-                "version": serde_json::Value::Null,
-                "tool": "Conda",
-            },
-        });
-
-        let toolchain = Toolchain {
-            name: "test".into(),
-            path: "/tmp/conda".into(),
-            language_name: LanguageName::new_static("Python"),
-            as_json: data,
-        };
-
-        let script = cx
-            .update(|cx| provider.activation_script(&toolchain, ShellKind::Posix, cx))
-            .await;
-
-        assert!(
-            script.is_empty(),
-            "Nameless conda toolchains must not fall back to `conda activate base`, actual: {:?}",
-            script
-        );
-    }
-
-    #[gpui::test]
-    async fn test_conda_activation_skips_unquotable_name(cx: &mut TestAppContext) {
-        use language::{LanguageName, Toolchain, ToolchainLister};
-        use settings::{CondaManager, VenvSettings};
-        use task::ShellKind;
-
-        use crate::python::PythonToolchainProvider;
-
-        cx.executor().allow_parking();
-
-        cx.update(|cx| {
-            let test_settings = SettingsStore::test(cx);
-            cx.set_global(test_settings);
-            cx.update_global::<SettingsStore, _>(|store, cx| {
-                store.update_user_settings(cx, |s| {
-                    s.terminal
-                        .get_or_insert_with(Default::default)
-                        .project
-                        .detect_venv = Some(VenvSettings::On {
-                        activate_script: None,
-                        venv_name: None,
-                        directories: None,
-                        conda_manager: Some(CondaManager::Conda),
-                    });
-                });
-            });
-        });
-
-        let fs = project::FakeFs::new(cx.executor());
-        let provider = PythonToolchainProvider::new(fs);
-        // shlex::try_quote rejects strings containing a NUL byte, so this name
-        // is guaranteed to fail the Posix quoting path.
-        let unquotable_name = "foo\0bar";
-        let manager_executable = std::env::current_exe().unwrap();
-
-        let data = serde_json::json!({
-            "name": unquotable_name,
-            "kind": "Conda",
-            "executable": "/tmp/conda/bin/python",
-            "version": serde_json::Value::Null,
-            "prefix": serde_json::Value::Null,
-            "arch": serde_json::Value::Null,
-            "displayName": serde_json::Value::Null,
-            "project": serde_json::Value::Null,
-            "symlinks": serde_json::Value::Null,
-            "manager": {
-                "executable": manager_executable,
-                "version": serde_json::Value::Null,
-                "tool": "Conda",
-            },
-        });
-
-        let toolchain = Toolchain {
-            name: "test".into(),
-            path: "/tmp/conda".into(),
-            language_name: LanguageName::new_static("Python"),
-            as_json: data,
-        };
-
-        let script = cx
-            .update(|cx| provider.activation_script(&toolchain, ShellKind::Posix, cx))
-            .await;
-
-        assert!(
-            !script.iter().any(|s| s.contains("conda activate")),
-            "Unquotable conda env names must not emit any `conda activate` line, actual: {:?}",
-            script
         );
     }
 

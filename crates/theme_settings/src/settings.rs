@@ -44,13 +44,9 @@ pub struct ThemeSettings {
     ui_font_size: Pixels,
     /// The font used for UI elements.
     pub ui_font: Font,
-    /// The font size used for buffers, and the terminal.
-    ///
-    /// The terminal font size can be overridden using it's own setting.
+    /// The font size used for buffers.
     buffer_font_size: Pixels,
-    /// The font used for buffers, and the terminal.
-    ///
-    /// The terminal font family can be overridden using it's own setting.
+    /// The font used for buffers.
     pub buffer_font: Font,
     git_commit_buffer_font_size: Option<Pixels>,
     /// The font family to use for rendering in the markdown preview.
@@ -70,11 +66,9 @@ pub struct ThemeSettings {
     mermaid_font_family: Option<SharedString>,
     /// The font weight for headings in the markdown preview.
     markdown_preview_heading_font_weight: FontWeight,
-    /// The line height for buffers, and the terminal.
+    /// The line height for buffers.
     ///
     /// Changing this may affect the spacing of some UI elements.
-    ///
-    /// The terminal font family can be overridden using it's own setting.
     pub buffer_line_height: BufferLineHeight,
     /// The current theme selection.
     pub theme: ThemeSelection,

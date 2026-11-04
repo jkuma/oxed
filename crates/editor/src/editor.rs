@@ -248,9 +248,9 @@ use ui::{
 use ui_input::ErasedEditor;
 use util::{RangeExt, ResultExt, TryFutureExt, maybe, post_inc};
 use workspace::{
-    Item as WorkspaceItem, ItemId, ItemNavHistory, NavigationEntry, OpenInTerminal, OpenTerminal,
-    Pane, RestoreOnStartupBehavior, SERIALIZATION_THROTTLE_TIME, SplitDirection, TabBarSettings,
-    Toast, Workspace, WorkspaceId, WorkspaceSettings,
+    Item as WorkspaceItem, ItemId, ItemNavHistory, NavigationEntry, Pane, RestoreOnStartupBehavior,
+    SERIALIZATION_THROTTLE_TIME, SplitDirection, TabBarSettings, Toast, Workspace, WorkspaceId,
+    WorkspaceSettings,
     item::{ItemBufferKind, ItemHandle, PreviewTabsSettings, SaveOptions},
     notifications::{DetachAndPromptErr, NotificationId, NotifyResultExt, NotifyTaskExt},
     searchable::{SearchEvent, SelectSearchOptions},
@@ -5907,35 +5907,6 @@ impl Editor {
         };
         let task = self.reload(project, window, cx);
         self.detach_and_notify_err(task, window, cx);
-    }
-
-    pub fn open_active_item_in_terminal(
-        &mut self,
-        _: &OpenInTerminal,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if let Some(working_directory) = self.active_buffer(cx).and_then(|buffer| {
-            let project_path = buffer.read(cx).project_path(cx)?;
-            let project = self.project()?.read(cx);
-            let entry = project.entry_for_path(&project_path, cx)?;
-            let parent = match &entry.canonical_path {
-                Some(canonical_path) => canonical_path.to_path_buf(),
-                None => project.absolute_path(&project_path, cx)?,
-            }
-            .parent()?
-            .to_path_buf();
-            Some(parent)
-        }) {
-            window.dispatch_action(
-                OpenTerminal {
-                    working_directory,
-                    local: false,
-                }
-                .boxed_clone(),
-                cx,
-            );
-        }
     }
 
     fn set_gutter_context_menu(

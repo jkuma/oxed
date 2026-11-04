@@ -54,7 +54,7 @@ use ui::{
 };
 use util::{RangeExt, ResultExt, TryFutureExt, debug_panic, rel_path::RelPath};
 use workspace::{
-    OpenInTerminal, OpenTerminal, WeakItemHandle, Workspace,
+    WeakItemHandle, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
     item::ItemHandle,
     searchable::{SearchEvent, SearchableItem},
@@ -1805,7 +1805,6 @@ impl OutlinePanel {
         let auto_fold_dirs = OutlinePanelSettings::get_global(cx).auto_fold_dirs;
         let is_foldable = auto_fold_dirs && !is_root && self.is_foldable(&entry);
         let is_unfoldable = auto_fold_dirs && !is_root && self.is_unfoldable(&entry);
-        let open_in_terminal = window.is_action_available(&OpenTerminal::default(), cx);
 
         let context_menu = ContextMenu::build(window, cx, |menu, _, _| {
             menu.context(self.focus_handle.clone())
@@ -1813,9 +1812,6 @@ impl OutlinePanel {
                     ui::utils::reveal_in_file_manager_label(false),
                     Box::new(RevealInFileManager),
                 )
-                .when(open_in_terminal, |menu| {
-                    menu.action("Open in Terminal", Box::new(OpenInTerminal))
-                })
                 .when(is_unfoldable, |menu| {
                     menu.action("Unfold Directory", Box::new(UnfoldDirectory))
                 })
@@ -2350,36 +2346,6 @@ impl OutlinePanel {
         {
             self.project
                 .update(cx, |project, cx| project.reveal_path(&abs_path, cx));
-        }
-    }
-
-    fn open_in_terminal(
-        &mut self,
-        _: &OpenInTerminal,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let selected_entry = self.selected_entry();
-        let abs_path = selected_entry.and_then(|entry| self.abs_path(entry, cx));
-        let working_directory = if let (
-            Some(abs_path),
-            Some(PanelEntry::Fs(FsEntry::File(..) | FsEntry::ExternalFile(..))),
-        ) = (&abs_path, selected_entry)
-        {
-            abs_path.parent().map(|p| p.to_owned())
-        } else {
-            abs_path
-        };
-
-        if let Some(working_directory) = working_directory {
-            window.dispatch_action(
-                workspace::OpenTerminal {
-                    working_directory,
-                    local: false,
-                }
-                .boxed_clone(),
-                cx,
-            )
         }
     }
 
@@ -5706,9 +5672,7 @@ impl EventEmitter<PanelEvent> for OutlinePanel {}
 
 impl Render for OutlinePanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let (is_local, is_via_ssh) = self.project.read_with(cx, |project, _| {
-            (project.is_local(), project.is_via_remote_server())
-        });
+        let is_local = self.project.read(cx).is_local();
         let query = self.query(cx);
         let pinned = self.pinned;
         let settings = OutlinePanelSettings::get_global(cx);
@@ -5754,9 +5718,6 @@ impl Render for OutlinePanel {
             .on_action(cx.listener(Self::open_excerpts_split))
             .when(is_local, |el| {
                 el.on_action(cx.listener(Self::reveal_in_finder))
-            })
-            .when(is_local || is_via_ssh, |el| {
-                el.on_action(cx.listener(Self::open_in_terminal))
             })
             .on_mouse_down(
                 MouseButton::Right,

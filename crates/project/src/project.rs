@@ -14,7 +14,6 @@ pub mod project_settings;
 pub mod search;
 pub mod task_inventory;
 pub mod task_store;
-pub mod terminals;
 pub mod toolchain_store;
 pub mod trusted_worktrees;
 pub mod worktree_store;
@@ -122,7 +121,6 @@ use std::{
 };
 
 use task_store::TaskStore;
-use terminals::Terminals;
 use text::{Anchor, BufferId, Point, Rope};
 use util::{
     ResultExt as _, maybe,
@@ -220,7 +218,6 @@ pub struct Project {
     buffers_needing_diff: HashSet<WeakEntity<Buffer>>,
     git_diff_debouncer: DebouncedDelay<Self>,
     remotely_created_models: Arc<Mutex<RemotelyCreatedModels>>,
-    terminals: Terminals,
     node: Option<NodeRuntime>,
     search_history: SearchHistory,
     search_included_history: SearchHistory,
@@ -1283,9 +1280,6 @@ impl Project {
 
                 buffers_needing_diff: Default::default(),
                 git_diff_debouncer: DebouncedDelay::new(),
-                terminals: Terminals {
-                    local_handles: Vec::new(),
-                },
                 node: Some(node),
                 search_history: Self::new_search_history(),
                 environment,
@@ -1496,9 +1490,6 @@ impl Project {
                 remote_client: Some(remote.clone()),
                 buffers_needing_diff: Default::default(),
                 git_diff_debouncer: DebouncedDelay::new(),
-                terminals: Terminals {
-                    local_handles: Vec::new(),
-                },
                 node: Some(node),
                 search_history: Self::new_search_history(),
                 environment,
@@ -1806,11 +1797,6 @@ impl Project {
     #[inline]
     pub fn fs(&self) -> &Arc<dyn Fs> {
         &self.fs
-    }
-
-    #[inline]
-    pub fn supports_terminal(&self, _cx: &App) -> bool {
-        self.is_local() || self.is_via_remote_server()
     }
 
     #[inline]
