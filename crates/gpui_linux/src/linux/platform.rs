@@ -37,8 +37,8 @@ use crate::linux::{
 };
 use gpui::{
     Action, ActivityGuard, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle,
-    ForegroundExecutor, GraphicalEnvironment, Keymap, Menu, MenuItem, OwnedMenu, PathPromptOptions,
-    Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
+    ForegroundExecutor, GraphicalEnvironment, Keymap, Menu, OwnedMenu, PathPromptOptions, Platform,
+    PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
     PlatformWindow, Result, RunnableVariant, Task, ThermalState, WindowAppearance,
     WindowButtonLayout, WindowParams, WindowingModes, WindowingRequest,
 };
@@ -64,10 +64,7 @@ const FILE_PICKER_PORTAL_MISSING: &str =
 pub(crate) struct PlatformHandlers {
     pub(crate) open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
     pub(crate) quit: Option<Box<dyn FnMut() -> bool>>,
-    pub(crate) reopen: Option<Box<dyn FnMut()>>,
     pub(crate) app_menu_action: Option<Box<dyn FnMut(&dyn Action)>>,
-    pub(crate) will_open_app_menu: Option<Box<dyn FnMut()>>,
-    pub(crate) validate_app_menu_command: Option<Box<dyn FnMut(&dyn Action) -> bool>>,
     pub(crate) keyboard_layout_change: Option<Box<dyn FnMut()>>,
     pub(crate) system_sleep: Option<Box<dyn FnMut()>>,
     pub(crate) system_wake: Option<Box<dyn FnMut()>>,
@@ -696,18 +693,6 @@ impl Platform for LinuxPlatform {
         log::info!("activate is not implemented on Linux, ignoring the call")
     }
 
-    fn hide(&self) {
-        log::info!("hide is not implemented on Linux, ignoring the call")
-    }
-
-    fn hide_other_apps(&self) {
-        log::info!("hide_other_apps is not implemented on Linux, ignoring the call")
-    }
-
-    fn unhide_other_apps(&self) {
-        log::info!("unhide_other_apps is not implemented on Linux, ignoring the call")
-    }
-
     fn primary_display(&self) -> Option<Rc<dyn PlatformDisplay>> {
         self.connection.borrow().primary_display()
     }
@@ -913,12 +898,6 @@ impl Platform for LinuxPlatform {
         });
     }
 
-    fn on_reopen(&self, callback: Box<dyn FnMut()>) {
-        self.with_common(|common| {
-            common.callbacks.reopen = Some(callback);
-        });
-    }
-
     fn on_system_sleep(&self, callback: Box<dyn FnMut()>) {
         self.with_common(|common| {
             common.callbacks.system_sleep = Some(callback);
@@ -965,18 +944,6 @@ impl Platform for LinuxPlatform {
         });
     }
 
-    fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>) {
-        self.with_common(|common| {
-            common.callbacks.will_open_app_menu = Some(callback);
-        });
-    }
-
-    fn on_validate_app_menu_command(&self, callback: Box<dyn FnMut(&dyn Action) -> bool>) {
-        self.with_common(|common| {
-            common.callbacks.validate_app_menu_command = Some(callback);
-        });
-    }
-
     fn app_path(&self) -> Result<PathBuf> {
         // get the path of the executable of the current process
         let app_path = env::current_exe()?;
@@ -991,10 +958,6 @@ impl Platform for LinuxPlatform {
 
     fn get_menus(&self) -> Option<Vec<OwnedMenu>> {
         self.with_common(|common| Some(common.menus.clone()))
-    }
-
-    fn set_dock_menu(&self, _menu: Vec<MenuItem>, _keymap: &Keymap) {
-        // todo(linux)
     }
 
     fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
@@ -1112,8 +1075,6 @@ impl Platform for LinuxPlatform {
     fn read_from_clipboard(&self) -> Option<ClipboardItem> {
         self.connection.borrow().read_from_clipboard()
     }
-
-    fn add_recent_document(&self, _path: &Path) {}
 }
 
 /// Opens `target` with the first of the desktop's launchers that succeeds. Returns whether one

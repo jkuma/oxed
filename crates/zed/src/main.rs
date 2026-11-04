@@ -347,18 +347,6 @@ fn main() {
             })
         }
     });
-    app.on_reopen(move |cx| {
-        if let Some(app_state) = AppState::try_global(cx) {
-            cx.spawn({
-                async move |cx| {
-                    if let Err(e) = restore_or_create_workspace(app_state, cx).await {
-                        fail_to_open_window_async(e, cx)
-                    }
-                }
-            })
-            .detach();
-        }
-    });
 
     app.run(move |cx| {
         cx.set_global(app_db);
@@ -514,7 +502,7 @@ fn main() {
         image_viewer::init(cx);
         diagnostics::init(cx);
 
-        workspace::init(app_state.clone(), cx);
+        workspace::init(cx);
         ui_prompt::init(cx);
 
         go_to_line::init(cx);
@@ -748,9 +736,6 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                     })
                 })
                 .detach_and_log_err(cx);
-            }
-            OpenRequestKind::DockMenuAction { index } => {
-                cx.perform_dock_menu_action(index);
             }
             OpenRequestKind::BuiltinJsonSchema { schema_path } => {
                 workspace::with_active_or_new_workspace(cx, |_workspace, window, cx| {

@@ -3437,8 +3437,8 @@ mod tests {
     async fn test_pending_serialization_flushed_on_shutdown(cx: &mut gpui::TestAppContext) {
         crate::tests::init_test(cx);
 
-        let app_state = cx.update(crate::AppState::test);
-        cx.update(|cx| crate::init(app_state.clone(), cx));
+        cx.update(crate::AppState::test);
+        cx.update(|cx| crate::init(cx));
 
         let fs = fs::FakeFs::new(cx.executor());
         let dir = unique_test_dir(&fs, "shutdown-flush").await;

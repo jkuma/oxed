@@ -26,9 +26,8 @@ use ui::{
 };
 use util::{ResultExt, paths::PathExt};
 use workspace::{
-    HistoryManager, ModalView, MultiWorkspace, OpenMode, OpenOptions, OpenVisible, RecentWorkspace,
-    Workspace, WorkspaceDb, WorkspaceId, notifications::DetachAndPromptErr,
-    with_active_or_new_workspace,
+    ModalView, MultiWorkspace, OpenMode, OpenOptions, OpenVisible, RecentWorkspace, Workspace,
+    WorkspaceDb, WorkspaceId, notifications::DetachAndPromptErr, with_active_or_new_workspace,
 };
 use zed_actions::OpenRecent;
 
@@ -1545,11 +1544,9 @@ impl RecentProjectsDelegate {
             let db = WorkspaceDb::global(cx);
             cx.spawn_in(window, async move |this, cx| {
                 let Some(fs) = fs else { return };
-                let deleted_workspace_ids = db
-                    .delete_recent_workspace_group(&recent_workspace)
+                db.delete_recent_workspace_group(&recent_workspace)
                     .await
-                    .log_err()
-                    .unwrap_or_default();
+                    .log_err();
                 let workspaces = db
                     .recent_project_workspaces(fs.as_ref())
                     .await
@@ -1558,15 +1555,6 @@ impl RecentProjectsDelegate {
                     Self::update_picker_after_recent_project_deletion(
                         picker, ix, workspaces, window, cx,
                     );
-                    // After deleting a project, we want to update the history manager to reflect the change.
-                    // But we do not emit a update event when user opens a project, because it's handled in `workspace::load_workspace`.
-                    if let Some(history_manager) = HistoryManager::global(cx) {
-                        history_manager.update(cx, |this, cx| {
-                            for workspace_id in &deleted_workspace_ids {
-                                this.delete_history(*workspace_id, cx);
-                            }
-                        });
-                    }
                 })
                 .ok();
             })

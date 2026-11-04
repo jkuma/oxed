@@ -844,7 +844,6 @@ impl VsCodeSettings {
             active_pane_modifiers: self.active_pane_modifiers(),
             accessible_mode: None,
             text_rendering_mode: None,
-            use_display_p3: None,
             autosave: self.read_enum("files.autoSave", |s| match s {
                 "off" => Some(AutosaveSetting::Off),
                 "afterDelay" => Some(AutosaveSetting::AfterDelay {
@@ -892,14 +891,6 @@ impl VsCodeSettings {
             show_call_status_icon: None,
             use_system_path_prompts: self.read_bool("files.simpleDialog.enable").map(|b| !b),
             use_system_prompts: None,
-            use_system_window_tabs: self.read_bool("window.nativeTabs"),
-            fullscreen_mode: self.read_bool("window.nativeFullScreen").map(|b| {
-                if b {
-                    FullscreenMode::Native
-                } else {
-                    FullscreenMode::Simple
-                }
-            }),
             window_title_format: self.read_window_title_format(),
             window_title_separator: self.read_string("window.titleSeparator"),
             when_closing_with_no_tabs: self.read_bool("window.closeWhenEmpty").map(|b| {

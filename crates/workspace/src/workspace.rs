@@ -1,6 +1,5 @@
 pub mod active_file_name;
 pub mod dock;
-pub mod history_manager;
 pub mod invalid_item_view;
 pub mod item;
 mod modal_layer;
@@ -45,11 +44,9 @@ use gpui::{
     ClipboardItem, Context, CursorStyle, Decorations, DragMoveEvent, Entity, EntityId,
     EventEmitter, FocusHandle, Focusable, Global, HitboxBehavior, Hsla, KeyContext, Keystroke,
     ManagedView, MouseButton, PathPromptOptions, Point, PromptLevel, Render, ResizeEdge, Size,
-    Stateful, Subscription, SystemWindowTabController, Task, TaskExt, Tiling, WeakEntity,
-    WindowBounds, WindowHandle, WindowId, WindowOptions, actions, canvas, point, relative, size,
-    transparent_black,
+    Stateful, Subscription, Task, TaskExt, Tiling, WeakEntity, WindowBounds, WindowHandle,
+    WindowId, WindowOptions, actions, canvas, point, relative, size, transparent_black,
 };
-pub use history_manager::*;
 use http_client::HttpClientWithUrl;
 pub use item::{
     Item, ItemHandle, ItemSettings, PreviewTabsSettings, ProjectItem, SerializableItem,
@@ -868,11 +865,10 @@ pub fn prompt_for_open_path_and_open(
     .detach();
 }
 
-pub fn init(app_state: Arc<AppState>, cx: &mut App) {
+pub fn init(cx: &mut App) {
     component::init();
     theme_preview::init(cx);
     toast_layer::init(cx);
-    history_manager::init(app_state.fs.clone(), cx);
 
     cx.on_app_quit(flush_windows_serialization_on_quit).detach();
 
@@ -1459,7 +1455,6 @@ impl Workspace {
                 &project::Event::WorktreeRemoved(_) => {
                     this.update_window_title(window, cx);
                     this.serialize_workspace(window, cx);
-                    this.update_history(cx);
                 }
 
                 &project::Event::WorktreeAdded(id) => {
@@ -1471,7 +1466,6 @@ impl Workspace {
                         .is_some_and(|wt| wt.read(cx).is_visible())
                     {
                         this.serialize_workspace(window, cx);
-                        this.update_history(cx);
                     }
                 }
                 project::Event::WorktreeUpdatedEntries(..) => {
@@ -1492,7 +1486,7 @@ impl Workspace {
                 project::Event::DisconnectedFromRemote {
                     server_not_running: _,
                 } => {
-                    this.update_window_edited(window, cx);
+                    this.update_window_edited();
                 }
 
                 project::Event::Closed => {
@@ -2010,14 +2004,6 @@ impl Workspace {
                         .log_err();
                 }
             }
-
-            window
-                .update(cx, |_, _window, cx| {
-                    workspace.update(cx, |this: &mut Workspace, cx| {
-                        this.update_history(cx);
-                    });
-                })
-                .log_err();
 
             window
                 .update(cx, |_, window, _cx| {
@@ -5326,7 +5312,7 @@ impl Workspace {
             }
             pane::Event::RemovedItem { item } => {
                 cx.emit(Event::ActiveItemChanged);
-                self.update_window_edited(window, cx);
+                self.update_window_edited();
                 if let hash_map::Entry::Occupied(entry) = self.panes_by_item.entry(item.item_id())
                     && entry.get().entity_id() == pane.entity_id()
                 {
@@ -5658,22 +5644,12 @@ impl Workspace {
             title = render_window_title_format(default_template, separator, &context);
         }
 
-        let document_path = active_project_path
-            .as_ref()
-            .and_then(|path| project.absolute_path(path, cx));
-        window.set_document_path(document_path.as_deref());
-
         if let Some(last_title) = self.last_window_title.as_ref()
             && &title == last_title
         {
             return;
         }
         window.set_window_title(&title);
-        SystemWindowTabController::update_tab_title(
-            cx,
-            window.window_handle().window_id(),
-            SharedString::from(&title),
-        );
         self.last_window_title = Some(title);
     }
 
@@ -5752,19 +5728,14 @@ impl Workspace {
         }
     }
 
-    fn update_window_edited(&mut self, window: &mut Window, _cx: &mut App) {
-        if !self.owns_window_chrome() {
-            return;
-        }
-        let is_edited = self.is_window_edited();
-        if is_edited != self.window_edited {
-            self.window_edited = is_edited;
-            window.set_window_edited(self.window_edited);
+    fn update_window_edited(&mut self) {
+        if self.owns_window_chrome() {
+            self.window_edited = self.is_window_edited();
         }
     }
 
-    /// Re-applies this workspace's title and edited indicator to the platform
-    /// window, bypassing the change-detection caches.
+    /// Re-applies this workspace's title to the platform window and recomputes
+    /// its edited state, bypassing the change-detection caches.
     ///
     /// Several workspaces can share a single platform window (a multi-workspace
     /// window). The `last_window_title`/`window_edited` caches assume the
@@ -5784,7 +5755,6 @@ impl Workspace {
         self.apply_window_title(window, cx);
 
         self.window_edited = self.is_window_edited();
-        window.set_window_edited(self.window_edited);
     }
 
     fn update_item_dirty_state(
@@ -5801,7 +5771,7 @@ impl Workspace {
         }
         if was_dirty {
             self.dirty_items.remove(&item_id);
-            self.update_window_edited(window, cx);
+            self.update_window_edited();
             return;
         }
 
@@ -5811,11 +5781,11 @@ impl Workspace {
         };
         let on_release_callback = Box::new(move |cx: &mut App| {
             window_handle
-                .update(cx, |_, window, cx| {
+                .update(cx, |_, _window, cx| {
                     workspace
-                        .update(cx, |workspace, cx| {
+                        .update(cx, |workspace, _cx| {
                             workspace.dirty_items.remove(&item_id);
-                            workspace.update_window_edited(window, cx)
+                            workspace.update_window_edited()
                         })
                         .ok();
                 })
@@ -5824,7 +5794,7 @@ impl Workspace {
 
         let s = item.on_release(cx, on_release_callback);
         self.dirty_items.insert(item_id, s);
-        self.update_window_edited(window, cx);
+        self.update_window_edited();
     }
 
     fn render_notifications(&self, _window: &mut Window, _cx: &mut Context<Self>) -> Option<Div> {
@@ -6142,18 +6112,6 @@ impl Workspace {
         PathList::new(&self.root_paths(cx))
     }
 
-    fn update_history(&self, cx: &mut App) {
-        let Some(id) = self.database_id() else {
-            return;
-        };
-        if let Some(manager) = HistoryManager::global(cx) {
-            let paths = PathList::new(&self.root_paths(cx));
-            manager.update(cx, |this, cx| {
-                this.update_history(id, HistoryManagerEntry::new(id, &paths), cx);
-            });
-        }
-    }
-
     async fn serialize_items(
         this: &WeakEntity<Self>,
         items_rx: UnboundedReceiver<Box<dyn SerializableItemHandle>>,
@@ -6328,7 +6286,7 @@ impl Workspace {
                     workspace.serialize_workspace_internal(window, cx).detach();
 
                     // Ensure that we mark the window as edited if we did load dirty items
-                    workspace.update_window_edited(window, cx);
+                    workspace.update_window_edited();
                 })
                 .ok();
 
@@ -7203,16 +7161,11 @@ impl Workspace {
             return;
         };
         let windows = cx.windows();
-        let next_window =
-            SystemWindowTabController::get_next_tab_group_window(cx, current_window_id).or_else(
-                || {
-                    windows
-                        .iter()
-                        .cycle()
-                        .skip_while(|window| window.window_id() != current_window_id)
-                        .nth(1)
-                },
-            );
+        let next_window = windows
+            .iter()
+            .cycle()
+            .skip_while(|window| window.window_id() != current_window_id)
+            .nth(1);
 
         if let Some(window) = next_window {
             window
@@ -7226,17 +7179,12 @@ impl Workspace {
             return;
         };
         let windows = cx.windows();
-        let prev_window =
-            SystemWindowTabController::get_prev_tab_group_window(cx, current_window_id).or_else(
-                || {
-                    windows
-                        .iter()
-                        .rev()
-                        .cycle()
-                        .skip_while(|window| window.window_id() != current_window_id)
-                        .nth(1)
-                },
-            );
+        let prev_window = windows
+            .iter()
+            .rev()
+            .cycle()
+            .skip_while(|window| window.window_id() != current_window_id)
+            .nth(1);
 
         if let Some(window) = prev_window {
             window
@@ -9757,86 +9705,6 @@ mod tests {
         // Remove a project folder
         project.update(cx, |project, cx| project.remove_worktree(worktree_id, cx));
         assert_eq!(cx.window_title().as_deref(), Some("root2 — one.txt"));
-    }
-
-    #[gpui::test]
-    async fn test_document_path_updates_with_active_item(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(
-            "/root",
-            json!({
-                "one.txt": "",
-                "two.txt": "",
-            }),
-        )
-        .await;
-
-        let project = Project::test(fs, ["root".as_ref()], cx).await;
-        let (workspace, cx) =
-            cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
-        let pane = workspace.read_with(cx, |workspace, _| workspace.active_pane().clone());
-        let worktree_id = project.update(cx, |project, cx| {
-            project.worktrees(cx).next().unwrap().read(cx).id()
-        });
-
-        let item1 = cx.new(|cx| {
-            TestItem::new(cx).with_project_items(&[new_test_project_item(
-                1,
-                "one.txt",
-                worktree_id,
-                cx,
-            )])
-        });
-        let item2 = cx.new(|cx| {
-            TestItem::new(cx).with_project_items(&[new_test_project_item(
-                2,
-                "two.txt",
-                worktree_id,
-                cx,
-            )])
-        });
-
-        // Initially no document path
-        assert_eq!(cx.document_path(), None);
-
-        // Add an item - document path should be set
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(item1), None, true, window, cx)
-        });
-        assert_eq!(
-            cx.document_path(),
-            Some(std::path::PathBuf::from("root/one.txt"))
-        );
-
-        // Add a second item - document path should update
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(item2), None, true, window, cx)
-        });
-        assert_eq!(
-            cx.document_path(),
-            Some(std::path::PathBuf::from("root/two.txt"))
-        );
-
-        // Close the active item - document path should revert to first item
-        pane.update_in(cx, |pane, window, cx| {
-            pane.close_active_item(&Default::default(), window, cx)
-        })
-        .await
-        .unwrap();
-        assert_eq!(
-            cx.document_path(),
-            Some(std::path::PathBuf::from("root/one.txt"))
-        );
-
-        // Close all items - document path should be cleared
-        pane.update_in(cx, |pane, window, cx| {
-            pane.close_active_item(&Default::default(), window, cx)
-        })
-        .await
-        .unwrap();
-        assert_eq!(cx.document_path(), None);
     }
 
     #[gpui::test]
@@ -15957,21 +15825,6 @@ mod tests {
         let item = TestProjectItem::new(id, path, cx);
         item.update(cx, |item, _| {
             item.is_dirty = true;
-        });
-        item
-    }
-
-    fn new_test_project_item(
-        id: u64,
-        path: &str,
-        worktree_id: WorktreeId,
-        cx: &mut App,
-    ) -> Entity<TestProjectItem> {
-        let item = TestProjectItem::new(id, path, cx);
-        item.update(cx, |item, _| {
-            if let Some(ref mut project_path) = item.project_path {
-                project_path.worktree_id = worktree_id;
-            }
         });
         item
     }

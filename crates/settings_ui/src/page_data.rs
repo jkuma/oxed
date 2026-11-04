@@ -1137,7 +1137,7 @@ fn appearance_page() -> SettingsPage {
         ]
     }
 
-    fn text_rendering_section() -> [SettingsPageItem; 3] {
+    fn text_rendering_section() -> [SettingsPageItem; 2] {
         [
             SettingsPageItem::SectionHeader("Text Rendering"),
             SettingsPageItem::SettingItem(SettingItem {
@@ -1150,19 +1150,6 @@ fn appearance_page() -> SettingsPage {
                     },
                     write: |settings_content, value, _| {
                         settings_content.workspace.text_rendering_mode = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Display P3",
-                description: "(macOS only) render windows using the Display P3 color space.",
-                field: Box::new(SettingField {
-                    json_path: Some("use_display_p3"),
-                    pick: |settings_content| settings_content.workspace.use_display_p3.as_ref(),
-                    write: |settings_content, value, _| {
-                        settings_content.workspace.use_display_p3 = value;
                     },
                 }),
                 metadata: None,
@@ -4406,7 +4393,7 @@ fn window_and_layout_page() -> SettingsPage {
         ]
     }
 
-    fn window_section() -> [SettingsPageItem; 6] {
+    fn window_section() -> [SettingsPageItem; 4] {
         [
             SettingsPageItem::SectionHeader("Window"),
             SettingsPageItem::SettingItem(SettingItem {
@@ -4444,35 +4431,6 @@ fn window_and_layout_page() -> SettingsPage {
                     placeholder: Some(" — "),
                     ..Default::default()
                 })),
-                files: USER,
-            }),
-            // todo(settings_ui): Should we filter by platform.as_ref()?
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Use System Window Tabs",
-                description: "(macOS only) whether to allow Windows to tab together.",
-                field: Box::new(SettingField {
-                    json_path: Some("use_system_window_tabs"),
-                    pick: |settings_content| {
-                        settings_content.workspace.use_system_window_tabs.as_ref()
-                    },
-                    write: |settings_content, value, _| {
-                        settings_content.workspace.use_system_window_tabs = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Fullscreen Mode",
-                description: "(macOS only) which fullscreen mode the toggle fullscreen action enters.",
-                field: Box::new(SettingField {
-                    json_path: Some("fullscreen_mode"),
-                    pick: |settings_content| settings_content.workspace.fullscreen_mode.as_ref(),
-                    write: |settings_content, value, _| {
-                        settings_content.workspace.fullscreen_mode = value;
-                    },
-                }),
-                metadata: None,
                 files: USER,
             }),
             SettingsPageItem::SettingItem(SettingItem {

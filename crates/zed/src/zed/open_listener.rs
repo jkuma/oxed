@@ -49,9 +49,6 @@ pub enum OpenRequestKind {
     Extension {
         extension_id: String,
     },
-    DockMenuAction {
-        index: usize,
-    },
     BuiltinJsonSchema {
         schema_path: String,
     },
@@ -75,10 +72,6 @@ impl std::fmt::Debug for OpenRequestKind {
             Self::Extension { extension_id } => f
                 .debug_struct("Extension")
                 .field("extension_id", extension_id)
-                .finish(),
-            Self::DockMenuAction { index } => f
-                .debug_struct("DockMenuAction")
-                .field("index", index)
                 .finish(),
             Self::BuiltinJsonSchema { schema_path } => f
                 .debug_struct("BuiltinJsonSchema")
@@ -114,10 +107,6 @@ impl OpenRequest {
         for url in request.urls {
             if let Some(server_name) = url.strip_prefix("zed-cli://") {
                 this.kind = Some(OpenRequestKind::CliConnection(connect_to_cli(server_name)?));
-            } else if let Some(action_index) = url.strip_prefix("zed-dock-action://") {
-                this.kind = Some(OpenRequestKind::DockMenuAction {
-                    index: action_index.parse()?,
-                });
             } else if let Some(file) = url.strip_prefix("file://") {
                 this.parse_file_path(file)
             } else if let Some(file) = url.strip_prefix("zed://file") {

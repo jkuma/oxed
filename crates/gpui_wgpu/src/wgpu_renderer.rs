@@ -183,20 +183,14 @@ enum RendererState {
         surface: wgpu::Surface<'static>,
         core: WgpuRendererCore,
     },
-    /// The native surface is gone (Android `TerminateWindow`, browser context loss) but
-    /// the device, pipelines, and atlas remain so `replace_surface` can resume without
-    /// re-uploading cached textures.
-    Unconfigured { core: WgpuRendererCore },
     /// Released by `destroy`, or dropped for a device recovery that has not succeeded yet.
     Released,
 }
 
 pub struct WgpuRenderer {
-    /// Shared GPU context for device recovery coordination (unused on WASM).
-    #[allow(dead_code)]
+    /// Shared GPU context for device recovery coordination.
     context: Option<GpuContext>,
-    /// Compositor GPU hint for adapter selection (unused on WASM).
-    #[allow(dead_code)]
+    /// Compositor GPU hint for adapter selection.
     compositor_gpu: Option<CompositorGpuHint>,
     state: RendererState,
     surface_config: wgpu::SurfaceConfiguration,
@@ -215,14 +209,14 @@ pub struct WgpuRenderer {
 impl WgpuRenderer {
     fn core(&self) -> Option<&WgpuRendererCore> {
         match &self.state {
-            RendererState::Ready { core, .. } | RendererState::Unconfigured { core } => Some(core),
+            RendererState::Ready { core, .. } => Some(core),
             RendererState::Released => None,
         }
     }
 
     fn core_mut(&mut self) -> Option<&mut WgpuRendererCore> {
         match &mut self.state {
-            RendererState::Ready { core, .. } | RendererState::Unconfigured { core } => Some(core),
+            RendererState::Ready { core, .. } => Some(core),
             RendererState::Released => None,
         }
     }
@@ -922,10 +916,6 @@ impl WgpuRenderer {
     }
 
     pub fn draw(&mut self, scene: &Scene) -> bool {
-        // Bail out early if the surface has been unconfigured (e.g. during
-        // Android background/rotation transitions).  Attempting to acquire
-        // a texture from an unconfigured surface can block indefinitely on
-        // some drivers (Adreno).
         let RendererState::Ready { surface, core } = &mut self.state else {
             return false;
         };
@@ -1717,83 +1707,6 @@ impl WgpuRendererCore {
 }
 
 impl WgpuRenderer {
-    /// Mark the surface as unconfigured so rendering is skipped until a new
-    /// surface is provided via [`replace_surface`](Self::replace_surface).
-    ///
-    /// This does **not** drop the renderer — the device, queue, atlas, and
-    /// pipelines stay alive.  Use this when the native window is destroyed
-    /// (e.g. Android `TerminateWindow`) but you intend to re-create the
-    /// surface later without losing cached atlas textures.
-    pub fn unconfigure_surface(&mut self) {
-        self.state = match std::mem::replace(&mut self.state, RendererState::Released) {
-            RendererState::Ready { core, surface } => {
-                drop(surface);
-                RendererState::Unconfigured { core }
-            }
-            state @ (RendererState::Unconfigured { .. } | RendererState::Released) => state,
-        };
-        // Drop intermediate textures since they reference the old surface size.
-        if let Some(core) = self.core_mut() {
-            core.resources.invalidate_intermediate_textures();
-        }
-    }
-
-    /// Replace the wgpu surface with a new one (e.g. after Android destroys
-    /// and recreates the native window).  Keeps the device, queue, atlas, and
-    /// all pipelines intact so cached `AtlasTextureId`s remain valid.
-    ///
-    /// The `instance` **must** be the same [`wgpu::Instance`] that was used to
-    /// create the adapter and device (i.e. from the [`WgpuContext`]).  Using a
-    /// different instance will cause a "Device does not exist" panic because
-    /// the wgpu device is bound to its originating instance.
-    pub fn replace_surface<W: HasWindowHandle>(
-        &mut self,
-        window: &W,
-        config: WgpuSurfaceConfig,
-        instance: &wgpu::Instance,
-    ) -> anyhow::Result<()> {
-        let window_handle = window
-            .window_handle()
-            .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
-
-        let surface = create_surface(instance, window_handle.as_raw())?;
-
-        let width = (config.size.width.0 as u32).max(1);
-        let height = (config.size.height.0 as u32).max(1);
-
-        let alpha_mode = if config.transparent {
-            self.transparent_alpha_mode
-        } else {
-            self.opaque_alpha_mode
-        };
-
-        self.surface_config.width = width;
-        self.surface_config.height = height;
-        self.surface_config.alpha_mode = alpha_mode;
-        if let Some(mode) = config.preferred_present_mode {
-            self.surface_config.present_mode = mode;
-        }
-
-        let mut core = match std::mem::replace(&mut self.state, RendererState::Released) {
-            RendererState::Ready {
-                core,
-                surface: old_surface,
-            } => {
-                drop(old_surface);
-                core
-            }
-            RendererState::Unconfigured { core } => core,
-            RendererState::Released => {
-                anyhow::bail!("Cannot replace the surface: GPU resources have been released")
-            }
-        };
-        surface.configure(&core.resources.device, &self.surface_config);
-        core.resources.invalidate_intermediate_textures();
-        self.state = RendererState::Ready { surface, core };
-
-        Ok(())
-    }
-
     pub fn destroy(&mut self) {
         // Release surface-bound GPU resources eagerly so the underlying native
         // window can be destroyed before the renderer itself is dropped.

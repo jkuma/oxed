@@ -1,8 +1,7 @@
 pub mod platforms;
-mod system_window_tabs;
 
 use gpui::{
-    Action, AnyElement, App, Context, Decorations, Entity, Hsla, InteractiveElement, IntoElement,
+    Action, AnyElement, App, Context, Decorations, Hsla, InteractiveElement, IntoElement,
     MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window, WindowButtonLayout,
     WindowControlArea, div, px,
 };
@@ -13,14 +12,7 @@ use ui::{
     utils::{TRAFFIC_LIGHT_PADDING, platform_title_bar_height},
 };
 
-use crate::{
-    platforms::{platform_linux, platform_windows},
-    system_window_tabs::SystemWindowTabs,
-};
-
-pub use system_window_tabs::{
-    DraggedWindowTab, MergeAllWindows, MoveTabToNewWindow, ShowNextWindowTab, ShowPreviousWindowTab,
-};
+use crate::platforms::{platform_linux, platform_windows};
 
 /// With client-side decorations, the title bar is pulled over the window frame's
 /// border to avoid a transparent gap in the rounded corners, and a border in the
@@ -50,21 +42,18 @@ pub struct PlatformTitleBar {
     platform_style: PlatformStyle,
     children: SmallVec<[AnyElement; 2]>,
     should_move: bool,
-    system_window_tabs: Entity<SystemWindowTabs>,
     button_layout: Option<WindowButtonLayout>,
 }
 
 impl PlatformTitleBar {
-    pub fn new(id: impl Into<ElementId>, cx: &mut Context<Self>) -> Self {
+    pub fn new(id: impl Into<ElementId>) -> Self {
         let platform_style = PlatformStyle::platform();
-        let system_window_tabs = cx.new(|_cx| SystemWindowTabs::new());
 
         Self {
             id: id.into(),
             platform_style,
             children: SmallVec::new(),
             should_move: false,
-            system_window_tabs,
             button_layout: None,
         }
     }
@@ -104,10 +93,6 @@ impl PlatformTitleBar {
         } else {
             None
         }
-    }
-
-    pub fn init(cx: &mut App) {
-        SystemWindowTabs::init(cx);
     }
 }
 
@@ -217,29 +202,21 @@ impl Render for PlatformTitleBar {
             })
             .map(|this| {
                 // Note: On Windows the title bar behavior is handled by the platform implementation.
-                this.id(self.id.clone())
-                    .when(self.platform_style == PlatformStyle::Mac, |this| {
+                this.id(self.id.clone()).when(
+                    self.platform_style == PlatformStyle::Linux
+                        && supported_controls.maximize
+                        && window.is_resizable(),
+                    |this| {
                         this.on_click(|event, window, _| {
                             if event.click_count() == 2 {
-                                window.titlebar_double_click();
+                                window.zoom_window();
                             }
                         })
-                    })
-                    .when(
-                        self.platform_style == PlatformStyle::Linux
-                            && supported_controls.maximize
-                            && window.is_resizable(),
-                        |this| {
-                            this.on_click(|event, window, _| {
-                                if event.click_count() == 2 {
-                                    window.zoom_window();
-                                }
-                            })
-                        },
-                    )
+                    },
+                )
             })
             .map(|this| {
-                if window.is_fullscreen() || window.is_simple_fullscreen() {
+                if window.is_fullscreen() {
                     this.pl_2()
                 } else if self.platform_style == PlatformStyle::Mac {
                     this.pl(px(TRAFFIC_LIGHT_PADDING))
@@ -281,33 +258,27 @@ impl Render for PlatformTitleBar {
                     .w_full()
                     .children(children),
             )
-            .when(
-                !window.is_fullscreen() && !window.is_simple_fullscreen(),
-                |title_bar| {
-                    let title_bar = title_bar.children(render_right_window_controls(
-                        button_layout,
-                        close_action.as_ref().boxed_clone(),
-                        window,
-                    ));
+            .when(!window.is_fullscreen(), |title_bar| {
+                let title_bar = title_bar.children(render_right_window_controls(
+                    button_layout,
+                    close_action.as_ref().boxed_clone(),
+                    window,
+                ));
 
-                    if self.platform_style == PlatformStyle::Linux
-                        && matches!(decorations, Decorations::Client { .. })
-                    {
-                        title_bar.when(supported_controls.window_menu, |titlebar| {
-                            titlebar.on_mouse_down(MouseButton::Right, move |ev, window, _| {
-                                window.show_window_menu(ev.position)
-                            })
+                if self.platform_style == PlatformStyle::Linux
+                    && matches!(decorations, Decorations::Client { .. })
+                {
+                    title_bar.when(supported_controls.window_menu, |titlebar| {
+                        titlebar.on_mouse_down(MouseButton::Right, move |ev, window, _| {
+                            window.show_window_menu(ev.position)
                         })
-                    } else {
-                        title_bar
-                    }
-                },
-            );
+                    })
+                } else {
+                    title_bar
+                }
+            });
 
-        v_flex()
-            .w_full()
-            .child(title_bar)
-            .child(self.system_window_tabs.clone().into_any_element())
+        v_flex().w_full().child(title_bar)
     }
 }
 

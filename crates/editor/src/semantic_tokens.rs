@@ -936,7 +936,7 @@ mod tests {
         cx.update(|cx| {
             assets::Assets.load_test_fonts(cx);
             crate::init(cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
         });
 
         let project = Project::test(app_state.fs.clone(), [], cx).await;
@@ -1194,7 +1194,7 @@ mod tests {
         cx.update(|cx| {
             assets::Assets.load_test_fonts(cx);
             crate::init(cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
         });
 
         let project = Project::test(app_state.fs.clone(), [], cx).await;
@@ -1454,7 +1454,7 @@ mod tests {
         cx.update(|cx| {
             assets::Assets.load_test_fonts(cx);
             crate::init(cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
         });
 
         let project = Project::test(app_state.fs.clone(), [], cx).await;
@@ -1728,7 +1728,7 @@ mod tests {
         cx.update(|cx| {
             assets::Assets.load_test_fonts(cx);
             crate::init(cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
         });
 
         let project = Project::test(app_state.fs.clone(), [], cx).await;

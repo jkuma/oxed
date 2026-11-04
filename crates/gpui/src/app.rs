@@ -15,7 +15,6 @@ use std::{
 use anyhow::{Context as _, Result, anyhow};
 use derive_more::{Deref, DerefMut};
 use futures::{Future, FutureExt, channel::oneshot, future::LocalBoxFuture};
-use itertools::Itertools;
 use parking_lot::RwLock;
 use slotmap::SlotMap;
 
@@ -42,18 +41,17 @@ pub use test_context::*;
 use crate::InspectorElementRegistry;
 use crate::asset_cache::CachedLoad;
 use crate::{
-    Action, ActionBuildError, ActionRegistry, ActivationPolicy, ActivityGuard, Any, AnyView,
-    AnyWindowHandle, AppContext, AppLifecyclePhase, Arena, ArenaBox, Asset, AssetSource,
-    BackgroundExecutor, Bounds, ClipboardItem, ClipboardReadError, CursorStyle, DispatchPhase,
-    DisplayChanges, DisplayEvent, DisplayId, EventEmitter, ExternalDragPayload, FocusHandle,
-    FocusMap, ForegroundExecutor, Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId,
-    Menu, MenuItem, MissingGlyph, OwnedMenu, PathPromptOptions, Pixels, Platform, PlatformDisplay,
-    PlatformKeyboardLayout, PlatformKeyboardMapper, Point, Priority, PromptBuilder, PromptButton,
-    PromptHandle, PromptLevel, Render, RenderImage, RenderablePromptHandle, Reservation,
-    ScreenCaptureSource, SharedString, SubscriberSet, Subscription, SvgRenderer,
-    SystemNotification, SystemNotificationResponse, Task, TextRenderingMode, TextSystem,
-    ThermalState, Window, WindowAppearance, WindowButtonLayout, WindowHandle, WindowId,
-    WindowInvalidator, WindowingRequest,
+    Action, ActionBuildError, ActionRegistry, ActivityGuard, Any, AnyView, AnyWindowHandle,
+    AppContext, AppLifecyclePhase, Arena, ArenaBox, Asset, AssetSource, BackgroundExecutor, Bounds,
+    ClipboardItem, ClipboardReadError, CursorStyle, DispatchPhase, DisplayChanges, DisplayEvent,
+    DisplayId, EventEmitter, ExternalDragPayload, FocusHandle, FocusMap, ForegroundExecutor,
+    Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MissingGlyph, OwnedMenu,
+    PathPromptOptions, Pixels, Platform, PlatformDisplay, PlatformKeyboardLayout,
+    PlatformKeyboardMapper, Point, Priority, PromptBuilder, PromptButton, PromptHandle,
+    PromptLevel, Render, RenderImage, RenderablePromptHandle, Reservation, ScreenCaptureSource,
+    SubscriberSet, Subscription, SvgRenderer, SystemNotification, SystemNotificationResponse, Task,
+    TextRenderingMode, TextSystem, ThermalState, Window, WindowAppearance, WindowButtonLayout,
+    WindowHandle, WindowId, WindowInvalidator, WindowingRequest,
     colors::{Colors, GlobalColors},
     hash, init_app_menus,
 };
@@ -257,10 +255,8 @@ impl Application {
 
     /// Sets the windowing mode the app starts in. See [`App::request_windowing`].
     ///
-    /// Defaults to windowed. On Linux, the default environment is the process's own, and the app
-    /// starts headless if that names no allowed display server. On macOS, headless means the app
-    /// starts without a Dock icon or menu bar ([`ActivationPolicy::Accessory`]). Has no effect on
-    /// other platforms.
+    /// Defaults to windowed. The default environment is the process's own, and the app starts
+    /// headless if that names no allowed display server.
     pub fn with_windowing(self, request: WindowingRequest) -> Self {
         self.0.borrow().platform.set_initial_windowing(request);
         self
@@ -320,21 +316,6 @@ impl Application {
         F: 'static + FnMut(Vec<String>),
     {
         self.0.borrow().platform.on_open_urls(Box::new(callback));
-        self
-    }
-
-    /// Invokes a handler when an already-running application is launched.
-    /// On macOS, this can occur when the application icon is double-clicked or the app is launched via the dock.
-    pub fn on_reopen<F>(&self, mut callback: F) -> &Self
-    where
-        F: 'static + FnMut(&mut App),
-    {
-        let this = Rc::downgrade(&self.0);
-        self.0.borrow_mut().platform.on_reopen(Box::new(move || {
-            if let Some(app) = this.upgrade() {
-                callback(&mut app.borrow_mut());
-            }
-        }));
         self
     }
 
@@ -506,297 +487,6 @@ pub enum CursorHideMode {
     /// resolves to an action that consumes the keystroke.
     #[default]
     OnTypingAndAction,
-}
-
-#[doc(hidden)]
-#[derive(Clone, PartialEq, Eq)]
-pub struct SystemWindowTab {
-    pub id: WindowId,
-    pub title: SharedString,
-    pub handle: AnyWindowHandle,
-    pub last_active_at: Instant,
-}
-
-impl SystemWindowTab {
-    /// Create a new instance of the window tab.
-    pub fn new(title: SharedString, handle: AnyWindowHandle) -> Self {
-        Self {
-            id: handle.id,
-            title,
-            handle,
-            last_active_at: Instant::now(),
-        }
-    }
-}
-
-/// A controller for managing window tabs.
-#[derive(Default)]
-pub struct SystemWindowTabController {
-    visible: Option<bool>,
-    tab_groups: FxHashMap<usize, Vec<SystemWindowTab>>,
-}
-
-impl Global for SystemWindowTabController {}
-
-impl SystemWindowTabController {
-    /// Create a new instance of the window tab controller.
-    pub fn new() -> Self {
-        Self {
-            visible: None,
-            tab_groups: FxHashMap::default(),
-        }
-    }
-
-    /// Initialize the global window tab controller.
-    pub fn init(cx: &mut App) {
-        cx.set_global(SystemWindowTabController::new());
-    }
-
-    /// Get all tab groups.
-    pub fn tab_groups(&self) -> &FxHashMap<usize, Vec<SystemWindowTab>> {
-        &self.tab_groups
-    }
-
-    /// Get the next tab group window handle.
-    pub fn get_next_tab_group_window(cx: &mut App, id: WindowId) -> Option<&AnyWindowHandle> {
-        let controller = cx.global::<SystemWindowTabController>();
-        let current_group = controller
-            .tab_groups
-            .iter()
-            .find_map(|(group, tabs)| tabs.iter().find(|tab| tab.id == id).map(|_| group));
-
-        let current_group = current_group?;
-        // TODO: `.keys()` returns arbitrary order, what does "next" mean?
-        let mut group_ids: Vec<_> = controller.tab_groups.keys().collect();
-        let idx = group_ids.iter().position(|g| *g == current_group)?;
-        let next_idx = (idx + 1) % group_ids.len();
-
-        controller
-            .tab_groups
-            .get(group_ids[next_idx])
-            .and_then(|tabs| {
-                tabs.iter()
-                    .max_by_key(|tab| tab.last_active_at)
-                    .or_else(|| tabs.first())
-                    .map(|tab| &tab.handle)
-            })
-    }
-
-    /// Get the previous tab group window handle.
-    pub fn get_prev_tab_group_window(cx: &mut App, id: WindowId) -> Option<&AnyWindowHandle> {
-        let controller = cx.global::<SystemWindowTabController>();
-        let current_group = controller
-            .tab_groups
-            .iter()
-            .find_map(|(group, tabs)| tabs.iter().find(|tab| tab.id == id).map(|_| group));
-
-        let current_group = current_group?;
-        // TODO: `.keys()` returns arbitrary order, what does "previous" mean?
-        let mut group_ids: Vec<_> = controller.tab_groups.keys().collect();
-        let idx = group_ids.iter().position(|g| *g == current_group)?;
-        let prev_idx = if idx == 0 {
-            group_ids.len() - 1
-        } else {
-            idx - 1
-        };
-
-        controller
-            .tab_groups
-            .get(group_ids[prev_idx])
-            .and_then(|tabs| {
-                tabs.iter()
-                    .max_by_key(|tab| tab.last_active_at)
-                    .or_else(|| tabs.first())
-                    .map(|tab| &tab.handle)
-            })
-    }
-
-    /// Get all tabs in the same window.
-    pub fn tabs(&self, id: WindowId) -> Option<&Vec<SystemWindowTab>> {
-        self.tab_groups
-            .values()
-            .find(|tabs| tabs.iter().any(|tab| tab.id == id))
-    }
-
-    /// Initialize the visibility of the system window tab controller.
-    pub fn init_visible(cx: &mut App, visible: bool) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        if controller.visible.is_none() {
-            controller.visible = Some(visible);
-        }
-    }
-
-    /// Get the visibility of the system window tab controller.
-    pub fn is_visible(&self) -> bool {
-        self.visible.unwrap_or(false)
-    }
-
-    /// Set the visibility of the system window tab controller.
-    pub fn set_visible(cx: &mut App, visible: bool) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        controller.visible = Some(visible);
-    }
-
-    /// Update the last active of a window.
-    pub fn update_last_active(cx: &mut App, id: WindowId) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        for windows in controller.tab_groups.values_mut() {
-            for tab in windows.iter_mut() {
-                if tab.id == id {
-                    tab.last_active_at = Instant::now();
-                }
-            }
-        }
-    }
-
-    /// Update the position of a tab within its group.
-    pub fn update_tab_position(cx: &mut App, id: WindowId, ix: usize) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        for (_, windows) in controller.tab_groups.iter_mut() {
-            if let Some(current_pos) = windows.iter().position(|tab| tab.id == id) {
-                if ix < windows.len() && current_pos != ix {
-                    let window_tab = windows.remove(current_pos);
-                    windows.insert(ix, window_tab);
-                }
-                break;
-            }
-        }
-    }
-
-    /// Update the title of a tab.
-    pub fn update_tab_title(cx: &mut App, id: WindowId, title: SharedString) {
-        let controller = cx.global::<SystemWindowTabController>();
-        let tab = controller
-            .tab_groups
-            .values()
-            .flat_map(|windows| windows.iter())
-            .find(|tab| tab.id == id);
-
-        if tab.map_or(true, |t| t.title == title) {
-            return;
-        }
-
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        for windows in controller.tab_groups.values_mut() {
-            for tab in windows.iter_mut() {
-                if tab.id == id {
-                    tab.title = title;
-                    return;
-                }
-            }
-        }
-    }
-
-    /// Insert a tab into a tab group.
-    pub fn add_tab(cx: &mut App, id: WindowId, tabs: Vec<SystemWindowTab>) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        let Some(tab) = tabs.iter().find(|tab| tab.id == id).cloned() else {
-            return;
-        };
-
-        let mut expected_tab_ids: Vec<_> = tabs
-            .iter()
-            .filter(|tab| tab.id != id)
-            .map(|tab| tab.id)
-            .sorted()
-            .collect();
-
-        let mut tab_group_id = None;
-        for (group_id, group_tabs) in &controller.tab_groups {
-            let tab_ids: Vec<_> = group_tabs.iter().map(|tab| tab.id).sorted().collect();
-            if tab_ids == expected_tab_ids {
-                tab_group_id = Some(*group_id);
-                break;
-            }
-        }
-
-        if let Some(tab_group_id) = tab_group_id {
-            if let Some(tabs) = controller.tab_groups.get_mut(&tab_group_id) {
-                tabs.push(tab);
-            }
-        } else {
-            let new_group_id = controller.tab_groups.len();
-            controller.tab_groups.insert(new_group_id, tabs);
-        }
-    }
-
-    /// Remove a tab from a tab group.
-    pub fn remove_tab(cx: &mut App, id: WindowId) -> Option<SystemWindowTab> {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        let mut removed_tab = None;
-
-        controller.tab_groups.retain(|_, tabs| {
-            if let Some(pos) = tabs.iter().position(|tab| tab.id == id) {
-                removed_tab = Some(tabs.remove(pos));
-            }
-            !tabs.is_empty()
-        });
-
-        removed_tab
-    }
-
-    /// Move a tab to a new tab group.
-    pub fn move_tab_to_new_window(cx: &mut App, id: WindowId) {
-        let mut removed_tab = Self::remove_tab(cx, id);
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-
-        if let Some(tab) = removed_tab {
-            let new_group_id = controller.tab_groups.keys().max().map_or(0, |k| k + 1);
-            controller.tab_groups.insert(new_group_id, vec![tab]);
-        }
-    }
-
-    /// Merge all tab groups into a single group.
-    pub fn merge_all_windows(cx: &mut App, id: WindowId) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        let Some(initial_tabs) = controller.tabs(id) else {
-            return;
-        };
-
-        let initial_tabs_len = initial_tabs.len();
-        let mut all_tabs = initial_tabs.clone();
-
-        for (_, mut tabs) in controller.tab_groups.drain() {
-            tabs.retain(|tab| !all_tabs[..initial_tabs_len].contains(tab));
-            all_tabs.extend(tabs);
-        }
-
-        controller.tab_groups.insert(0, all_tabs);
-    }
-
-    /// Selects the next tab in the tab group in the trailing direction.
-    pub fn select_next_tab(cx: &mut App, id: WindowId) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        let Some(tabs) = controller.tabs(id) else {
-            return;
-        };
-
-        let current_index = tabs.iter().position(|tab| tab.id == id).unwrap();
-        let next_index = (current_index + 1) % tabs.len();
-
-        let _ = &tabs[next_index].handle.update(cx, |_, window, _| {
-            window.activate_window();
-        });
-    }
-
-    /// Selects the previous tab in the tab group in the leading direction.
-    pub fn select_previous_tab(cx: &mut App, id: WindowId) {
-        let mut controller = cx.global_mut::<SystemWindowTabController>();
-        let Some(tabs) = controller.tabs(id) else {
-            return;
-        };
-
-        let current_index = tabs.iter().position(|tab| tab.id == id).unwrap();
-        let previous_index = if current_index == 0 {
-            tabs.len() - 1
-        } else {
-            current_index - 1
-        };
-
-        let _ = &tabs[previous_index].handle.update(cx, |_, window, _| {
-            window.activate_window();
-        });
-    }
 }
 
 pub(crate) enum GpuiMode {
@@ -1053,7 +743,6 @@ impl App {
         });
 
         init_app_menus(platform.as_ref(), &app.borrow());
-        SystemWindowTabController::init(&mut app.borrow_mut());
         #[cfg(feature = "profiler")]
         crate::profiler::journal::observe_power(&app.borrow());
 
@@ -1289,11 +978,9 @@ impl App {
 
     /// Switches the platform between headless and windowed modes.
     ///
-    /// On Linux, headless means no display server: windows opened afterwards lay out and handle
-    /// input but draw nothing. Windowed, the platform connects to the display server the
-    /// environment names. On macOS, the modes set the [`ActivationPolicy`]: headless is
-    /// `Accessory` (no Dock icon or menu bar) and windowed is `Regular`. Switching to windowed
-    /// doesn't activate the app: call [`App::activate`] for that.
+    /// Headless means no display server: windows opened afterwards lay out and handle input but
+    /// draw nothing. Windowed, the platform connects to the display server the environment names.
+    /// Switching to windowed doesn't activate the app: call [`App::activate`] for that.
     ///
     /// The returned task resolves once the switch has been applied. It fails if the platform is
     /// already in the requested mode (switching to another display server means going headless
@@ -1592,21 +1279,6 @@ impl App {
         self.platform.activate(ignoring_other_apps);
     }
 
-    /// Hide the application at the platform level.
-    pub fn hide(&self) {
-        self.platform.hide();
-    }
-
-    /// Hide other applications at the platform level.
-    pub fn hide_other_apps(&self) {
-        self.platform.hide_other_apps();
-    }
-
-    /// Unhide other applications at the platform level.
-    pub fn unhide_other_apps(&self) {
-        self.platform.unhide_other_apps();
-    }
-
     /// Returns the list of currently active displays.
     pub fn displays(&self) -> Vec<Rc<dyn PlatformDisplay>> {
         self.platform.displays()
@@ -1788,20 +1460,6 @@ impl App {
     /// Returns the appearance of the application's windows.
     pub fn window_appearance(&self) -> WindowAppearance {
         self.platform.window_appearance()
-    }
-
-    /// Overrides the appearance (light/dark) applied to the app's windows, independent of
-    /// the OS-wide setting. Pass `None` to clear the override and follow the system again.
-    /// The current value is reported by [`App::window_appearance`].
-    ///
-    /// On macOS this sets the underlying `NSApplication.appearance`, which controls the
-    /// native window chrome (the window border and titlebar) of every window. Use this
-    /// when the app uses a dark theme while the system is in light mode (or vice versa)
-    /// so the window edges render to match the theme. While an appearance is forced,
-    /// windows stop tracking system light/dark changes; pass `None` to resume following
-    /// the system. On other platforms this is a no-op.
-    pub fn set_window_appearance(&self, appearance: Option<WindowAppearance>) {
-        self.platform.set_window_appearance(appearance);
     }
 
     /// Returns the window button layout configuration when supported.
@@ -2023,18 +1681,6 @@ impl App {
     /// By default, [`QuitMode::Default`] is used.
     pub fn set_quit_mode(&mut self, mode: QuitMode) {
         self.quit_mode = mode;
-    }
-
-    /// Sets whether the application participates in the system's foreground UI.
-    ///
-    /// Only has an effect on macOS, where [`Self::request_windowing`] normally sets it. Use this
-    /// for an accessory app that shows windows, such as a menu bar utility. It overrides the
-    /// policy until the next [`Self::request_windowing`], and the app counts as headless while
-    /// `Accessory`. After switching to [`ActivationPolicy::Regular`], activate the app yourself
-    /// with [`Self::activate`]; otherwise its menu bar may not appear until the app is
-    /// reactivated.
-    pub fn set_activation_policy(&mut self, policy: ActivationPolicy) {
-        self.platform.set_activation_policy(policy);
     }
 
     /// Returns the SVG renderer used by the application.
@@ -2837,16 +2483,6 @@ impl App {
         subscription
     }
 
-    pub(crate) fn clear_pending_keystrokes(&mut self) {
-        for window in self.windows() {
-            window
-                .update(self, |_, window, cx| {
-                    window.clear_pending_keystrokes(cx);
-                })
-                .ok();
-        }
-    }
-
     /// Checks if the given action is bound in the current context, as defined by the app's current focus,
     /// the bindings in the element tree, and any global action listeners.
     pub fn is_action_available(&mut self, action: &dyn Action) -> bool {
@@ -2873,34 +2509,6 @@ impl App {
     /// Gets the menu bar for this application.
     pub fn get_menus(&self) -> Option<Vec<OwnedMenu>> {
         self.platform.get_menus()
-    }
-
-    /// Sets the right click menu for the app icon in the dock
-    pub fn set_dock_menu(&self, menus: Vec<MenuItem>) {
-        self.platform.set_dock_menu(menus, &self.keymap.borrow())
-    }
-
-    /// Performs the action associated with the given dock menu item, only used on Windows for now.
-    pub fn perform_dock_menu_action(&self, action: usize) {
-        self.platform.perform_dock_menu_action(action);
-    }
-
-    /// Adds given path to the bottom of the list of recent paths for the application.
-    /// The list is usually shown on the application icon's context menu in the dock,
-    /// and allows to open the recent files via that context menu.
-    /// If the path is already in the list, it will be moved to the bottom of the list.
-    pub fn add_recent_document(&self, path: &Path) {
-        self.platform.add_recent_document(path);
-    }
-
-    /// Updates the jump list with the updated list of recent paths for the application, only used on Windows for now.
-    /// Note that this also sets the dock menu on Windows.
-    pub fn update_jump_list(
-        &self,
-        menus: Vec<MenuItem>,
-        entries: Vec<SmallVec<[PathBuf; 2]>>,
-    ) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
-        self.platform.update_jump_list(menus, entries)
     }
 
     /// Dispatch an action to the currently active window or global action handler

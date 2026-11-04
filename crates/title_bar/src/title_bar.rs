@@ -4,10 +4,7 @@ mod title_bar_settings;
 use crate::application_menu::{ApplicationMenu, show_menus};
 use arrayvec::ArrayVec;
 use git_ui_core::worktree_picker::WorktreePicker;
-pub use platform_title_bar::{
-    self, DraggedWindowTab, MergeAllWindows, MoveTabToNewWindow, PlatformTitleBar,
-    ShowNextWindowTab, ShowPreviousWindowTab,
-};
+pub use platform_title_bar::{self, PlatformTitleBar};
 use project::{linked_worktree_short_name, repo_identity_path, repo_identity_path_if_local};
 
 #[cfg(not(target_os = "macos"))]
@@ -51,8 +48,6 @@ fn linked_worktree_name_anchor<'a>(
 }
 
 pub fn init(cx: &mut App) {
-    platform_title_bar::PlatformTitleBar::init(cx);
-
     cx.observe_new(|workspace: &mut Workspace, window, cx| {
         let Some(window) = window else {
             return;
@@ -342,7 +337,7 @@ impl TitleBar {
             }));
         }
 
-        let platform_titlebar = cx.new(|cx| PlatformTitleBar::new(id, cx));
+        let platform_titlebar = cx.new(|_| PlatformTitleBar::new(id));
 
         Self {
             platform_titlebar,

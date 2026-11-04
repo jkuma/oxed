@@ -227,8 +227,6 @@
   //  3. Use grayscale text rendering:
   //         "text_rendering_mode": "grayscale"
   "text_rendering_mode": "platform_default",
-  // Whether to render windows using the Display P3 color space (macOS only).
-  "use_display_p3": false,
   // Whether to show padding for zoomed panels.
   // When enabled, zoomed center panels (e.g. code editor) will have padding all around,
   // while zoomed bottom/left/right panels will have padding to the top/right/left (respectively).
@@ -562,16 +560,6 @@
     // Whether to show code action buttons in the editor toolbar.
     "code_actions": false,
   },
-  // Whether to allow windows to tab together based on the user's tabbing preference (macOS only).
-  "use_system_window_tabs": false,
-  // Which fullscreen mode the `zed::ToggleFullScreen` action enters (macOS only).
-  //
-  // 1. Use macOS's native fullscreen, which moves the window into its own Mission Control space.
-  //     "native"
-  // 2. Resize the window to cover the entire screen, including the menu bar and,
-  //    on notched displays, the area around the notch.
-  //     "simple"
-  "fullscreen_mode": "native",
   // Titlebar related settings
   "title_bar": {
     // Whether to show git status indicators on the branch icon in the titlebar.

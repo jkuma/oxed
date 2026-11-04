@@ -804,8 +804,6 @@ actions!(
         SelectUp,
         /// Shows code completion suggestions at the cursor position.
         ShowCompletions,
-        /// Shows the system character palette.
-        ShowCharacterPalette,
         /// Shows signature help for the current function.
         ShowSignatureHelp,
         /// Shows word completions.

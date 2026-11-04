@@ -12526,11 +12526,11 @@ pub(crate) fn init_test(cx: &mut TestAppContext) {
 
 fn init_test_with_editor(cx: &mut TestAppContext) {
     cx.update(|cx| {
-        let app_state = AppState::test(cx);
+        AppState::test(cx);
         theme_settings::init(theme::LoadThemes::JustBase, cx);
         editor::init(cx);
         crate::init(cx);
-        workspace::init(app_state, cx);
+        workspace::init(cx);
 
         cx.update_global::<SettingsStore, _>(|store, cx| {
             store.update_user_settings(cx, |settings| {
@@ -12548,12 +12548,12 @@ fn init_test_with_editor(cx: &mut TestAppContext) {
 
 fn init_test_with_git_ui(cx: &mut TestAppContext) {
     cx.update(|cx| {
-        let app_state = AppState::test(cx);
+        AppState::test(cx);
         theme_settings::init(theme::LoadThemes::JustBase, cx);
         editor::init(cx);
         git_ui::init(cx);
         crate::init(cx);
-        workspace::init(app_state, cx);
+        workspace::init(cx);
 
         cx.update_global::<SettingsStore, _>(|store, cx| {
             store.update_user_settings(cx, |settings| {

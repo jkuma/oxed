@@ -697,12 +697,6 @@ impl WorktreeStore {
 
             this.update(cx, |this, cx| this.add(&worktree, cx))?;
 
-            if visible {
-                cx.update(|cx| {
-                    cx.add_recent_document(abs_path.as_path());
-                });
-            }
-
             Ok(worktree)
         })
     }

@@ -136,8 +136,6 @@ fn open_performance_profiler(
             WindowOptions {
                 titlebar: Some(TitlebarOptions {
                     title: Some("Profiler Window".into()),
-                    appears_transparent: false,
-                    traffic_light_position: None,
                 }),
                 focus: true,
                 show: true,

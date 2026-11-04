@@ -144,10 +144,6 @@ impl PlatformWindow for HeadlessWindow {
         self.0.borrow_mut().title = Some(title.to_owned());
     }
 
-    fn get_title(&self) -> String {
-        self.0.borrow().title.clone().unwrap_or_default()
-    }
-
     fn set_background_appearance(&self, _background: WindowBackgroundAppearance) {}
 
     fn minimize(&self) {}

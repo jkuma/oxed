@@ -497,18 +497,6 @@ impl Platform for TestPlatform {
         //
     }
 
-    fn hide(&self) {
-        unimplemented!()
-    }
-
-    fn hide_other_apps(&self) {
-        unimplemented!()
-    }
-
-    fn unhide_other_apps(&self) {
-        unimplemented!()
-    }
-
     fn displays(&self) -> Vec<std::rc::Rc<dyn crate::PlatformDisplay>> {
         self.displays
             .borrow()
@@ -648,10 +636,6 @@ impl Platform for TestPlatform {
 
     fn on_quit(&self, _callback: Box<dyn FnMut() -> bool>) {}
 
-    fn on_reopen(&self, _callback: Box<dyn FnMut()>) {
-        unimplemented!()
-    }
-
     fn on_system_sleep(&self, _callback: Box<dyn FnMut()>) {}
 
     fn on_system_wake(&self, _callback: Box<dyn FnMut()>) {}
@@ -712,15 +696,7 @@ impl Platform for TestPlatform {
         Some(self.menus.borrow().clone())
     }
 
-    fn set_dock_menu(&self, _menu: Vec<crate::MenuItem>, _keymap: &Keymap) {}
-
-    fn add_recent_document(&self, _paths: &Path) {}
-
     fn on_app_menu_action(&self, _callback: Box<dyn FnMut(&dyn crate::Action)>) {}
-
-    fn on_will_open_app_menu(&self, _callback: Box<dyn FnMut()>) {}
-
-    fn on_validate_app_menu_command(&self, _callback: Box<dyn FnMut(&dyn crate::Action) -> bool>) {}
 
     fn app_path(&self) -> Result<std::path::PathBuf> {
         unimplemented!()

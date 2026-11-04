@@ -29,8 +29,8 @@ use crate::{
     FontId, FontMetrics, FontRun, ForegroundExecutor, GlyphId, GpuSpecs, Hsla, ImageSource, Keymap,
     LineLayout, MissingGlyphSink, Pixels, PlatformGestures, PlatformInput, Point, Priority,
     RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Scene, ShapedGlyph,
-    ShapedRun, SharedString, Size, SvgRenderer, SystemWindowTab, Task, Window, WindowControlArea,
-    hash, point, px, size,
+    ShapedRun, SharedString, Size, SvgRenderer, Task, Window, WindowControlArea, hash, point, px,
+    size,
 };
 use anyhow::bail;
 use anyhow::{Context as _, Result};
@@ -140,21 +140,6 @@ bitflags::bitflags! {
 /// the zero, negative, and non-finite rates platforms use to mean "unknown".
 pub fn refresh_interval_from_hz(hertz: f64) -> Option<Duration> {
     (hertz.is_finite() && hertz > 0.0).then(|| Duration::from_secs_f64(1.0 / hertz))
-}
-
-/// Controls whether the application participates in the system's foreground UI.
-///
-/// Only has an effect on macOS; other platforms ignore this setting. There,
-/// [`App::request_windowing`] sets it: `Accessory` while headless and `Regular` while windowed.
-/// Set it directly with [`App::set_activation_policy`] for the one case that doesn't cover: an
-/// accessory app that shows windows, such as a menu bar utility.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum ActivationPolicy {
-    /// Participate in foreground application UI, such as the Dock and menu bar on macOS.
-    #[default]
-    Regular,
-    /// Run without foreground application UI while retaining the ability to open windows.
-    Accessory,
 }
 
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
@@ -308,11 +293,6 @@ pub trait Platform: 'static {
     }
     fn restart(&self, binary_path: Option<PathBuf>, arguments: Vec<OsString>);
     fn activate(&self, ignoring_other_apps: bool);
-    /// Sets the initial or current activation policy. Has no effect outside macOS.
-    fn set_activation_policy(&self, _policy: ActivationPolicy) {}
-    fn hide(&self);
-    fn hide_other_apps(&self);
-    fn unhide_other_apps(&self);
 
     fn displays(&self) -> Vec<Rc<dyn PlatformDisplay>>;
     fn primary_display(&self) -> Option<Rc<dyn PlatformDisplay>>;
@@ -351,16 +331,6 @@ pub trait Platform: 'static {
     /// Returns the appearance of the application's windows.
     fn window_appearance(&self) -> WindowAppearance;
 
-    /// Overrides the appearance (light/dark) applied to the app's windows, independent
-    /// of the OS-wide setting. Pass `None` to clear the override and follow the system
-    /// again. The override is reflected by [`Platform::window_appearance`].
-    ///
-    /// Currently only implemented on macOS, where it sets `NSApplication.appearance` so
-    /// the native window chrome (the window border and titlebar) of every window matches
-    /// a dark app theme even when the system is in light mode (or vice versa). A no-op on
-    /// other platforms.
-    fn set_window_appearance(&self, _appearance: Option<WindowAppearance>) {}
-
     /// Returns the window button layout configuration when supported.
     fn button_layout(&self) -> Option<WindowButtonLayout> {
         None
@@ -384,7 +354,6 @@ pub trait Platform: 'static {
     fn open_with_system(&self, path: &Path);
 
     fn on_quit(&self, callback: Box<dyn FnMut() -> bool>);
-    fn on_reopen(&self, callback: Box<dyn FnMut()>);
     /// Registers the callback invoked when the system is about to sleep.
     fn on_system_sleep(&self, callback: Box<dyn FnMut()>);
     /// Registers the callback invoked when the system resumes from sleep.
@@ -419,19 +388,7 @@ pub trait Platform: 'static {
         None
     }
 
-    fn set_dock_menu(&self, menu: Vec<MenuItem>, keymap: &Keymap);
-    fn perform_dock_menu_action(&self, _action: usize) {}
-    fn add_recent_document(&self, _path: &Path) {}
-    fn update_jump_list(
-        &self,
-        _menus: Vec<MenuItem>,
-        _entries: Vec<SmallVec<[PathBuf; 2]>>,
-    ) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
-        Task::ready(Vec::new())
-    }
     fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>);
-    fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>);
-    fn on_validate_app_menu_command(&self, callback: Box<dyn FnMut(&dyn Action) -> bool>);
 
     fn thermal_state(&self) -> ThermalState;
     fn on_thermal_state_change(&self, callback: Box<dyn FnMut()>);
@@ -1206,34 +1163,6 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn schedule_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
     fn is_subpixel_rendering_supported(&self) -> bool;
-
-    // macOS specific methods
-    fn get_title(&self) -> String {
-        String::new()
-    }
-    fn tabbed_windows(&self) -> Option<Vec<SystemWindowTab>> {
-        None
-    }
-    fn tab_bar_visible(&self) -> bool {
-        false
-    }
-    fn set_edited(&mut self, _edited: bool) {}
-    fn set_document_path(&self, _path: Option<&std::path::Path>) {}
-    fn toggle_simple_fullscreen(&self) {}
-    fn is_simple_fullscreen(&self) -> bool {
-        false
-    }
-    fn show_character_palette(&self) {}
-    fn titlebar_double_click(&self, _is_resizable: bool, _is_minimizable: bool) {}
-    fn on_move_tab_to_new_window(&self, _callback: Box<dyn FnMut()>) {}
-    fn on_merge_all_windows(&self, _callback: Box<dyn FnMut()>) {}
-    fn on_select_previous_tab(&self, _callback: Box<dyn FnMut()>) {}
-    fn on_select_next_tab(&self, _callback: Box<dyn FnMut()>) {}
-    fn on_toggle_tab_bar(&self, _callback: Box<dyn FnMut()>) {}
-    fn merge_all_windows(&self) {}
-    fn move_tab_to_new_window(&self) {}
-    fn toggle_window_tab_overview(&self) {}
-    fn set_tabbing_identifier(&self, _identifier: Option<String>) {}
 
     fn native_window_state(&self) -> Option<Vec<u8>> {
         None
@@ -2470,22 +2399,8 @@ pub struct WindowOptions {
     pub kind: WindowKind,
 
     /// Whether the window can be moved by the user. When `false`, the user cannot drag
-    /// the window (on macOS this sets `NSWindow.isMovable`, which also disables the
-    /// Window-menu tiling items); programmatic moves are still allowed.
+    /// the window; programmatic moves are still allowed.
     pub is_movable: bool,
-
-    /// Whether the application owns dragging of the (custom) titlebar, rather than
-    /// AppKit. Only has an effect on macOS.
-    ///
-    /// Set this to `true` for windows that draw their own titlebar and move the window
-    /// themselves via [`Window::start_window_move`]. It marks the whole content view as
-    /// app-owned titlebar content, so AppKit neither drags the window from the titlebar
-    /// nor delays titlebar clicks while disambiguating double-clicks (a delay first
-    /// observed on macOS 27). It is independent of `is_movable`, so such windows stay
-    /// user-movable (via their own drag) and keep the Window-menu tiling items enabled.
-    ///
-    /// Leave this `false` for windows that rely on AppKit's native titlebar dragging.
-    pub app_owns_titlebar_drag: bool,
 
     /// The minimum interval between animation frames while the window is inactive.
     ///
@@ -2535,9 +2450,6 @@ pub struct WindowParams {
 
     /// Whether the window should be movable by the user
     pub is_movable: bool,
-
-    /// Whether the application owns dragging of the (custom) titlebar (macOS only)
-    pub app_owns_titlebar_drag: bool,
 
     /// Whether the window should be resizable by the user
     pub is_resizable: bool,
@@ -2603,14 +2515,11 @@ impl Default for WindowOptions {
             window_bounds: None,
             titlebar: Some(TitlebarOptions {
                 title: Default::default(),
-                appears_transparent: Default::default(),
-                traffic_light_position: Default::default(),
             }),
             focus: true,
             show: true,
             kind: WindowKind::Normal,
             is_movable: true,
-            app_owns_titlebar_drag: false,
             inactive_frame_interval: Some(Duration::from_micros(33_333)),
             is_resizable: true,
             is_minimizable: true,
@@ -2629,13 +2538,6 @@ impl Default for WindowOptions {
 pub struct TitlebarOptions {
     /// The initial title of the window
     pub title: Option<SharedString>,
-
-    /// Should the default system titlebar be hidden to allow for a custom-drawn titlebar? (macOS and Windows only)
-    /// Refer to [`WindowOptions::window_decorations`] on Linux
-    pub appears_transparent: bool,
-
-    /// The position of the macOS traffic light buttons
-    pub traffic_light_position: Option<Point<Pixels>>,
 }
 
 /// The kind of window to create

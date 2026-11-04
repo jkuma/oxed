@@ -17,12 +17,12 @@ use crate::{
     PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams,
     RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
     SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size,
-    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
-    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextInputConfiguration,
-    TextInputStateChange, TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState,
-    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
-    WindowBounds, WindowControls, WindowDecorations, WindowInsets, WindowOptions, WindowParams,
-    WindowTextSystem, WindowVisibility, point, prelude::*, px, rems, size, transparent_black,
+    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, TabStopMap,
+    TaffyLayoutEngine, Task, TextInputConfiguration, TextInputStateChange, TextRenderingMode,
+    TextStyle, TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
+    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
+    WindowInsets, WindowOptions, WindowParams, WindowTextSystem, WindowVisibility, point,
+    prelude::*, px, rems, size, transparent_black,
 };
 
 use crate::gestures::{GestureTuning, RecognizedTouchGesture, TouchGestureRecognizer};
@@ -1586,7 +1586,6 @@ impl Window {
             show,
             kind,
             is_movable,
-            app_owns_titlebar_drag,
             inactive_frame_interval,
             is_resizable,
             is_minimizable,
@@ -1610,7 +1609,6 @@ impl Window {
                 titlebar,
                 kind,
                 is_movable,
-                app_owns_titlebar_drag,
                 is_resizable,
                 is_minimizable,
                 focus,
@@ -1621,12 +1619,6 @@ impl Window {
                 icon,
             },
         )?;
-
-        let tab_bar_visible = platform_window.tab_bar_visible();
-        SystemWindowTabController::init_visible(cx, tab_bar_visible);
-        if let Some(tabs) = platform_window.tabbed_windows() {
-            SystemWindowTabController::add_tab(cx, handle.window_id(), tabs);
-        }
 
         let display_id = platform_window.display().map(|display| display.id());
         let sprite_atlas = platform_window.sprite_atlas();
@@ -1742,13 +1734,9 @@ impl Window {
         }
 
         platform_window.on_close(Box::new({
-            let window_id = handle.window_id();
             let mut cx = cx.to_async();
             move || {
                 let _ = handle.update(&mut cx, |_, window, _| window.remove_window());
-                let _ = cx.update(|cx| {
-                    SystemWindowTabController::remove_tab(cx, window_id);
-                });
             }
         }));
         platform_window.on_request_frame(Box::new({
@@ -2005,8 +1993,6 @@ impl Window {
 
                         window.bounds_changed(cx);
                         window.refresh();
-
-                        SystemWindowTabController::update_last_active(cx, window.handle.id);
                     })
                     .log_err();
             }
@@ -2057,58 +2043,6 @@ impl Window {
                     .unwrap_or(None)
             })
         });
-        platform_window.on_move_tab_to_new_window({
-            let mut cx = cx.to_async();
-            Box::new(move || {
-                handle
-                    .update(&mut cx, |_, _window, cx| {
-                        SystemWindowTabController::move_tab_to_new_window(cx, handle.window_id());
-                    })
-                    .log_err();
-            })
-        });
-        platform_window.on_merge_all_windows({
-            let mut cx = cx.to_async();
-            Box::new(move || {
-                handle
-                    .update(&mut cx, |_, _window, cx| {
-                        SystemWindowTabController::merge_all_windows(cx, handle.window_id());
-                    })
-                    .log_err();
-            })
-        });
-        platform_window.on_select_next_tab({
-            let mut cx = cx.to_async();
-            Box::new(move || {
-                handle
-                    .update(&mut cx, |_, _window, cx| {
-                        SystemWindowTabController::select_next_tab(cx, handle.window_id());
-                    })
-                    .log_err();
-            })
-        });
-        platform_window.on_select_previous_tab({
-            let mut cx = cx.to_async();
-            Box::new(move || {
-                handle
-                    .update(&mut cx, |_, _window, cx| {
-                        SystemWindowTabController::select_previous_tab(cx, handle.window_id())
-                    })
-                    .log_err();
-            })
-        });
-        platform_window.on_toggle_tab_bar({
-            let mut cx = cx.to_async();
-            Box::new(move || {
-                handle
-                    .update(&mut cx, |_, window, cx| {
-                        let tab_bar_visible = window.platform_window.tab_bar_visible();
-                        SystemWindowTabController::set_visible(cx, tab_bar_visible);
-                    })
-                    .log_err();
-            })
-        });
-
         if let Some(app_id) = app_id {
             platform_window.set_app_id(&app_id);
         }
@@ -2897,13 +2831,6 @@ impl Window {
         self.platform_window.is_fullscreen()
     }
 
-    /// Returns whether the window is currently in simple (borderless) fullscreen,
-    /// where it covers the entire screen including the menu bar and notch area.
-    /// Always `false` on platforms other than macOS.
-    pub fn is_simple_fullscreen(&self) -> bool {
-        self.platform_window.is_simple_fullscreen()
-    }
-
     pub(crate) fn appearance_changed(&mut self, cx: &mut App) {
         self.appearance = self.platform_window.appearance();
 
@@ -3046,28 +2973,12 @@ impl Window {
             .set_background_appearance(background_appearance);
     }
 
-    /// Mark the window as dirty at the platform level.
-    pub fn set_window_edited(&mut self, edited: bool) {
-        self.platform_window.set_edited(edited);
-    }
-
-    /// Set the path of the file this window represents.
-    /// On macOS, this sets the window's accessibility document property (AXDocument).
-    pub fn set_document_path(&self, path: Option<&std::path::Path>) {
-        self.platform_window.set_document_path(path);
-    }
-
     /// Determine the display on which the window is visible.
     pub fn display(&self, cx: &App) -> Option<Rc<dyn PlatformDisplay>> {
         cx.platform
             .displays()
             .into_iter()
             .find(|display| Some(display.id()) == self.display_id)
-    }
-
-    /// Show the platform character palette.
-    pub fn show_character_palette(&self) {
-        self.platform_window.show_character_palette();
     }
 
     /// The scale factor of the display associated with the window. For example, it could
@@ -6630,14 +6541,6 @@ impl Window {
         self.platform_window.toggle_fullscreen();
     }
 
-    /// Toggle simple (borderless) fullscreen, where the window covers the entire
-    /// screen including the menu bar and, on notched displays, the area around the
-    /// notch. Unlike [`Window::toggle_fullscreen`], this does not move the window
-    /// into its own Mission Control space. Only has an effect on macOS.
-    pub fn toggle_simple_fullscreen(&self) {
-        self.platform_window.toggle_simple_fullscreen();
-    }
-
     /// Updates the IME panel position suggestions for languages like japanese, chinese.
     pub fn invalidate_character_coordinates(&self) {
         self.on_next_frame(|window, cx| {
@@ -6914,56 +6817,6 @@ impl Window {
     /// Currently returns None on Mac and Windows.
     pub fn gpu_specs(&self) -> Option<GpuSpecs> {
         self.platform_window.gpu_specs()
-    }
-
-    /// Perform titlebar double-click action.
-    /// This is macOS specific.
-    pub fn titlebar_double_click(&self) {
-        self.platform_window
-            .titlebar_double_click(self.is_resizable, self.is_minimizable);
-    }
-
-    /// Gets the window's title at the platform level.
-    /// This is macOS specific.
-    pub fn window_title(&self) -> String {
-        self.platform_window.get_title()
-    }
-
-    /// Returns a list of all tabbed windows and their titles.
-    /// This is macOS specific.
-    pub fn tabbed_windows(&self) -> Option<Vec<SystemWindowTab>> {
-        self.platform_window.tabbed_windows()
-    }
-
-    /// Returns the tab bar visibility.
-    /// This is macOS specific.
-    pub fn tab_bar_visible(&self) -> bool {
-        self.platform_window.tab_bar_visible()
-    }
-
-    /// Merges all open windows into a single tabbed window.
-    /// This is macOS specific.
-    pub fn merge_all_windows(&self) {
-        self.platform_window.merge_all_windows()
-    }
-
-    /// Moves the tab to a new containing window.
-    /// This is macOS specific.
-    pub fn move_tab_to_new_window(&self) {
-        self.platform_window.move_tab_to_new_window()
-    }
-
-    /// Shows or hides the window tab overview.
-    /// This is macOS specific.
-    pub fn toggle_window_tab_overview(&self) {
-        self.platform_window.toggle_window_tab_overview()
-    }
-
-    /// Sets the tabbing identifier for the window.
-    /// This is macOS specific.
-    pub fn set_tabbing_identifier(&self, tabbing_identifier: Option<String>) {
-        self.platform_window
-            .set_tabbing_identifier(tabbing_identifier)
     }
 
     /// Request the OS to play an alert sound. On some platforms this is associated

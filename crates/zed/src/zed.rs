@@ -26,7 +26,7 @@ use gpui::{
     FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement, PathPromptOptions,
     PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions, UpdateGlobal,
     WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions, actions,
-    image_cache, img, point, px, retain_all,
+    image_cache, img, px, retain_all,
 };
 use image_viewer::ImageInfo;
 use language::Capability;
@@ -83,10 +83,6 @@ actions!(
     [
         /// Opens the element inspector for debugging UI.
         DebugElements,
-        /// Hides the application window.
-        Hide,
-        /// Hides all other application windows.
-        HideOthers,
         /// Minimizes the current window.
         Minimize,
         /// Opens the default settings file.
@@ -97,8 +93,6 @@ actions!(
         ShowDefaultSemanticTokenRules,
         /// Resets the application database.
         ResetDatabase,
-        /// Shows all hidden windows.
-        ShowAll,
         /// Toggles fullscreen mode.
         ToggleFullScreen,
         /// Zooms the window.
@@ -143,12 +137,6 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
-    #[cfg(target_os = "macos")]
-    cx.on_action(|_: &Hide, cx| cx.hide());
-    #[cfg(target_os = "macos")]
-    cx.on_action(|_: &HideOthers, cx| cx.hide_other_apps());
-    #[cfg(target_os = "macos")]
-    cx.on_action(|_: &ShowAll, cx| cx.unhide_other_apps());
     cx.on_action(quit);
 
     // When Zed logs to stdout rather than the log file, avoid registering
@@ -294,22 +282,12 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         });
 
     WindowOptions {
-        titlebar: Some(TitlebarOptions {
-            title: None,
-            appears_transparent: true,
-            traffic_light_position: Some(point(px(9.0), px(9.0))),
-        }),
+        titlebar: Some(TitlebarOptions { title: None }),
         window_bounds: None,
         focus: false,
         show: false,
         kind: WindowKind::Normal,
         is_movable: true,
-        // Zed draws its own titlebar and moves the window via [`Window::start_window_move`],
-        // so on macOS AppKit should not own titlebar dragging. This avoids the titlebar
-        // click delay from AppKit's drag disambiguation (first observed on macOS 27) while
-        // keeping the window movable and the Window-menu tiling items enabled. No-op on
-        // other platforms.
-        app_owns_titlebar_drag: true,
         display_id: display.map(|display| display.id()),
         window_background: cx.theme().window_background_appearance(),
         app_id: Some(app_id.to_owned()),
@@ -334,7 +312,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     .detach();
 
     init_cursor_hide_mode(cx);
-    init_app_appearance(cx);
     init_reduce_motion(cx);
 
     cx.observe_new(|_multi_workspace: &mut MultiWorkspace, window, cx| {
@@ -716,17 +693,8 @@ fn register_actions(
         .register_action(|_, _: &Zoom, window, _| {
             window.zoom_window();
         })
-        .register_action(|_, _: &ToggleFullScreen, window, cx| {
-            let use_simple_fullscreen = PlatformStyle::platform() == PlatformStyle::Mac
-                && (window.is_simple_fullscreen()
-                    || (!window.is_fullscreen()
-                        && WorkspaceSettings::get_global(cx).fullscreen_mode
-                            == settings::FullscreenMode::Simple));
-            if use_simple_fullscreen {
-                window.toggle_simple_fullscreen();
-            } else {
-                window.toggle_fullscreen();
-            }
+        .register_action(|_, _: &ToggleFullScreen, window, _| {
+            window.toggle_fullscreen();
         })
         .register_action(|_, _: &zed_actions::dev::ToggleFpsOverlay, window, _| {
             window.cycle_debug_frame_overlay_mode();
@@ -1286,9 +1254,7 @@ fn open_about_window(cx: &mut App) {
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some("About Zed".into()),
-                appears_transparent: true,
-                traffic_light_position: Some(point(px(12.), px(12.))),
+                title: Some("About Oxed".into()),
             }),
             window_bounds: Some(WindowBounds::centered(window_size, cx)),
             is_resizable: false,
@@ -1541,24 +1507,6 @@ fn init_cursor_hide_mode(cx: &mut App) {
     cx.observe_global::<SettingsStore>(apply).detach();
 }
 
-fn init_app_appearance(cx: &mut App) {
-    // Force the native window chrome (border + titlebar) to match the selected theme.
-    // `System` follows the OS (no override); any other theme forces its appearance, so a
-    // dark theme doesn't render a light window border when the system is in light mode.
-    let apply = |cx: &mut App| {
-        let appearance = match ThemeSettings::get_global(cx).theme.mode() {
-            Some(theme_settings::ThemeAppearanceMode::System) => None,
-            _ => Some(match cx.theme().appearance() {
-                theme::Appearance::Light => gpui::WindowAppearance::Light,
-                theme::Appearance::Dark => gpui::WindowAppearance::Dark,
-            }),
-        };
-        cx.set_window_appearance(appearance);
-    };
-    apply(cx);
-    cx.observe_global::<SettingsStore>(apply).detach();
-}
-
 #[derive(Copy, Clone, Debug, settings::RegisterSetting)]
 struct ReduceMotionSetting(settings::ReduceMotionMode);
 
@@ -1758,12 +1706,6 @@ fn reload_keymaps(cx: &mut App, mut user_key_bindings: Vec<KeyBinding>) {
     }
     cx.bind_keys(user_key_bindings);
     reload_menus(cx);
-    // On Windows, this is set in the `update_jump_list` method of the `HistoryManager`.
-    #[cfg(not(target_os = "windows"))]
-    cx.set_dock_menu(vec![gpui::MenuItem::action(
-        "New Window",
-        workspace::NewWindow,
-    )]);
     // todo: nicer api here?
     keymap_editor::KeymapEventChannel::trigger_keymap_changed(cx);
 }
@@ -4415,7 +4357,7 @@ mod tests {
             let app_state = AppState::test(cx);
 
             theme_settings::init(theme::LoadThemes::JustBase, cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
             onboarding::init(cx);
             app_state
         })
@@ -4860,7 +4802,6 @@ mod tests {
                 "toast",
                 "toolchain",
                 "which_key",
-                "window",
                 "workspace",
                 "worktree_picker",
                 "zed",
@@ -5043,7 +4984,7 @@ mod tests {
             gpui_tokio::init(cx);
             AppState::set_global(app_state.clone(), cx);
             theme_settings::init(theme::LoadThemes::JustBase, cx);
-            workspace::init(app_state.clone(), cx);
+            workspace::init(cx);
             release_channel::init(Version::new(0, 0, 0), cx);
             command_palette::init(cx);
             editor::init(cx);

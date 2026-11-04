@@ -587,7 +587,6 @@ fn init_renderers(cx: &mut App) {
         .add_basic_renderer::<settings::ShowIndentGuides>(render_dropdown)
         .add_basic_renderer::<settings::RelativeLineNumbers>(render_dropdown)
         .add_basic_renderer::<settings::WindowDecorations>(render_dropdown)
-        .add_basic_renderer::<settings::FullscreenMode>(render_dropdown)
         .add_basic_renderer::<settings::WindowButtonLayoutContentDiscriminants>(render_dropdown)
         .add_basic_renderer::<settings::ScanSymlinksSetting>(render_dropdown)
         .add_basic_renderer::<settings::FontSize>(render_editable_number_field)
@@ -797,9 +796,7 @@ fn open_settings_editor_with(
         cx.open_window(
             WindowOptions {
                 titlebar: Some(TitlebarOptions {
-                    title: Some("Zed — Settings".into()),
-                    appears_transparent: true,
-                    traffic_light_position: Some(point(px(12.0), px(12.0))),
+                    title: Some("Oxed — Settings".into()),
                 }),
                 focus: true,
                 show: true,
@@ -1775,7 +1772,7 @@ impl SettingsWindow {
         .detach();
 
         let title_bar = if !cfg!(target_os = "macos") {
-            Some(cx.new(|cx| PlatformTitleBar::new("settings-title-bar", cx)))
+            Some(cx.new(|_| PlatformTitleBar::new("settings-title-bar")))
         } else {
             None
         };
