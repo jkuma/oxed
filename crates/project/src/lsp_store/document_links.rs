@@ -11,7 +11,6 @@ use gpui::{AppContext as _, Context, Entity, SharedString, Task};
 use language::{Buffer, point_to_lsp};
 use lsp::LanguageServerId;
 use lsp::request::DocumentLinkResolve;
-use rpc::proto;
 use settings::Settings as _;
 use text::{Anchor, BufferId, ToPointUtf16 as _};
 use util::ResultExt as _;
@@ -96,15 +95,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshDocumentLinks {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshDocumentLinks {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh document links downstream")
-                .log_err();
-        }
     }
 
     /// `Some(..)` means the underlying state was actually refreshed; `None`

@@ -4,7 +4,6 @@ pub mod git_traversal;
 pub mod job_debug_queue;
 pub mod pending_op;
 
-use crate::ProjectId;
 use crate::{
     Project, ProjectEnvironment, ProjectItem, ProjectPath,
     buffer_store::{BufferStore, BufferStoreEvent},
@@ -58,15 +57,11 @@ use language::{Anchor, Buffer, BufferEvent, Capability, Language, LanguageRegist
 use paths::{config_dir, home_dir};
 use pending_op::{PendingOp, PendingOpId, PendingOps, PendingOpsSummary};
 use postage::stream::Stream as _;
-use rpc::{
-    AnyProtoClient,
-    proto::{self, split_repository_update},
-};
+use rpc::proto::{self};
 use serde::Deserialize;
 use settings::{GitDiffBaseSetting, Settings, SettingsLocation, SettingsStore, WorktreeId};
 use smol::future::yield_now;
 use std::{
-    cmp::Ordering,
     collections::{BTreeSet, HashSet, VecDeque, hash_map::Entry},
     future::Future,
     mem,
@@ -454,22 +449,9 @@ pub enum GitAccess {
 
 struct GitStoreState {
     next_repository_id: Arc<AtomicU64>,
-    downstream: Option<LocalDownstreamState>,
     project_environment: Entity<ProjectEnvironment>,
     fs: Arc<dyn Fs>,
     _fs_watches: Box<[Task<()>]>,
-}
-
-enum DownstreamUpdate {
-    UpdateRepository(RepositorySnapshot),
-    RemoveRepository(RepositoryId),
-}
-
-struct LocalDownstreamState {
-    client: AnyProtoClient,
-    project_id: ProjectId,
-    updates_tx: mpsc::UnboundedSender<DownstreamUpdate>,
-    _task: Task<Result<()>>,
 }
 
 #[derive(Clone, Debug)]
@@ -486,34 +468,7 @@ pub struct StatusEntry {
     pub unstaged_diff_stat: Option<DiffStat>,
 }
 
-impl StatusEntry {
-    fn to_proto(&self) -> proto::StatusEntry {
-        let simple_status = match self.status {
-            FileStatus::Ignored | FileStatus::Untracked => proto::GitStatus::Added as i32,
-            FileStatus::Unmerged { .. } => proto::GitStatus::Conflict as i32,
-            FileStatus::Tracked(TrackedStatus {
-                index_status,
-                worktree_status,
-            }) => tracked_status_to_proto(if worktree_status != StatusCode::Unmodified {
-                worktree_status
-            } else {
-                index_status
-            }),
-        };
-
-        proto::StatusEntry {
-            repo_path: self.repo_path.as_unix_str().to_owned(),
-            simple_status,
-            status: Some(status_to_proto(self.status)),
-            diff_stat_added: self.diff_stat.map(|ds| ds.added),
-            diff_stat_deleted: self.diff_stat.map(|ds| ds.deleted),
-            staged_diff_stat_added: self.staged_diff_stat.map(|ds| ds.added),
-            staged_diff_stat_deleted: self.staged_diff_stat.map(|ds| ds.deleted),
-            unstaged_diff_stat_added: self.unstaged_diff_stat.map(|ds| ds.added),
-            unstaged_diff_stat_deleted: self.unstaged_diff_stat.map(|ds| ds.deleted),
-        }
-    }
-}
+impl StatusEntry {}
 
 impl TryFrom<proto::StatusEntry> for StatusEntry {
     type Error = anyhow::Error;
@@ -848,7 +803,7 @@ impl GitStore {
                                         is_trusted,
                                         cx,
                                     );
-                                    repo.schedule_scan(None, cx);
+                                    repo.schedule_scan(cx);
                                 })
                             }
                             let display_repo_ids =
@@ -872,7 +827,6 @@ impl GitStore {
             buffer_store,
             GitStoreState {
                 next_repository_id: Arc::new(AtomicU64::new(1)),
-                downstream: None,
                 project_environment: environment,
                 _fs_watches,
                 fs,
@@ -979,63 +933,6 @@ impl GitStore {
         };
 
         self.set_active_repo_id(repo_id, cx);
-    }
-
-    pub fn shared(&mut self, project_id: u64, client: AnyProtoClient, cx: &mut Context<Self>) {
-        let downstream_client = &mut self.state.downstream;
-        let mut snapshots = HashMap::default();
-        let (updates_tx, mut updates_rx) = mpsc::unbounded();
-        for repo in self.repositories.values() {
-            updates_tx
-                .unbounded_send(DownstreamUpdate::UpdateRepository(
-                    repo.read(cx).snapshot.clone(),
-                ))
-                .ok();
-        }
-        *downstream_client = Some(LocalDownstreamState {
-            client: client.clone(),
-            project_id: ProjectId(project_id),
-            updates_tx,
-            _task: cx.spawn(async move |this, cx| {
-                cx.background_spawn(async move {
-                    while let Some(update) = updates_rx.next().await {
-                        match update {
-                            DownstreamUpdate::UpdateRepository(snapshot) => {
-                                if let Some(old_snapshot) = snapshots.get_mut(&snapshot.id) {
-                                    let update = snapshot.build_update(old_snapshot, project_id);
-                                    *old_snapshot = snapshot;
-                                    for update in split_repository_update(update) {
-                                        client.send(update)?;
-                                    }
-                                } else {
-                                    let update = snapshot.initial_update(project_id);
-                                    for update in split_repository_update(update) {
-                                        client.send(update)?;
-                                    }
-                                    snapshots.insert(snapshot.id, snapshot);
-                                }
-                            }
-                            DownstreamUpdate::RemoveRepository(id) => {
-                                client.send(proto::RemoveRepository {
-                                    project_id,
-                                    id: id.to_proto(),
-                                })?;
-                            }
-                        }
-                    }
-                    anyhow::Ok(())
-                })
-                .await
-                .ok();
-                this.update(cx, |this, _| {
-                    this.state.downstream.take();
-                })
-            }),
-        });
-    }
-
-    pub fn unshared(&mut self, _cx: &mut Context<Self>) {
-        self.state.downstream.take();
     }
 
     pub fn active_repository(&self) -> Option<Entity<Repository>> {
@@ -2139,13 +2036,6 @@ impl GitStore {
         cx.spawn(|_: &mut AsyncApp| async move { rx.await? })
     }
 
-    fn downstream_client(&self) -> Option<(AnyProtoClient, ProjectId)> {
-        self.state
-            .downstream
-            .as_ref()
-            .map(|state| (state.client.clone(), state.project_id))
-    }
-
     fn on_worktree_store_event(
         &mut self,
         worktree_store: Entity<WorktreeStore>,
@@ -2154,7 +2044,6 @@ impl GitStore {
     ) {
         let GitStoreState {
             project_environment,
-            downstream,
             fs,
             ..
         } = &self.state;
@@ -2168,14 +2057,11 @@ impl GitStore {
                 {
                     let paths_by_git_repo =
                         self.process_updated_entries(&worktree, updated_entries, cx);
-                    let downstream = downstream
-                        .as_ref()
-                        .map(|downstream| downstream.updates_tx.clone());
                     cx.spawn(async move |_, cx| {
                         let paths_by_git_repo = paths_by_git_repo.await;
                         for (repo, paths) in paths_by_git_repo {
                             repo.update(cx, |repo, cx| {
-                                repo.paths_changed(paths, downstream.clone(), cx);
+                                repo.paths_changed(paths, cx);
                             });
                         }
                     })
@@ -2191,9 +2077,6 @@ impl GitStore {
                 self.update_repositories_from_worktree(
                     *worktree_id,
                     project_environment.clone(),
-                    downstream
-                        .as_ref()
-                        .map(|downstream| downstream.updates_tx.clone()),
                     changed_repos.clone(),
                     fs.clone(),
                     cx,
@@ -2223,13 +2106,6 @@ impl GitStore {
                     self.display_diffs.remove(&repo_id);
                     self.repositories.remove(&repo_id);
                     self.worktree_ids.remove(&repo_id);
-                    if let Some(updates_tx) =
-                        downstream.as_ref().map(|downstream| &downstream.updates_tx)
-                    {
-                        updates_tx
-                            .unbounded_send(DownstreamUpdate::RemoveRepository(repo_id))
-                            .ok();
-                    }
                 }
 
                 if is_active_repo_removed {
@@ -2314,7 +2190,6 @@ impl GitStore {
         &mut self,
         worktree_id: WorktreeId,
         project_environment: Entity<ProjectEnvironment>,
-        updates_tx: Option<mpsc::UnboundedSender<DownstreamUpdate>>,
         updated_git_repositories: UpdatedGitRepositoriesSet,
         fs: Arc<dyn Fs>,
         cx: &mut Context<Self>,
@@ -2379,12 +2254,12 @@ impl GitStore {
                                 is_trusted,
                                 cx,
                             );
-                            existing.schedule_scan(updates_tx.clone(), cx);
+                            existing.schedule_scan(cx);
                         });
                     } else {
                         existing.update(cx, |existing, cx| {
                             existing.snapshot.work_directory_abs_path = new_work_directory_abs_path;
-                            existing.schedule_scan(updates_tx.clone(), cx);
+                            existing.schedule_scan(cx);
                         });
                     }
                 } else {
@@ -2437,11 +2312,6 @@ impl GitStore {
             }
             self.display_diffs.remove(&id);
             self.repositories.remove(&id);
-            if let Some(updates_tx) = updates_tx.as_ref() {
-                updates_tx
-                    .unbounded_send(DownstreamUpdate::RemoveRepository(id))
-                    .ok();
-            }
         }
     }
 
@@ -2605,14 +2475,10 @@ impl GitStore {
         }
         let GitStoreState {
             next_repository_id,
-            downstream,
             project_environment,
             fs,
             ..
         } = &self.state;
-        let updates_tx = downstream
-            .as_ref()
-            .map(|downstream| downstream.updates_tx.clone());
         let project_environment = project_environment.downgrade();
         let fs = fs.clone();
         let is_trusted = TrustedWorktrees::try_get_global(cx)
@@ -2640,13 +2506,7 @@ impl GitStore {
                 object_read_limiter,
                 cx,
             );
-            if let Some(updates_tx) = updates_tx.as_ref() {
-                // trigger an empty `UpdateRepository` to ensure remote active_repo_id is set correctly
-                updates_tx
-                    .unbounded_send(DownstreamUpdate::UpdateRepository(repo.snapshot()))
-                    .ok();
-            }
-            repo.schedule_scan(updates_tx, cx);
+            repo.schedule_scan(cx);
             repo
         });
         self._subscriptions
@@ -3986,141 +3846,6 @@ impl RepositorySnapshot {
         }
     }
 
-    fn initial_update(&self, project_id: u64) -> proto::UpdateRepository {
-        proto::UpdateRepository {
-            branch_summary: self.branch.as_ref().map(branch_to_proto),
-            branch_list: self.branch_list.iter().map(branch_to_proto).collect(),
-            branch_list_error: self
-                .branch_list_error
-                .as_ref()
-                .map(|error| error.to_string()),
-            head_commit_details: self.head_commit.as_ref().map(commit_details_to_proto),
-            updated_statuses: self
-                .statuses_by_path
-                .iter()
-                .map(|entry| entry.to_proto())
-                .collect(),
-            removed_statuses: Default::default(),
-            current_merge_conflicts: self
-                .merge
-                .merge_heads_by_conflicted_path
-                .iter()
-                .map(|(repo_path, _)| repo_path.as_unix_str().to_owned())
-                .collect(),
-            merge_message: self.merge.message.as_ref().map(|msg| msg.to_string()),
-            project_id,
-            id: self.id.to_proto(),
-            abs_path: self.work_directory_abs_path.to_string_lossy().into_owned(),
-            entry_ids: vec![self.id.to_proto()],
-            scan_id: self.scan_id,
-            is_last_update: true,
-            stash_entries: self
-                .stash_entries
-                .entries
-                .iter()
-                .map(stash_to_proto)
-                .collect(),
-            remote_upstream_url: self.remote_upstream_url.clone(),
-            remote_origin_url: self.remote_origin_url.clone(),
-            repository_dir_abs_path: Some(
-                self.repository_dir_abs_path.to_string_lossy().into_owned(),
-            ),
-            common_dir_abs_path: Some(self.common_dir_abs_path.to_string_lossy().into_owned()),
-            linked_worktrees: self
-                .linked_worktrees
-                .iter()
-                .map(worktree_to_proto)
-                .collect(),
-        }
-    }
-
-    fn build_update(&self, old: &Self, project_id: u64) -> proto::UpdateRepository {
-        let mut updated_statuses: Vec<proto::StatusEntry> = Vec::new();
-        let mut removed_statuses: Vec<String> = Vec::new();
-
-        let mut new_statuses = self.statuses_by_path.iter().peekable();
-        let mut old_statuses = old.statuses_by_path.iter().peekable();
-
-        let mut current_new_entry = new_statuses.next();
-        let mut current_old_entry = old_statuses.next();
-        loop {
-            match (current_new_entry, current_old_entry) {
-                (Some(new_entry), Some(old_entry)) => {
-                    match new_entry.repo_path.cmp(&old_entry.repo_path) {
-                        Ordering::Less => {
-                            updated_statuses.push(new_entry.to_proto());
-                            current_new_entry = new_statuses.next();
-                        }
-                        Ordering::Equal => {
-                            if new_entry.status != old_entry.status
-                                || new_entry.diff_stat != old_entry.diff_stat
-                            {
-                                updated_statuses.push(new_entry.to_proto());
-                            }
-                            current_old_entry = old_statuses.next();
-                            current_new_entry = new_statuses.next();
-                        }
-                        Ordering::Greater => {
-                            removed_statuses.push(old_entry.repo_path.as_unix_str().to_owned());
-                            current_old_entry = old_statuses.next();
-                        }
-                    }
-                }
-                (None, Some(old_entry)) => {
-                    removed_statuses.push(old_entry.repo_path.as_unix_str().to_owned());
-                    current_old_entry = old_statuses.next();
-                }
-                (Some(new_entry), None) => {
-                    updated_statuses.push(new_entry.to_proto());
-                    current_new_entry = new_statuses.next();
-                }
-                (None, None) => break,
-            }
-        }
-
-        proto::UpdateRepository {
-            branch_summary: self.branch.as_ref().map(branch_to_proto),
-            branch_list: self.branch_list.iter().map(branch_to_proto).collect(),
-            branch_list_error: self
-                .branch_list_error
-                .as_ref()
-                .map(|error| error.to_string()),
-            head_commit_details: self.head_commit.as_ref().map(commit_details_to_proto),
-            updated_statuses,
-            removed_statuses,
-            current_merge_conflicts: self
-                .merge
-                .merge_heads_by_conflicted_path
-                .iter()
-                .map(|(path, _)| path.as_unix_str().to_owned())
-                .collect(),
-            merge_message: self.merge.message.as_ref().map(|msg| msg.to_string()),
-            project_id,
-            id: self.id.to_proto(),
-            abs_path: self.work_directory_abs_path.to_string_lossy().into_owned(),
-            entry_ids: vec![],
-            scan_id: self.scan_id,
-            is_last_update: true,
-            stash_entries: self
-                .stash_entries
-                .entries
-                .iter()
-                .map(stash_to_proto)
-                .collect(),
-            remote_upstream_url: self.remote_upstream_url.clone(),
-            remote_origin_url: self.remote_origin_url.clone(),
-            repository_dir_abs_path: Some(
-                self.repository_dir_abs_path.to_string_lossy().into_owned(),
-            ),
-            common_dir_abs_path: Some(self.common_dir_abs_path.to_string_lossy().into_owned()),
-            linked_worktrees: self
-                .linked_worktrees
-                .iter()
-                .map(worktree_to_proto)
-                .collect(),
-        }
-    }
-
     /// Returns the main worktree path for this repository, if one exists.
     ///
     /// Linked worktrees attached to bare repositories do not have a main
@@ -4642,38 +4367,7 @@ impl Repository {
                             continue;
                         };
 
-                        let downstream_client = git_store.downstream_client();
                         diff_state.update(cx, |diff_state, cx| {
-                            use proto::update_diff_bases::Mode;
-
-                            if let Some((client, project_id)) = downstream_client {
-                                let (staged_text, committed_text, mode) =
-                                    match diff_bases_change.clone() {
-                                        Some(DiffBasesChange::SetIndex(index)) => {
-                                            (index, None, Mode::IndexOnly)
-                                        }
-                                        Some(DiffBasesChange::SetHead(head)) => {
-                                            (None, head, Mode::HeadOnly)
-                                        }
-                                        Some(DiffBasesChange::SetEach { index, head }) => {
-                                            (index, head, Mode::IndexAndHead)
-                                        }
-                                        Some(DiffBasesChange::SetBoth(text)) => {
-                                            (None, text, Mode::IndexMatchesHead)
-                                        }
-                                        None => (None, None, Mode::Unchanged),
-                                    };
-                                client
-                                    .send(proto::UpdateDiffBases {
-                                        project_id: project_id.to_proto(),
-                                        buffer_id: buffer_id.to_proto(),
-                                        staged_text,
-                                        committed_text,
-                                        mode: mode as i32,
-                                    })
-                                    .log_err();
-                            }
-
                             diff_state.diff_bases_changed(buffer_snapshot, diff_bases_change, cx);
                         });
                     }
@@ -4938,16 +4632,8 @@ impl Repository {
             }
         });
 
-        let scan_updates_tx = self.git_store().map(|git_store| {
-            git_store
-                .read(cx)
-                .state
-                .downstream
-                .as_ref()
-                .map(|downstream| downstream.updates_tx.clone())
-        });
-        if let Some(updates_tx) = scan_updates_tx {
-            self.schedule_scan(updates_tx, cx);
+        if self.git_store().is_some() {
+            self.schedule_scan(cx);
         }
 
         receiver
@@ -5865,14 +5551,6 @@ impl Repository {
         index: Option<usize>,
         cx: &mut Context<Self>,
     ) -> oneshot::Receiver<anyhow::Result<()>> {
-        let updates_tx = self.git_store().and_then(|git_store| {
-            git_store
-                .read(cx)
-                .state
-                .downstream
-                .as_ref()
-                .map(|downstream| downstream.updates_tx.clone())
-        });
         let this = cx.weak_entity();
         self.send_job("stash_drop", None, move |git_repo, mut cx| async move {
             match git_repo {
@@ -5886,16 +5564,10 @@ impl Repository {
                     if result.is_ok()
                         && let Ok(stash_entries) = backend.stash_entries().await
                     {
-                        let snapshot = this.update(&mut cx, |this, cx| {
+                        this.update(&mut cx, |this, cx| {
                             this.snapshot.stash_entries = stash_entries;
                             cx.emit(RepositoryEvent::StashEntriesChanged);
-                            this.snapshot.clone()
                         })?;
-                        if let Some(updates_tx) = updates_tx {
-                            updates_tx
-                                .unbounded_send(DownstreamUpdate::UpdateRepository(snapshot))
-                                .ok();
-                        }
                     }
 
                     result
@@ -5955,7 +5627,6 @@ impl Repository {
     async fn refresh_branch_list(
         this: &WeakEntity<Self>,
         backend: Arc<dyn GitRepository>,
-        updates_tx: Option<mpsc::UnboundedSender<DownstreamUpdate>>,
         cx: &mut AsyncApp,
     ) -> Result<()> {
         let branches_scan = backend.branches().await?;
@@ -5963,7 +5634,7 @@ impl Repository {
         let branch_list: Arc<[Branch]> = branches_scan.branches.into();
         let branch = branch_list.iter().find(|branch| branch.is_head).cloned();
         log::info!("head branch after scan is {branch:?}");
-        let snapshot = this.update(cx, |this, cx| {
+        this.update(cx, |this, cx| {
             let head_changed = branch != this.snapshot.branch;
             let branch_list_changed = *branch_list != *this.snapshot.branch_list;
             let branch_list_error_changed = this.snapshot.branch_list_error != branch_list_error;
@@ -5976,13 +5647,7 @@ impl Repository {
             if branch_list_changed || branch_list_error_changed {
                 cx.emit(RepositoryEvent::BranchListChanged);
             }
-            this.snapshot.clone()
         })?;
-        if let Some(updates_tx) = updates_tx {
-            updates_tx
-                .unbounded_send(DownstreamUpdate::UpdateRepository(snapshot))
-                .ok();
-        }
         Ok(())
     }
 
@@ -6025,15 +5690,6 @@ impl Repository {
         askpass: AskPassDelegate,
         cx: &mut Context<Self>,
     ) -> oneshot::Receiver<Result<RemoteCommandOutput>> {
-        let updates_tx = self.git_store().and_then(|git_store| {
-            git_store
-                .read(cx)
-                .state
-                .downstream
-                .as_ref()
-                .map(|downstream| downstream.updates_tx.clone())
-        });
-
         let this = cx.weak_entity();
         self.send_job(
             "fetch",
@@ -6049,7 +5705,7 @@ impl Repository {
                             .fetch(fetch_options, askpass, environment, cx.clone())
                             .await;
                         if result.is_ok() {
-                            Self::refresh_branch_list(&this, backend, updates_tx, &mut cx).await?;
+                            Self::refresh_branch_list(&this, backend, &mut cx).await?;
                         }
                         result
                     }
@@ -6073,15 +5729,6 @@ impl Repository {
                 PushOptions::Force => " --force-with-lease",
             })
             .unwrap_or("");
-
-        let updates_tx = self.git_store().and_then(|git_store| {
-            git_store
-                .read(cx)
-                .state
-                .downstream
-                .as_ref()
-                .map(|downstream| downstream.updates_tx.clone())
-        });
 
         let this = cx.weak_entity();
         self.send_job(
@@ -6107,7 +5754,7 @@ impl Repository {
                             .await;
                         // TODO would be nice to not have to do this manually
                         if result.is_ok() {
-                            Self::refresh_branch_list(&this, backend, updates_tx, &mut cx).await?;
+                            Self::refresh_branch_list(&this, backend, &mut cx).await?;
                         }
                         result
                     }
@@ -6813,11 +6460,7 @@ impl Repository {
         self.pending_ops = updated;
     }
 
-    fn schedule_scan(
-        &mut self,
-        updates_tx: Option<mpsc::UnboundedSender<DownstreamUpdate>>,
-        cx: &mut Context<Self>,
-    ) {
+    fn schedule_scan(&mut self, cx: &mut Context<Self>) {
         let this = cx.weak_entity();
         let _ = self.send_keyed_job(
             "schedule_scan",
@@ -6830,15 +6473,10 @@ impl Repository {
                     return anyhow::Ok(());
                 };
                 let RepositoryState::Local(LocalRepositoryState { backend, .. }) = state;
-                let snapshot = compute_snapshot(this.clone(), backend.clone(), &mut cx).await;
+                compute_snapshot(this.clone(), backend.clone(), &mut cx).await;
                 this.update(&mut cx, |this, cx| {
                     this.clear_pending_ops(cx);
                 });
-                if let Some(updates_tx) = updates_tx {
-                    updates_tx
-                        .unbounded_send(DownstreamUpdate::UpdateRepository(snapshot))
-                        .ok();
-                }
                 Ok(())
             },
         );
@@ -7019,12 +6657,7 @@ impl Repository {
         })
     }
 
-    fn paths_changed(
-        &mut self,
-        paths: Vec<RepoPath>,
-        updates_tx: Option<mpsc::UnboundedSender<DownstreamUpdate>>,
-        cx: &mut Context<Self>,
-    ) {
+    fn paths_changed(&mut self, paths: Vec<RepoPath>, cx: &mut Context<Self>) {
         if !paths.is_empty() {
             self.paths_needing_status_update.push(paths);
         }
@@ -7150,14 +6783,6 @@ impl Repository {
                             .statuses_by_path
                             .edit(changed_path_statuses, ());
                         this.snapshot.scan_id += 1;
-                    }
-
-                    if let Some(updates_tx) = updates_tx {
-                        updates_tx
-                            .unbounded_send(DownstreamUpdate::UpdateRepository(
-                                this.snapshot.clone(),
-                            ))
-                            .ok();
                     }
                 })
             },
@@ -7547,60 +7172,6 @@ fn get_permalink_in_rust_registry_src(
         ),
     );
     Ok(permalink)
-}
-
-fn branch_to_proto(branch: &git::repository::Branch) -> proto::Branch {
-    proto::Branch {
-        is_head: branch.is_head,
-        ref_name: branch.ref_name.to_string(),
-        unix_timestamp: branch
-            .most_recent_commit
-            .as_ref()
-            .map(|commit| commit.commit_timestamp as u64),
-        upstream: branch.upstream.as_ref().map(|upstream| proto::GitUpstream {
-            ref_name: upstream.ref_name.to_string(),
-            tracking: upstream
-                .tracking
-                .status()
-                .map(|upstream| proto::UpstreamTracking {
-                    ahead: upstream.ahead as u64,
-                    behind: upstream.behind as u64,
-                }),
-        }),
-        most_recent_commit: branch
-            .most_recent_commit
-            .as_ref()
-            .map(|commit| proto::CommitSummary {
-                sha: commit.sha.to_string(),
-                subject: commit.subject.to_string(),
-                commit_timestamp: commit.commit_timestamp,
-                author_name: commit.author_name.to_string(),
-            }),
-    }
-}
-
-fn worktree_to_proto(worktree: &git::repository::Worktree) -> proto::Worktree {
-    proto::Worktree {
-        path: worktree.path.to_string_lossy().to_string(),
-        ref_name: worktree
-            .ref_name
-            .as_ref()
-            .map(|s| s.to_string())
-            .unwrap_or_default(),
-        sha: worktree.sha.to_string(),
-        is_main: worktree.is_main,
-        is_bare: worktree.is_bare,
-    }
-}
-
-fn commit_details_to_proto(commit: &CommitDetails) -> proto::GitCommitDetails {
-    proto::GitCommitDetails {
-        sha: commit.sha.to_string(),
-        message: commit.message.to_string(),
-        commit_timestamp: commit.commit_timestamp,
-        author_email: commit.author_email.to_string(),
-        author_name: commit.author_name.to_string(),
-    }
 }
 
 async fn append_pattern_to_ignore_file(
@@ -9054,50 +8625,4 @@ fn status_from_proto(
         }
     };
     Ok(result)
-}
-
-fn status_to_proto(status: FileStatus) -> proto::GitFileStatus {
-    use proto::git_file_status::{Tracked, Unmerged, Variant};
-
-    let variant = match status {
-        FileStatus::Untracked => Variant::Untracked(Default::default()),
-        FileStatus::Ignored => Variant::Ignored(Default::default()),
-        FileStatus::Unmerged(UnmergedStatus {
-            first_head,
-            second_head,
-        }) => Variant::Unmerged(Unmerged {
-            first_head: unmerged_status_to_proto(first_head),
-            second_head: unmerged_status_to_proto(second_head),
-        }),
-        FileStatus::Tracked(TrackedStatus {
-            index_status,
-            worktree_status,
-        }) => Variant::Tracked(Tracked {
-            index_status: tracked_status_to_proto(index_status),
-            worktree_status: tracked_status_to_proto(worktree_status),
-        }),
-    };
-    proto::GitFileStatus {
-        variant: Some(variant),
-    }
-}
-
-fn unmerged_status_to_proto(code: UnmergedStatusCode) -> i32 {
-    match code {
-        UnmergedStatusCode::Added => proto::GitStatus::Added as _,
-        UnmergedStatusCode::Deleted => proto::GitStatus::Deleted as _,
-        UnmergedStatusCode::Updated => proto::GitStatus::Updated as _,
-    }
-}
-
-fn tracked_status_to_proto(code: StatusCode) -> i32 {
-    match code {
-        StatusCode::Added => proto::GitStatus::Added as _,
-        StatusCode::Deleted => proto::GitStatus::Deleted as _,
-        StatusCode::Modified => proto::GitStatus::Modified as _,
-        StatusCode::Renamed => proto::GitStatus::Renamed as _,
-        StatusCode::TypeChanged => proto::GitStatus::TypeChanged as _,
-        StatusCode::Copied => proto::GitStatus::Copied as _,
-        StatusCode::Unmodified => proto::GitStatus::Unmodified as _,
-    }
 }

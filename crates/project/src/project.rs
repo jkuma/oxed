@@ -1213,41 +1213,6 @@ impl Project {
         project
     }
 
-    #[cfg(any(test, feature = "test-support"))]
-    pub fn add_test_remote_worktree(
-        &mut self,
-        abs_path: &str,
-        cx: &mut Context<Self>,
-    ) -> Entity<Worktree> {
-        use rpc::{AnyProtoClient, NoopProtoClient};
-        use util::paths::PathStyle;
-
-        let root_name = std::path::Path::new(abs_path)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        let client = AnyProtoClient::new(NoopProtoClient::new());
-        let worktree = Worktree::remote(
-            0,
-            ReplicaId::new(1),
-            proto::WorktreeMetadata {
-                id: 100 + self.visible_worktrees(cx).count() as u64,
-                root_name,
-                visible: true,
-                abs_path: abs_path.to_string(),
-                root_repo_common_dir: None,
-                root_repo_is_linked_worktree: false,
-            },
-            client,
-            PathStyle::Unix,
-            cx,
-        );
-        self.worktree_store
-            .update(cx, |store, cx| store.add(&worktree, cx));
-        worktree
-    }
-
     #[inline]
     pub fn bookmark_store(&self) -> Entity<BookmarkStore> {
         self.bookmark_store.clone()
@@ -2323,7 +2288,6 @@ impl Project {
             }
             WorktreeStoreEvent::WorktreeReleased(..) => {}
             WorktreeStoreEvent::WorktreeOrderChanged => cx.emit(Event::WorktreeOrderChanged),
-            WorktreeStoreEvent::WorktreeUpdateSent(_) => {}
             WorktreeStoreEvent::WorktreeUpdatedEntries(worktree_id, changes) => {
                 cx.emit(Event::WorktreeUpdatedEntries(*worktree_id, changes.clone()))
             }
@@ -3626,10 +3590,6 @@ impl Project {
         RemotelyCreatedModelGuard {
             remote_models: Arc::downgrade(&models),
         }
-    }
-
-    pub fn worktree_metadata_protos(&self, cx: &App) -> Vec<proto::WorktreeMetadata> {
-        self.worktree_store.read(cx).worktree_metadata_protos(cx)
     }
 
     /// Iterator of all open buffers that have unsaved changes

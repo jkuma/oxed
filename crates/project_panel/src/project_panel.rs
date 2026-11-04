@@ -4781,9 +4781,8 @@ impl ProjectPanel {
 
         let open_file_after_drop = paths.len() == 1 && paths[0].is_file();
 
-        let Some((target_directory, worktree, fs)) = maybe!({
+        let Some((target_directory, worktree)) = maybe!({
             let project = self.project.read(cx);
-            let fs = project.fs().clone();
             let worktree = project.worktree_for_entry(entry_id, cx)?;
             let entry = worktree.read(cx).entry_for_id(entry_id)?;
             let path = entry.path.clone();
@@ -4792,7 +4791,7 @@ impl ProjectPanel {
             } else {
                 path.parent()?.into()
             };
-            Some((target_directory, worktree, fs))
+            Some((target_directory, worktree))
         }) else {
             return;
         };
@@ -4846,7 +4845,7 @@ impl ProjectPanel {
                 let (worktree_id, task) = worktree.update(cx, |worktree, cx| {
                     (
                         worktree.id(),
-                        worktree.copy_external_entries(target_directory, paths, fs, cx),
+                        worktree.copy_external_entries(target_directory, paths, cx),
                     )
                 });
 

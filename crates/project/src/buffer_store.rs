@@ -1,22 +1,18 @@
 use crate::{
     ProjectPath,
-    lsp_store::OpenLspBufferHandle,
     worktree_store::{WorktreeStore, WorktreeStoreEvent},
 };
 use anyhow::{Context as _, Result, anyhow};
 use collections::{HashMap, HashSet, hash_map};
-use futures::{Future, FutureExt as _, StreamExt as _, channel::oneshot, future::Shared};
-use gpui::{
-    App, AppContext as _, Context, Entity, EventEmitter, Subscription, Task, TaskExt, WeakEntity,
-};
+use futures::{Future, FutureExt as _, StreamExt as _, future::Shared};
+use gpui::{App, AppContext as _, Context, Entity, EventEmitter, Subscription, Task, WeakEntity};
 use language::{
     Buffer, BufferEvent, Capability, DiskState, File as _, Language, LineEnding,
     language_settings::{AllLanguageSettings, LineEndingSetting},
-    proto::{serialize_line_ending, serialize_version, split_operations},
 };
 use rpc::{
-    AnyProtoClient, ErrorCode, ErrorExt as _,
-    proto::{self, PeerId},
+    ErrorCode, ErrorExt as _,
+    proto::{self},
 };
 
 use settings::Settings;
@@ -33,24 +29,7 @@ pub struct BufferStore {
     worktree_store: Entity<WorktreeStore>,
     opened_buffers: HashMap<BufferId, OpenBuffer>,
     path_to_buffer_id: HashMap<ProjectPath, BufferId>,
-    downstream_client: Option<(AnyProtoClient, u64)>,
-    shared_buffers: HashMap<proto::PeerId, HashMap<BufferId, SharedBuffer>>,
-    pending_buffer_shares: HashMap<u64, Task<()>>,
-    next_buffer_share_id: u64,
     non_searchable_buffers: HashSet<BufferId>,
-    project_search: RemoteProjectSearchState,
-}
-
-#[derive(Default)]
-struct RemoteProjectSearchState {
-    // Used by the side running the actual search for match candidates to potentially cancel the search prematurely.
-    searches_in_progress: HashMap<(PeerId, u64), Task<Result<()>>>,
-}
-
-#[derive(Hash, Eq, PartialEq, Clone)]
-struct SharedBuffer {
-    buffer: Entity<Buffer>,
-    lsp_handle: Option<OpenLspBufferHandle>,
 }
 
 struct LocalBufferStore {
@@ -102,7 +81,6 @@ impl LocalBufferStore {
         let encoding = buffer.encoding();
         let has_bom = buffer.has_bom();
         let version = buffer.version();
-        let buffer_id = buffer.remote_id();
         let file = buffer.file().cloned();
         if file
             .as_ref()
@@ -115,30 +93,9 @@ impl LocalBufferStore {
             worktree.write_file(path, text, line_ending, encoding, has_bom, cx)
         });
 
-        cx.spawn(async move |this, cx| {
+        cx.spawn(async move |_, cx| {
             let new_file = save.await?;
             let mtime = new_file.disk_state().mtime();
-            this.update(cx, |this, cx| {
-                if let Some((downstream_client, project_id)) = this.downstream_client.clone() {
-                    if has_changed_file {
-                        downstream_client
-                            .send(proto::UpdateBufferFile {
-                                project_id,
-                                buffer_id: buffer_id.to_proto(),
-                                file: Some(language::File::to_proto(&*new_file, cx)),
-                            })
-                            .log_err();
-                    }
-                    downstream_client
-                        .send(proto::BufferSaved {
-                            project_id,
-                            buffer_id: buffer_id.to_proto(),
-                            version: serialize_version(&version),
-                            mtime: mtime.map(|time| time.into()),
-                        })
-                        .log_err();
-                }
-            })?;
             buffer_handle.update(cx, |buffer, cx| {
                 if has_changed_file {
                     buffer.file_updated(new_file, cx);
@@ -321,16 +278,6 @@ impl LocalBufferStore {
                         .local_buffer_ids_by_entry_id
                         .insert(entry_id, buffer_id);
                 }
-            }
-
-            if let Some((client, project_id)) = &this.downstream_client {
-                client
-                    .send(proto::UpdateBufferFile {
-                        project_id: *project_id,
-                        buffer_id: buffer_id.to_proto(),
-                        file: Some(new_file.to_proto(cx)),
-                    })
-                    .ok();
             }
 
             buffer.file_updated(Arc::new(new_file), cx);
@@ -540,16 +487,11 @@ impl BufferStore {
                     }
                 }),
             },
-            downstream_client: None,
             opened_buffers: Default::default(),
             path_to_buffer_id: Default::default(),
-            shared_buffers: Default::default(),
-            pending_buffer_shares: HashMap::default(),
-            next_buffer_share_id: 0,
             loading_buffers: Default::default(),
             non_searchable_buffers: Default::default(),
             worktree_store,
-            project_search: Default::default(),
         }
     }
 
@@ -760,29 +702,6 @@ impl BufferStore {
         (buffers, Vec::new())
     }
 
-    pub fn disconnected_from_host(&mut self, cx: &mut App) {
-        for open_buffer in self.opened_buffers.values_mut() {
-            if let Some(buffer) = open_buffer.upgrade() {
-                buffer.update(cx, |buffer, _| buffer.give_up_waiting());
-            }
-        }
-
-        for buffer in self.buffers() {
-            buffer.update(cx, |buffer, cx| {
-                buffer.set_capability(Capability::ReadOnly, cx)
-            });
-        }
-    }
-
-    pub fn shared(&mut self, remote_id: u64, downstream_client: AnyProtoClient, _cx: &mut App) {
-        self.downstream_client = Some((downstream_client, remote_id));
-    }
-
-    pub fn unshared(&mut self, _cx: &mut Context<Self>) {
-        self.downstream_client.take();
-        self.forget_shared_buffers();
-    }
-
     fn buffer_changed_file(&mut self, buffer: Entity<Buffer>, cx: &mut App) -> Option<()> {
         let file = File::from_dyn(buffer.read(cx).file())?;
 
@@ -822,39 +741,9 @@ impl BufferStore {
             BufferEvent::FileHandleChanged => {
                 self.buffer_changed_file(buffer, cx);
             }
-            BufferEvent::Reloaded => {
-                let Some((downstream_client, project_id)) = self.downstream_client.as_ref() else {
-                    return;
-                };
-                let buffer = buffer.read(cx);
-                downstream_client
-                    .send(proto::BufferReloaded {
-                        project_id: *project_id,
-                        buffer_id: buffer.remote_id().to_proto(),
-                        version: serialize_version(&buffer.version()),
-                        mtime: buffer.saved_mtime().map(|t| t.into()),
-                        line_ending: serialize_line_ending(buffer.line_ending()) as i32,
-                    })
-                    .log_err();
-            }
             BufferEvent::LanguageChanged(_) => {}
             _ => {}
         }
-    }
-
-    pub fn register_shared_lsp_handle(
-        &mut self,
-        peer_id: proto::PeerId,
-        buffer_id: BufferId,
-        handle: OpenLspBufferHandle,
-    ) {
-        if let Some(shared_buffers) = self.shared_buffers.get_mut(&peer_id)
-            && let Some(buffer) = shared_buffers.get_mut(&buffer_id)
-        {
-            buffer.lsp_handle = Some(handle);
-            return;
-        }
-        debug_panic!("tried to register shared lsp handle, but buffer was not shared")
     }
 
     pub fn reload_buffers(
@@ -867,105 +756,6 @@ impl BufferStore {
             return Task::ready(Ok(ProjectTransaction::default()));
         }
         self.local.reload_buffers(buffers, push_to_history, cx)
-    }
-
-    pub fn create_buffer_for_peer(
-        &mut self,
-        buffer: &Entity<Buffer>,
-        peer_id: proto::PeerId,
-        cx: &mut Context<Self>,
-    ) -> Task<Result<()>> {
-        let buffer_id = buffer.read(cx).remote_id();
-        let shared_buffers = self.shared_buffers.entry(peer_id).or_default();
-        if shared_buffers.contains_key(&buffer_id) {
-            return Task::ready(Ok(()));
-        }
-        shared_buffers.insert(
-            buffer_id,
-            SharedBuffer {
-                buffer: buffer.clone(),
-                lsp_handle: None,
-            },
-        );
-
-        let Some((client, project_id)) = self.downstream_client.clone() else {
-            return Task::ready(Ok(()));
-        };
-
-        let buffer = buffer.clone();
-        let share_id = util::post_inc(&mut self.next_buffer_share_id);
-        let (completion_tx, completion_rx) = oneshot::channel();
-        let transfer = cx.spawn(async move |buffer_store, cx| {
-            let operations = buffer.update(cx, |buffer, cx| buffer.serialize_ops(None, cx));
-            let operations = operations.await;
-            let state = buffer.update(cx, |buffer, cx| buffer.to_proto(cx));
-
-            let initial_state = proto::CreateBufferForPeer {
-                project_id,
-                peer_id: Some(peer_id),
-                variant: Some(proto::create_buffer_for_peer::Variant::State(state)),
-            };
-
-            if client.send(initial_state).log_err().is_some() {
-                let client = client.clone();
-                cx.background_spawn(async move {
-                    let mut chunks = split_operations(operations).peekable();
-                    while let Some(chunk) = chunks.next() {
-                        let is_last = chunks.peek().is_none();
-                        client.send(proto::CreateBufferForPeer {
-                            project_id,
-                            peer_id: Some(peer_id),
-                            variant: Some(proto::create_buffer_for_peer::Variant::Chunk(
-                                proto::BufferChunk {
-                                    buffer_id: buffer_id.into(),
-                                    operations: chunk,
-                                    is_last,
-                                },
-                            )),
-                        })?;
-                    }
-                    anyhow::Ok(())
-                })
-                .await
-                .log_err();
-            }
-
-            completion_tx.send(()).ok();
-            buffer_store
-                .update(cx, |store, _| {
-                    store.pending_buffer_shares.remove(&share_id);
-                })
-                .ok();
-        });
-        self.pending_buffer_shares.insert(share_id, transfer);
-        cx.background_spawn(async move {
-            completion_rx.await?;
-            Ok(())
-        })
-    }
-
-    pub fn forget_shared_buffers(&mut self) {
-        self.shared_buffers.clear();
-    }
-
-    pub fn forget_shared_buffers_for(&mut self, peer_id: &proto::PeerId) {
-        self.shared_buffers.remove(peer_id);
-    }
-
-    pub fn is_shared(&self, buffer_id: BufferId) -> bool {
-        self.shared_buffers
-            .values()
-            .any(|buffers| buffers.contains_key(&buffer_id))
-    }
-
-    pub fn update_peer_id(&mut self, old_peer_id: &proto::PeerId, new_peer_id: proto::PeerId) {
-        if let Some(buffers) = self.shared_buffers.remove(old_peer_id) {
-            self.shared_buffers.insert(new_peer_id, buffers);
-        }
-    }
-
-    pub fn has_shared_buffers(&self) -> bool {
-        !self.shared_buffers.is_empty()
     }
 
     pub fn create_local_buffer(
@@ -1005,38 +795,6 @@ impl BufferStore {
             }
         }
         buffer
-    }
-
-    pub fn serialize_project_transaction_for_peer(
-        &mut self,
-        project_transaction: ProjectTransaction,
-        peer_id: proto::PeerId,
-        cx: &mut Context<Self>,
-    ) -> proto::ProjectTransaction {
-        let mut serialized_transaction = proto::ProjectTransaction {
-            buffer_ids: Default::default(),
-            transactions: Default::default(),
-        };
-        for (buffer, transaction) in project_transaction.0 {
-            self.create_buffer_for_peer(&buffer, peer_id, cx)
-                .detach_and_log_err(cx);
-            serialized_transaction
-                .buffer_ids
-                .push(buffer.read(cx).remote_id().into());
-            serialized_transaction
-                .transactions
-                .push(language::proto::serialize_transaction(&transaction));
-        }
-        serialized_transaction
-    }
-
-    pub fn register_ongoing_project_search(
-        &mut self,
-        id: (PeerId, u64),
-        search: Task<anyhow::Result<()>>,
-    ) {
-        let _old = self.project_search.searches_in_progress.insert(id, search);
-        debug_assert!(_old.is_none());
     }
 }
 

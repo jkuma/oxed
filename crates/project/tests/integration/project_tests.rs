@@ -83,7 +83,7 @@ use std::{
 #[cfg(target_os = "linux")]
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt as _};
 use sum_tree::SumTree;
-use text::{Anchor, PointUtf16, ReplicaId, ToOffset, Unclipped};
+use text::{Anchor, PointUtf16, ToOffset, Unclipped};
 use unindent::Unindent as _;
 use util::{
     RandomCharIter, TryFutureExt as _, assert_set_eq, maybe, path,
@@ -8778,7 +8778,7 @@ async fn test_save_as_existing_file(cx: &mut gpui::TestAppContext) {
 }
 
 #[gpui::test(retries = 5)]
-async fn test_rescan_and_remote_updates(cx: &mut gpui::TestAppContext) {
+async fn test_rescan_updates_entries_and_buffers(cx: &mut gpui::TestAppContext) {
     use worktree::WorktreeModelHandle as _;
 
     init_test(cx);
@@ -8823,29 +8823,7 @@ async fn test_rescan_and_remote_updates(cx: &mut gpui::TestAppContext) {
     let file3_id = id_for_path("a/file3", cx);
     let file4_id = id_for_path("b/c/file4", cx);
 
-    // Create a remote copy of this worktree.
     let tree = project.update(cx, |project, cx| project.worktrees(cx).next().unwrap());
-    let metadata = tree.update(cx, |tree, _| tree.metadata_proto());
-
-    let updates = Arc::new(Mutex::new(Vec::new()));
-    tree.update(cx, |tree, cx| {
-        let updates = updates.clone();
-        tree.observe_updates(0, cx, move |update| {
-            updates.lock().push(update);
-            async { true }
-        });
-    });
-
-    let remote = cx.update(|cx| {
-        Worktree::remote(
-            0,
-            ReplicaId::REMOTE_SERVER,
-            metadata,
-            rpc::AnyProtoClient::new(rpc::NoopProtoClient::new()),
-            project.read(cx).path_style(cx),
-            cx,
-        )
-    });
 
     cx.executor().run_until_parked();
 
@@ -8916,31 +8894,6 @@ async fn test_rescan_and_remote_updates(cx: &mut gpui::TestAppContext) {
         assert_eq!(
             buffer5.read(cx).file().unwrap().disk_state(),
             DiskState::Deleted
-        );
-    });
-
-    // Update the remote worktree. Check that it becomes consistent with the
-    // local worktree.
-    cx.executor().run_until_parked();
-
-    remote.update(cx, |remote, _| {
-        for update in updates.lock().drain(..) {
-            remote.as_remote_mut().unwrap().update_from_remote(update);
-        }
-    });
-    cx.executor().run_until_parked();
-    remote.update(cx, |remote, _| {
-        assert_eq!(
-            remote.paths().collect::<Vec<_>>(),
-            vec![
-                rel_path("a"),
-                rel_path("a/file1"),
-                rel_path("a/file2.new"),
-                rel_path("b"),
-                rel_path("d"),
-                rel_path("d/file3"),
-                rel_path("d/file4"),
-            ]
         );
     });
 }

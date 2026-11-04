@@ -9,10 +9,8 @@ use language::{
     row_chunk::{RowChunk, RowChunks},
 };
 use lsp::LanguageServerId;
-use rpc::proto;
 use settings::Settings as _;
 use text::{Anchor, BufferSnapshot, Point, ToOffset as _};
-use util::ResultExt as _;
 
 use crate::{
     InlayHint, InlayId, LspStore, LspStoreEvent, ResolveState, lsp_command::InlayHints,
@@ -345,16 +343,6 @@ impl LspStore {
         cx: &mut Context<Self>,
     ) {
         self.mark_inlay_hints_refresh_pending(server_id, cx);
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshInlayHints {
-                    project_id: *project_id,
-                    server_id: server_id.to_proto(),
-                    request_id: Some(super::next_wire_refresh_request_id()),
-                })
-                .context("sending refresh inlay hints downstream")
-                .log_err();
-        }
     }
 
     pub(super) fn mark_inlay_hints_refresh_pending(

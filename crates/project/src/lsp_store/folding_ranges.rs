@@ -10,9 +10,7 @@ use gpui::{AppContext as _, Context, Entity, SharedString, Task};
 use itertools::Itertools;
 use language::Buffer;
 use lsp::LanguageServerId;
-use rpc::proto;
 use text::Anchor;
-use util::ResultExt as _;
 
 use crate::lsp_command::GetFoldingRanges;
 use crate::lsp_store::{
@@ -69,15 +67,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshFoldingRanges {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshFoldingRanges {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh folding ranges downstream")
-                .log_err();
-        }
     }
 
     /// Returns a task that resolves to the folding ranges for the given buffer.

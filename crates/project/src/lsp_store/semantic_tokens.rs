@@ -9,14 +9,12 @@ use futures::{
 use gpui::{App, AppContext, Context, Entity, ReadGlobal as _, SharedString, Task};
 use language::{Buffer, LanguageName, language_settings::all_language_settings};
 use lsp::LanguageServerId;
-use rpc::proto;
 use settings::{
     DefaultSemanticTokenRules, SemanticTokenRule, SemanticTokenRules, Settings as _, SettingsStore,
 };
 use smol::future::yield_now;
 
 use text::{Anchor, Bias, OffsetUtf16, PointUtf16, Unclipped};
-use util::ResultExt as _;
 
 use crate::{
     LanguageServerToQuery, LspStore, LspStoreEvent,
@@ -334,16 +332,16 @@ impl LspStore {
                 join_all(token_tasks)
                     .await
                     .into_iter()
-                    .flat_map(|(server_id, response)| {
-                        match response {
-                            Ok(tokens) => Some((server_id, tokens)),
-                            Err(e) => {
-                                log::error!("Failed to query semantic tokens for server {server_id:?}: {e:#}");
-                                None
-                            }
+                    .flat_map(|(server_id, response)| match response {
+                        Ok(tokens) => Some((server_id, tokens)),
+                        Err(e) => {
+                            log::error!(
+                                "Failed to query semantic tokens for server {server_id:?}: {e:#}"
+                            );
+                            None
                         }
                     })
-                    .collect()
+                    .collect(),
             )
         })
     }
@@ -361,15 +359,6 @@ impl LspStore {
             }
         }
         cx.emit(LspStoreEvent::RefreshSemanticTokens { server_id });
-        if let Some((client, project_id)) = self.downstream_client.as_ref() {
-            client
-                .send(proto::RefreshSemanticTokens {
-                    project_id: *project_id,
-                    server_id: server_id.to_proto(),
-                    request_id: Some(super::next_wire_refresh_request_id()),
-                })
-                .log_err();
-        }
     }
 
     #[cfg(any(test, feature = "test-support"))]

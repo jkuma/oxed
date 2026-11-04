@@ -6,9 +6,7 @@ use futures::{FutureExt as _, future::Shared};
 use gpui::{AppContext as _, Context, Entity, SharedString, Task};
 use language::{Buffer, LocalFile as _};
 use lsp::LanguageServerId;
-use rpc::proto;
 use settings::Settings as _;
-use util::ResultExt as _;
 use worktree::File;
 
 use crate::{
@@ -67,15 +65,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshDocumentColors {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshDocumentColors {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh document colors downstream")
-                .log_err();
-        }
     }
 
     pub fn document_colors(

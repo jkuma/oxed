@@ -96,7 +96,7 @@ use parking_lot::Mutex;
 use postage::{mpsc, sink::Sink, stream::Stream, watch};
 use rand::prelude::*;
 use rpc::proto;
-use rpc::{AnyProtoClient, ErrorCode, ErrorExt as _};
+use rpc::{ErrorCode, ErrorExt as _};
 use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
@@ -165,14 +165,6 @@ const DOCUMENT_DIAGNOSTICS_RETRIGGER_LIMIT: usize = 3;
 const DOCUMENT_DIAGNOSTICS_RETRIGGER_DELAY: Duration = Duration::from_millis(100);
 const SERVER_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10);
 static NEXT_PROMPT_REQUEST_ID: AtomicUsize = AtomicUsize::new(0);
-
-/// Refresh messages carry a monotonic id for backwards compatibility only: older peers
-/// use it to order refreshes, while current ones re-mark pending refreshes on arrival.
-/// The envelope's own message id cannot be used, as old peers compare the payload field.
-fn next_wire_refresh_request_id() -> u64 {
-    static NEXT_WIRE_REFRESH_REQUEST_ID: AtomicUsize = AtomicUsize::new(1);
-    NEXT_WIRE_REFRESH_REQUEST_ID.fetch_add(1, atomic::Ordering::Relaxed) as u64
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub enum ProgressToken {
@@ -1176,16 +1168,6 @@ impl LocalLspStore {
                     async move {
                         lsp_store.update(&mut cx, |lsp_store, cx| {
                             lsp_store.pull_workspace_diagnostics(server_id);
-                            lsp_store
-                                .downstream_client
-                                .as_ref()
-                                .map(|(client, project_id)| {
-                                    client.send(proto::PullWorkspaceDiagnostics {
-                                        project_id: *project_id,
-                                        server_id: server_id.to_proto(),
-                                    })
-                                })
-                                .transpose()?;
                             // Respond before pulling: awaiting a round-trip to the same server
                             // here can deadlock servers that bound their request concurrency
                             // and await this response.
@@ -4514,7 +4496,6 @@ pub struct FormattableBuffer {
 pub struct LspStore {
     local: LocalLspStore,
     last_formatting_failure: Option<String>,
-    downstream_client: Option<(AnyProtoClient, u64)>,
     nonce: u128,
     buffer_store: Entity<BufferStore>,
     worktree_store: Entity<WorktreeStore>,
@@ -4818,7 +4799,6 @@ impl LspStore {
                     .manifest_file_names(),
             },
             last_formatting_failure: None,
-            downstream_client: None,
             buffer_store,
             worktree_store,
             languages: languages.clone(),
@@ -4904,9 +4884,6 @@ impl LspStore {
                 .detach()
             }
             WorktreeStoreEvent::WorktreeRemoved(_, id) => self.remove_worktree(*id, cx),
-            WorktreeStoreEvent::WorktreeUpdateSent(worktree) => {
-                worktree.update(cx, |worktree, _cx| self.send_diagnostic_summaries(worktree));
-            }
             WorktreeStoreEvent::WorktreeUpdatedEntries(worktree_id, changes) => {
                 self.invalidate_diagnostic_summaries_for_removed_entries(*worktree_id, changes, cx);
             }
@@ -5520,28 +5497,6 @@ impl LspStore {
         self.active_entry = active_entry;
     }
 
-    pub(crate) fn send_diagnostic_summaries(&self, worktree: &mut Worktree) {
-        if let Some((client, downstream_project_id)) = self.downstream_client.clone()
-            && let Some(diangostic_summaries) = self.diagnostic_summaries.get(&worktree.id())
-        {
-            let mut summaries = diangostic_summaries.iter().flat_map(|(path, summaries)| {
-                summaries
-                    .iter()
-                    .map(|(server_id, summary)| summary.to_proto(*server_id, path.as_ref()))
-            });
-            if let Some(summary) = summaries.next() {
-                client
-                    .send(proto::UpdateDiagnosticSummary {
-                        project_id: downstream_project_id,
-                        worktree_id: worktree.id().to_proto(),
-                        summary: Some(summary),
-                        more_summaries: summaries.collect(),
-                    })
-                    .log_err();
-            }
-        }
-    }
-
     pub fn relevant_server_ids_for_capability_check(
         &self,
         buffer: &Entity<Buffer>,
@@ -5637,17 +5592,6 @@ impl LspStore {
                     .map(|uri| uri.to_string())
                     .collect(),
             });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::UpdateLanguageServer {
-                    project_id: *project_id,
-                    server_name: Some(server.name().to_string()),
-                    language_server_id: server.server_id().to_proto(),
-                    variant: Some(message.clone()),
-                })
-                .context("sending server metadata downstream")
-                .log_err();
-        }
         cx.emit(LspStoreEvent::LanguageServerUpdate {
             language_server_id: server.server_id(),
             name: Some(server.name()),
@@ -5695,15 +5639,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshDocumentHighlights {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshDocumentHighlights {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh document highlights downstream")
-                .log_err();
-        }
     }
 
     fn remote_document_selector_context(
@@ -8464,7 +8399,6 @@ impl LspStore {
 
         let mut cleared_paths: Vec<ProjectPath> = Vec::new();
         let mut cleared_server_ids: HashSet<LanguageServerId> = HashSet::default();
-        let downstream = self.downstream_client.clone();
 
         for (path, _, _) in changes
             .iter()
@@ -8473,21 +8407,6 @@ impl LspStore {
             if let Some(summaries_by_server_id) = summaries_for_tree.remove(path) {
                 for (server_id, _) in &summaries_by_server_id {
                     cleared_server_ids.insert(*server_id);
-                    if let Some((client, project_id)) = &downstream {
-                        client
-                            .send(proto::UpdateDiagnosticSummary {
-                                project_id: *project_id,
-                                worktree_id: worktree_id.to_proto(),
-                                summary: Some(proto::DiagnosticSummary {
-                                    path: path.as_ref().as_unix_str().to_owned(),
-                                    language_server_id: server_id.0 as u64,
-                                    error_count: 0,
-                                    warning_count: 0,
-                                }),
-                                more_summaries: Vec::new(),
-                            })
-                            .ok();
-                    }
                 }
                 cleared_paths.push(ProjectPath {
                     worktree_id,
@@ -8504,42 +8423,6 @@ impl LspStore {
                 });
             }
         }
-    }
-
-    pub fn shared(
-        &mut self,
-        project_id: u64,
-        downstream_client: AnyProtoClient,
-        _: &mut Context<Self>,
-    ) {
-        self.downstream_client = Some((downstream_client.clone(), project_id));
-
-        for (server_id, status) in &self.language_server_statuses {
-            if let Some(server) = self.language_server_for_id(*server_id)
-                && let Some(capabilities) =
-                    self.serialize_synced_server_capabilities(&server).log_err()
-            {
-                downstream_client
-                    .send(proto::StartLanguageServer {
-                        project_id,
-                        server: Some(proto::LanguageServer {
-                            id: server_id.to_proto(),
-                            name: status.name.to_string(),
-                            worktree_id: status.worktree.map(|id| id.to_proto()),
-                            language_name: status
-                                .language_name
-                                .as_ref()
-                                .map(|name| name.to_proto()),
-                        }),
-                        capabilities,
-                    })
-                    .log_err();
-            }
-        }
-    }
-
-    pub fn disconnected_from_host(&mut self) {
-        self.downstream_client.take();
     }
 
     #[cfg(feature = "test-support")]
@@ -8608,7 +8491,6 @@ impl LspStore {
         merge: impl Fn(&lsp::Uri, &Diagnostic, &App) -> bool + Clone,
         cx: &mut Context<Self>,
     ) -> anyhow::Result<()> {
-        let mut diagnostics_summary = None::<proto::UpdateDiagnosticSummary>;
         let mut updated_diagnostics_paths = HashMap::default();
         for mut update in diagnostic_updates {
             let abs_path = &update.diagnostics.document_abs_path;
@@ -8688,34 +8570,7 @@ impl LspStore {
                 )
             })?;
             match updated {
-                ControlFlow::Continue(new_summary) => {
-                    if let Some((project_id, new_summary)) = new_summary {
-                        match &mut diagnostics_summary {
-                            Some(diagnostics_summary) => {
-                                diagnostics_summary
-                                    .more_summaries
-                                    .push(proto::DiagnosticSummary {
-                                        path: project_path.path.as_ref().as_unix_str().to_owned(),
-                                        language_server_id: server_id.0 as u64,
-                                        error_count: new_summary.error_count,
-                                        warning_count: new_summary.warning_count,
-                                    })
-                            }
-                            None => {
-                                diagnostics_summary = Some(proto::UpdateDiagnosticSummary {
-                                    project_id,
-                                    worktree_id: worktree_id.to_proto(),
-                                    summary: Some(proto::DiagnosticSummary {
-                                        path: project_path.path.as_ref().as_unix_str().to_owned(),
-                                        language_server_id: server_id.0 as u64,
-                                        error_count: new_summary.error_count,
-                                        warning_count: new_summary.warning_count,
-                                    }),
-                                    more_summaries: Vec::new(),
-                                })
-                            }
-                        }
-                    }
+                ControlFlow::Continue(_) => {
                     updated_diagnostics_paths
                         .entry(server_id)
                         .or_insert_with(Vec::new)
@@ -8725,11 +8580,6 @@ impl LspStore {
             }
         }
 
-        if let Some((diagnostics_summary, (downstream_client, _))) =
-            diagnostics_summary.zip(self.downstream_client.as_ref())
-        {
-            downstream_client.send(diagnostics_summary).log_err();
-        }
         for (server_id, paths) in updated_diagnostics_paths {
             cx.emit(LspStoreEvent::DiagnosticsUpdated { server_id, paths });
         }
@@ -8743,7 +8593,7 @@ impl LspStore {
         path_in_worktree: Arc<RelPath>,
         diagnostics: Vec<DiagnosticEntry<Unclipped<PointUtf16>>>,
         _: &mut Context<Worktree>,
-    ) -> Result<ControlFlow<(), Option<(u64, proto::DiagnosticSummary)>>> {
+    ) -> Result<ControlFlow<()>> {
         let local = &mut self.local;
 
         let summaries_for_tree = self.diagnostic_summaries.entry(worktree_id).or_default();
@@ -8783,19 +8633,7 @@ impl LspStore {
         }
 
         if !old_summary.is_empty() || !new_summary.is_empty() {
-            if let Some((_, project_id)) = &self.downstream_client {
-                Ok(ControlFlow::Continue(Some((
-                    *project_id,
-                    proto::DiagnosticSummary {
-                        path: path_in_worktree.as_unix_str().to_owned(),
-                        language_server_id: server_id.0 as u64,
-                        error_count: new_summary.error_count as u32,
-                        warning_count: new_summary.warning_count as u32,
-                    },
-                ))))
-            } else {
-                Ok(ControlFlow::Continue(None))
-            }
+            Ok(ControlFlow::Continue(()))
         } else {
             Ok(ControlFlow::Break(()))
         }
@@ -9778,21 +9616,6 @@ impl LspStore {
         for (worktree_id, summaries) in self.diagnostic_summaries.iter_mut() {
             summaries.retain(|path, summaries_by_server_id| {
                 if summaries_by_server_id.remove(&server_id).is_some() {
-                    if let Some((client, project_id)) = self.downstream_client.clone() {
-                        client
-                            .send(proto::UpdateDiagnosticSummary {
-                                project_id,
-                                worktree_id: worktree_id.to_proto(),
-                                summary: Some(proto::DiagnosticSummary {
-                                    path: path.as_ref().as_unix_str().to_owned(),
-                                    language_server_id: server_id.0 as u64,
-                                    error_count: 0,
-                                    warning_count: 0,
-                                }),
-                                more_summaries: Vec::new(),
-                            })
-                            .log_err();
-                    }
                     cleared_paths.push(ProjectPath {
                         worktree_id: *worktree_id,
                         path: path.clone(),
@@ -10362,7 +10185,7 @@ impl LspStore {
             server_id,
             LanguageServerStatus {
                 name: language_server.name(),
-                language_name: Some(language_name.clone()),
+                language_name: Some(language_name),
                 server_version: language_server.version(),
                 server_readable_version: language_server.readable_version(),
                 pending_work: Default::default(),
@@ -10382,24 +10205,6 @@ impl LspStore {
             Some(key.worktree_id),
         ));
 
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref()
-            && let Some(capabilities) = self
-                .serialize_synced_server_capabilities(&language_server)
-                .log_err()
-        {
-            downstream_client
-                .send(proto::StartLanguageServer {
-                    project_id: *project_id,
-                    server: Some(proto::LanguageServer {
-                        id: server_id.to_proto(),
-                        name: language_server.name().to_string(),
-                        worktree_id: Some(key.worktree_id.to_proto()),
-                        language_name: Some(language_name.to_proto()),
-                    }),
-                    capabilities,
-                })
-                .log_err();
-        }
         self.lsp_server_capabilities
             .insert(server_id, server_capabilities);
 
@@ -11161,10 +10966,6 @@ impl LspStore {
         )?;
 
         Ok(())
-    }
-
-    pub fn downstream_client(&self) -> Option<(AnyProtoClient, u64)> {
-        self.downstream_client.clone()
     }
 
     pub fn worktree_store(&self) -> Entity<WorktreeStore> {

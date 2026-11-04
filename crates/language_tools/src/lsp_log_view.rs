@@ -44,8 +44,6 @@ pub fn open(
                 .update_in(cx, |workspace, window, cx| {
                     let project = workspace.project().clone();
                     let weak_project = project.downgrade();
-                    let project_is_local = project.read(cx).is_local();
-                    let weak_lsp_store = project.read(cx).lsp_store().downgrade();
                     let tool_log_store = log_store.clone();
                     let log_view = get_or_create_tool(
                         workspace,
@@ -56,9 +54,8 @@ pub fn open(
                     );
                     log_view.update(cx, |log_view, cx| {
                         let key_priority = |key: &LanguageServerLogKey| match &key.kind {
-                            LanguageServerKind::Local { .. } if project_is_local => 0,
-                            LanguageServerKind::Remote { .. } if !project_is_local => 0,
-                            _ => 1,
+                            LanguageServerKind::Local { .. } => 0,
+                            LanguageServerKind::Supplementary { .. } => 1,
                         };
                         let server_key = match server {
                             LanguageServerSelector::Id(id) => log_store
@@ -66,8 +63,7 @@ pub fn open(
                                 .language_servers
                                 .keys()
                                 .filter(|key| {
-                                    key.server_id == id
-                                        && key.is_for_project(&weak_project, &weak_lsp_store)
+                                    key.server_id == id && key.is_for_project(&weak_project)
                                 })
                                 .min_by_key(|key| key_priority(key))
                                 .cloned(),
@@ -76,7 +72,7 @@ pub fn open(
                                 .language_servers
                                 .iter()
                                 .filter(|(key, state)| {
-                                    key.is_for_project(&weak_project, &weak_lsp_store)
+                                    key.is_for_project(&weak_project)
                                         && state.name.as_ref() == Some(&name)
                                 })
                                 .min_by_key(|(key, _)| key_priority(key))
@@ -140,8 +136,8 @@ actions!(
     ]
 );
 
-pub fn init(on_headless_host: bool, cx: &mut App) {
-    let log_store = log_store::init(on_headless_host, cx);
+pub fn init(cx: &mut App) {
+    let log_store = log_store::init(cx);
 
     cx.observe_new(move |workspace: &mut Workspace, _, cx| {
         log_store.update(cx, |store, cx| {
@@ -172,10 +168,9 @@ impl LspLogView {
         cx: &mut Context<Self>,
     ) -> Self {
         let weak_project = project.downgrade();
-        let weak_lsp_store = project.read(cx).lsp_store().downgrade();
         let server_key = log_store
             .read(cx)
-            .server_keys_for_project(&weak_project, &weak_lsp_store)
+            .server_keys_for_project(&weak_project)
             .next();
         let model_changes_subscription =
             cx.observe_in(&log_store, window, move |this, store, window, cx| {
@@ -185,15 +180,10 @@ impl LspLogView {
                     .as_ref()
                     .filter(|key| {
                         store.read(cx).language_servers.contains_key(key)
-                            && key.is_for_project(&weak_project, &weak_lsp_store)
+                            && key.is_for_project(&weak_project)
                     })
                     .cloned()
-                    .or_else(|| {
-                        store
-                            .read(cx)
-                            .server_keys_for_project(&weak_project, &weak_lsp_store)
-                            .next()
-                    });
+                    .or_else(|| store.read(cx).server_keys_for_project(&weak_project).next());
                 if let Some(server_key) = server_key {
                     let stream_is_enabled = this.active_entry_kind == LogKind::ServerInfo
                         || this
@@ -394,16 +384,13 @@ impl LspLogView {
 
         let unknown_server = LanguageServerName::new_static("unknown server");
         let project = self.project.downgrade();
-        let lsp_store = self.project.read(cx).lsp_store().downgrade();
 
         let mut rows = log_store
             .language_servers
             .iter()
-            .filter(|(key, _)| key.is_for_project(&project, &lsp_store))
+            .filter(|(key, _)| key.is_for_project(&project))
             .map(|(key, state)| match &key.kind {
-                LanguageServerKind::Local { .. }
-                | LanguageServerKind::Remote { .. }
-                | LanguageServerKind::LocalSsh { .. } => {
+                LanguageServerKind::Local { .. } => {
                     let worktree_root_name = state
                         .worktree_id
                         .and_then(|id| self.project.read(cx).worktree_for_id(id, cx))

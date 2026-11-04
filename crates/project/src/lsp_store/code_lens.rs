@@ -10,11 +10,9 @@ use futures::{
 use gpui::{AppContext as _, Context, Entity, Task};
 use language::{Anchor, Buffer};
 use lsp::LanguageServerId;
-use rpc::proto;
 use settings::Settings as _;
 use std::time::Duration;
 use text::OffsetRangeExt as _;
-use util::ResultExt as _;
 
 use crate::{
     CodeAction, LspAction, LspStore, LspStoreEvent, Project,
@@ -101,15 +99,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshCodeLens {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshCodeLens {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh code lens downstream")
-                .log_err();
-        }
     }
 
     /// Fetches all code lenses for the buffer, each tagged with the

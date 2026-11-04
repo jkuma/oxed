@@ -10,7 +10,6 @@ use gpui::{AppContext as _, Context, Entity, Task};
 use itertools::Itertools;
 use language::{Buffer, BufferSnapshot, OutlineItem};
 use lsp::LanguageServerId;
-use rpc::proto;
 use text::{Anchor, Bias, PointUtf16};
 use util::ResultExt;
 
@@ -64,15 +63,6 @@ impl LspStore {
         cx.emit(LspStoreEvent::RefreshDocumentSymbols {
             server_id: for_server,
         });
-        if let Some((downstream_client, project_id)) = self.downstream_client.as_ref() {
-            downstream_client
-                .send(proto::RefreshDocumentSymbols {
-                    project_id: *project_id,
-                    server_id: for_server.map(|server_id| server_id.to_proto()),
-                })
-                .context("sending refresh document symbols downstream")
-                .log_err();
-        }
     }
 
     /// Returns a task that resolves to the document symbol outline items for

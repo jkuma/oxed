@@ -13,7 +13,6 @@ use project::{
     FakeFs, Project,
     lsp_store::log_store::{LanguageServerKind, LanguageServerLogKey, LogKind, LogStore},
 };
-use proto::PeerId;
 use serde_json::json;
 use settings::SettingsStore;
 use util::path;
@@ -33,27 +32,9 @@ async fn test_lsp_log_view_filters_servers_from_other_projects(cx: &mut TestAppC
     let worktree_id = project.read_with(cx, |project, cx| {
         project.worktrees(cx).next().unwrap().read(cx).id()
     });
-    let current_lsp_store = project
-        .read_with(cx, |project, _| project.lsp_store())
-        .downgrade();
-    let other_lsp_store = other_project
-        .read_with(cx, |project, _| project.lsp_store())
-        .downgrade();
-
-    let current_ssh_server_id = LanguageServerId(99);
     let current_server_id = LanguageServerId(100);
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
     log_store.update(cx, |store, cx| {
-        store.add_language_server(
-            LanguageServerKind::LocalSsh {
-                lsp_store: current_lsp_store,
-            },
-            current_ssh_server_id,
-            Some(LanguageServerName::new_static("current-ssh-server")),
-            Some(worktree_id),
-            None,
-            cx,
-        );
         store.add_language_server(
             LanguageServerKind::Local {
                 project: project.downgrade(),
@@ -65,11 +46,11 @@ async fn test_lsp_log_view_filters_servers_from_other_projects(cx: &mut TestAppC
             cx,
         );
         store.add_language_server(
-            LanguageServerKind::Remote {
+            LanguageServerKind::Local {
                 project: other_project.downgrade(),
             },
             current_server_id,
-            Some(LanguageServerName::new_static("other-remote-server")),
+            Some(LanguageServerName::new_static("other-server")),
             None,
             None,
             cx,
@@ -84,20 +65,10 @@ async fn test_lsp_log_view_filters_servers_from_other_projects(cx: &mut TestAppC
             None,
             cx,
         );
-        store.add_language_server(
-            LanguageServerKind::LocalSsh {
-                lsp_store: other_lsp_store,
-            },
-            current_ssh_server_id,
-            Some(LanguageServerName::new_static("other-ssh-server")),
-            None,
-            None,
-            cx,
-        );
     });
     assert_eq!(
         log_store.read_with(cx, |store, _| store.language_servers.len()),
-        5
+        3
     );
 
     let window =
@@ -114,16 +85,10 @@ async fn test_lsp_log_view_filters_servers_from_other_projects(cx: &mut TestAppC
             .collect::<Vec<_>>();
         assert_eq!(
             visible_servers,
-            [
-                (
-                    current_ssh_server_id,
-                    LanguageServerName::new_static("current-ssh-server"),
-                ),
-                (
-                    current_server_id,
-                    LanguageServerName::new_static("current-server"),
-                ),
-            ]
+            [(
+                current_server_id,
+                LanguageServerName::new_static("current-server"),
+            )]
         );
     });
 }
@@ -137,7 +102,7 @@ async fn test_lsp_log_view_labels_registered_supplementary_servers(cx: &mut Test
         .await;
     let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
     log_store.update(cx, |store, cx| store.add_project(&project, cx));
 
     let server_id = LanguageServerId(100);
@@ -199,7 +164,7 @@ async fn test_lsp_log_view_rpc_checkbox_tracks_view_ownership(cx: &mut TestAppCo
     fs.insert_tree(path!("/rpc-ownership"), json!({ "test.rs": "" }))
         .await;
     let project = Project::test(fs, [path!("/rpc-ownership").as_ref()], cx).await;
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
     let server_keys = [
         LanguageServerKind::Local {
             project: project.downgrade(),
@@ -219,15 +184,6 @@ async fn test_lsp_log_view_rpc_checkbox_tracks_view_ownership(cx: &mut TestAppCo
                 None,
                 None,
                 cx,
-            );
-            assert_eq!(
-                store.set_downstream_log_stream(
-                    server_key,
-                    PeerId { owner_id: 1, id: 1 },
-                    LogKind::Rpc,
-                    true,
-                ),
-                Some(())
             );
         }
     });
@@ -263,7 +219,7 @@ async fn rpc_registration_fixture(
     VisualTestContext,
 ) {
     let project = Project::test(FakeFs::new(cx.background_executor.clone()), [], cx).await;
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
     let key = LanguageServerLogKey::new(
         LanguageServerKind::Local {
             project: project.downgrade(),
@@ -427,7 +383,7 @@ async fn test_log_store_does_not_retain_language_servers(cx: &mut TestAppContext
         project: project.downgrade(),
     };
     let server_key = LanguageServerLogKey::new(server_kind.clone(), server_id);
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
 
     let (first_server, _first_fake_server) = lsp::FakeLanguageServer::new(
         server_id,
@@ -543,7 +499,7 @@ async fn test_lsp_log_view(cx: &mut TestAppContext) {
         },
     );
 
-    let log_store = cx.new(|cx| LogStore::new(false, cx));
+    let log_store = cx.new(LogStore::new);
     log_store.update(cx, |store, cx| store.add_project(&project, cx));
 
     let _rust_buffer = project

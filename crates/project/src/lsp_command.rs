@@ -11,13 +11,13 @@ use crate::{
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use collections::HashMap;
-use gpui::{App, AsyncApp, Entity, SharedString, TaskExt, prelude::FluentBuilder};
+use gpui::{App, AsyncApp, Entity, SharedString, prelude::FluentBuilder};
 use language::{
     Anchor, Bias, Buffer, BufferSnapshot, CachedLspAdapter, CharKind, CharScopeContext,
     OffsetRangeExt, PointUtf16, ToOffset, ToPointUtf16, Transaction, Unclipped,
     language_settings::{InlayHintKind, LanguageSettings},
     lsp_to_symbol_kind, point_from_lsp, point_to_lsp,
-    proto::{deserialize_markup_kind, serialize_anchor, serialize_markup_kind},
+    proto::{deserialize_markup_kind, serialize_markup_kind},
     range_from_lsp, range_to_lsp,
 };
 use lsp::{
@@ -25,7 +25,7 @@ use lsp::{
     CompletionContext, CompletionListItemDefaultsEditRange, LanguageServer, LanguageServerId,
     LinkedEditingRangeServerCapabilities, OneOf, RenameOptions, ServerCapabilities,
 };
-use rpc::proto::{self, PeerId};
+use rpc::proto::{self};
 use serde_json::Value;
 
 use std::{cmp::Reverse, collections::hash_map, ops::Range, path::Path, str::FromStr, sync::Arc};
@@ -1003,60 +1003,6 @@ pub async fn location_link_from_lsp(
             target: target_location,
         }
     }))
-}
-
-pub fn location_links_to_proto(
-    links: Vec<LocationLink>,
-    lsp_store: &mut LspStore,
-    peer_id: PeerId,
-    cx: &mut App,
-) -> Vec<proto::LocationLink> {
-    links
-        .into_iter()
-        .map(|definition| location_link_to_proto(definition, lsp_store, peer_id, cx))
-        .collect()
-}
-
-pub fn location_link_to_proto(
-    location: LocationLink,
-    lsp_store: &mut LspStore,
-    peer_id: PeerId,
-    cx: &mut App,
-) -> proto::LocationLink {
-    let origin = location.origin.map(|origin| {
-        lsp_store
-            .buffer_store()
-            .update(cx, |buffer_store, cx| {
-                buffer_store.create_buffer_for_peer(&origin.buffer, peer_id, cx)
-            })
-            .detach_and_log_err(cx);
-
-        let buffer_id = origin.buffer.read(cx).remote_id().into();
-        proto::Location {
-            start: Some(serialize_anchor(&origin.range.start)),
-            end: Some(serialize_anchor(&origin.range.end)),
-            buffer_id,
-        }
-    });
-
-    lsp_store
-        .buffer_store()
-        .update(cx, |buffer_store, cx| {
-            buffer_store.create_buffer_for_peer(&location.target.buffer, peer_id, cx)
-        })
-        .detach_and_log_err(cx);
-
-    let buffer_id = location.target.buffer.read(cx).remote_id().into();
-    let target = proto::Location {
-        start: Some(serialize_anchor(&location.target.range.start)),
-        end: Some(serialize_anchor(&location.target.range.end)),
-        buffer_id,
-    };
-
-    proto::LocationLink {
-        origin,
-        target: Some(target),
-    }
 }
 
 #[async_trait(?Send)]

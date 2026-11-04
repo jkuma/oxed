@@ -342,11 +342,9 @@ impl LanguageServerState {
             let server_selector = server_info.server_selector();
             let has_logs = self.workspace.upgrade().is_some_and(|workspace| {
                 let project = workspace.read(cx).project();
-                lsp_logs.read(cx).has_server_logs(
-                    &server_selector,
-                    &project.downgrade(),
-                    &self.lsp_store,
-                )
+                lsp_logs
+                    .read(cx)
+                    .has_server_logs(&server_selector, &project.downgrade())
             });
 
             let (status_color, status_label) = server_info
