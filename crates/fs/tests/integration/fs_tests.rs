@@ -684,13 +684,10 @@ async fn assert_copy_and_remove_semantics(root: &Path, fs: &dyn Fs) {
     fs.copy_file(&source, &target, overwrite).await.unwrap();
     assert_eq!(fs.load(&target).await.unwrap(), "from source");
 
-    cfg_select! {
-        unix => assert_eq!(
-            fs.metadata(&target).await.unwrap().unwrap().inode,
-            target_inode_before
-        ),
-        _ => { let _ = target_inode_before; }
-    }
+    assert_eq!(
+        fs.metadata(&target).await.unwrap().unwrap().inode,
+        target_inode_before
+    );
 
     fs.copy_file(&source, &target, CopyOptions::default())
         .await

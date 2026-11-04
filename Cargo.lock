@@ -8973,7 +8973,6 @@ dependencies = [
  "futures",
  "parking_lot",
  "rand 0.9.4",
- "web-time",
 ]
 
 [[package]]
@@ -11189,7 +11188,6 @@ dependencies = [
  "theme",
  "theme_settings",
  "ui_macros",
- "web-time",
 ]
 
 [[package]]

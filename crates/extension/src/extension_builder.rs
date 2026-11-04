@@ -31,14 +31,8 @@ const RUST_TARGET: &str = "wasm32-wasip2";
 const WASI_SDK_VERSION: &str = "34";
 const WASI_SDK_URL: &str = "https://github.com/WebAssembly/wasi-sdk/releases/download/";
 const WASI_SDK_PLATFORM: Option<&str> = cfg_select! {
-    all(target_os = "macos", target_arch = "x86_64") => Some("x86_64-macos"),
-    all(target_os = "macos", target_arch = "aarch64") => Some("arm64-macos"),
-    all(target_os = "linux", target_arch = "x86_64") => Some("x86_64-linux"),
-    all(target_os = "linux", target_arch = "aarch64") => Some("arm64-linux"),
-    all(target_os = "freebsd", target_arch = "x86_64") => Some("x86_64-linux"),
-    all(target_os = "freebsd", target_arch = "aarch64") => Some("arm64-linux"),
-    all(target_os = "windows", target_arch = "x86_64") => Some("x86_64-windows"),
-    all(target_os = "windows", target_arch = "aarch64") => Some("arm64-windows"),
+    target_arch = "x86_64" => Some("x86_64-linux"),
+    target_arch = "aarch64" => Some("arm64-linux"),
     _ => None
 };
 

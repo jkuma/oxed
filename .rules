@@ -142,4 +142,4 @@ Oxed is a standalone, Linux-only fork of Zed. It does not track upstream: remove
 * Removing a feature means deleting its crates, its call sites, its settings, its keymap entries, its assets and its tests. Hiding mechanisms (`UNAVAILABLE_ACTIONS` in `crates/settings/src/keymap_file.rs`, the `CommandPaletteFilter` block in `initialize_workspace`, the page filter in `settings_data`, `#[ignore]`d tests) are transitional: shrink them as the code behind them goes away.
 * Some kept crates still call `SomeGlobal::global(cx)` for features that are not initialized anymore; such a call panics at runtime, not at compile time.
 * Run `cargo test -p zed --bin oxed` after any removal: it loads the default keymaps and initializes every panel, and catches startup crashes the type checker misses.
-* Code under `#[cfg(target_os = "macos")]`, `#[cfg(target_os = "windows")]` or `#[cfg(target_family = "wasm")]` is dead: delete it rather than maintaining it.
+* Linux is the only target: do not add code, `cfg` branches or dependencies for macOS, Windows, FreeBSD or wasm. The exception is `crates/extension_api`, which extensions compile to wasm.
