@@ -609,7 +609,7 @@ pub(crate) fn open_options_for_behavior(
 
     // If reuse flag is passed, open a new workspace in an existing window.
     let requesting_window = if open_behavior == cli::OpenBehavior::Reuse {
-        workspace::local_workspace_windows(cx).into_iter().next()
+        workspace::workspace_windows(cx).into_iter().next()
     } else {
         None
     };

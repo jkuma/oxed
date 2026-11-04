@@ -320,13 +320,8 @@ fn resolve_open_target_internal(
     }
 
     let project = workspace.read(cx).project().clone();
-    let background_path_checks = background_path_checks.unwrap_or_else(|| {
-        if project.read(cx).is_local() {
-            BackgroundPathChecks::LocalFileSystem
-        } else {
-            BackgroundPathChecks::ProjectPathResolution
-        }
-    });
+    let background_path_checks =
+        background_path_checks.unwrap_or(BackgroundPathChecks::LocalFileSystem);
 
     let background_resolution_task = match background_path_checks {
         BackgroundPathChecks::LocalFileSystem => {

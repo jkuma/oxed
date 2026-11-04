@@ -932,7 +932,6 @@ impl ProjectPanel {
                             let file_path = entry.path.clone();
                             let worktree_id = worktree.read(cx).id();
                             let entry_id = entry.id;
-                            let is_via_ssh = project.read(cx).is_via_remote_server();
 
                             workspace
                                 .open_path_preview(
@@ -948,11 +947,6 @@ impl ProjectPanel {
                                 )
                                 .detach_and_prompt_err("Failed to open file", window, cx, move |e, _, _| {
                                     match e.error_code() {
-                                        ErrorCode::Disconnected => if is_via_ssh {
-                                            Some("Disconnected from SSH host".to_string())
-                                        } else {
-                                            Some("Disconnected from remote project".to_string())
-                                        },
                                         ErrorCode::UnsharedItem => Some(format!(
                                             "{} is not shared by the host. This could be because it has been marked as `private`",
                                             file_path.display(path_style)
@@ -1137,9 +1131,6 @@ impl ProjectPanel {
             let is_dir = entry.is_dir();
             let is_foldable = auto_fold_dirs && self.is_foldable(entry, worktree);
             let is_unfoldable = auto_fold_dirs && self.is_unfoldable(entry, worktree);
-            let is_read_only = project.is_read_only(cx);
-            let is_remote = project.is_remote();
-            let is_local = project.is_local();
             let file_name = Path::new(entry_file_name(entry, worktree.root_name()));
             let is_markdown =
                 !is_dir && MarkdownPreviewView::is_markdown_path(file_name, project.languages());
@@ -1171,125 +1162,103 @@ impl ProjectPanel {
             let has_pasteable_content = self.has_pasteable_content(cx);
             let context_menu = ContextMenu::build(window, cx, |menu, _, _| {
                 menu.context(self.focus_handle.clone()).map(|menu| {
-                    if is_read_only {
-                        menu.when(is_markdown, |menu| {
+                    menu.action("New File", Box::new(NewFile))
+                        .action("New Folder", Box::new(NewDirectory))
+                        .separator()
+                        .action("Reveal in File Manager", Box::new(RevealInFileManager))
+                        .action("Open in Default App", Box::new(OpenWithSystem))
+                        .when(is_markdown, |menu| {
                             menu.action("Open Markdown Preview", Box::new(OpenMarkdownPreview))
                         })
                         .when(is_svg, |menu| {
                             menu.action("Open SVG Preview", Box::new(OpenSvgPreview))
                         })
                         .when(is_dir, |menu| {
-                            menu.action("Search Inside", Box::new(NewSearchInDirectory))
+                            menu.separator()
+                                .action("Find in Folder…", Box::new(NewSearchInDirectory))
                         })
-                    } else {
-                        menu.action("New File", Box::new(NewFile))
-                            .action("New Folder", Box::new(NewDirectory))
-                            .separator()
-                            .when(is_local, |menu| {
-                                menu.action(
-                                    ui::utils::reveal_in_file_manager_label(is_remote),
-                                    Box::new(RevealInFileManager),
-                                )
-                            })
-                            .when(is_local, |menu| {
-                                menu.action("Open in Default App", Box::new(OpenWithSystem))
-                            })
-                            .when(is_markdown, |menu| {
-                                menu.action("Open Markdown Preview", Box::new(OpenMarkdownPreview))
-                            })
-                            .when(is_svg, |menu| {
-                                menu.action("Open SVG Preview", Box::new(OpenSvgPreview))
-                            })
-                            .when(is_dir, |menu| {
-                                menu.separator()
-                                    .action("Find in Folder…", Box::new(NewSearchInDirectory))
-                            })
-                            .when(is_unfoldable, |menu| {
-                                menu.action("Unfold Directory", Box::new(UnfoldDirectory))
-                            })
-                            .when(is_foldable, |menu| {
-                                menu.action("Fold Directory", Box::new(FoldDirectory))
-                            })
-                            .when(should_show_compare, |menu| {
-                                menu.separator()
-                                    .action("Compare Marked Files", Box::new(CompareMarkedFiles))
-                            })
-                            .separator()
-                            .action("Cut", Box::new(Cut))
-                            .action("Copy", Box::new(Copy))
-                            .action("Duplicate", Box::new(Duplicate))
-                            .action_disabled_when(!has_pasteable_content, "Paste", Box::new(Paste))
-                            .map(|menu| {
-                                let can_undo = self.undo_manager.can_undo();
-                                let can_redo = self.undo_manager.can_redo();
+                        .when(is_unfoldable, |menu| {
+                            menu.action("Unfold Directory", Box::new(UnfoldDirectory))
+                        })
+                        .when(is_foldable, |menu| {
+                            menu.action("Fold Directory", Box::new(FoldDirectory))
+                        })
+                        .when(should_show_compare, |menu| {
+                            menu.separator()
+                                .action("Compare Marked Files", Box::new(CompareMarkedFiles))
+                        })
+                        .separator()
+                        .action("Cut", Box::new(Cut))
+                        .action("Copy", Box::new(Copy))
+                        .action("Duplicate", Box::new(Duplicate))
+                        .action_disabled_when(!has_pasteable_content, "Paste", Box::new(Paste))
+                        .map(|menu| {
+                            let can_undo = self.undo_manager.can_undo();
+                            let can_redo = self.undo_manager.can_redo();
 
-                                menu.action_disabled_when(!can_undo, "Undo", Box::new(Undo))
-                                    .action_disabled_when(!can_redo, "Redo", Box::new(Redo))
-                            })
-                            .separator()
-                            .action("Copy Path", Box::new(zed_actions::workspace::CopyPath))
-                            .action(
-                                "Copy Relative Path",
-                                Box::new(zed_actions::workspace::CopyRelativePath),
-                            )
-                            .when(has_git_repo, |menu| {
-                                menu.separator()
-                                    .when(!is_dir && self.has_git_changes(entry_id), |menu| {
-                                        menu.action(
-                                            "Restore File",
-                                            Box::new(git::RestoreFile { skip_prompt: false }),
-                                        )
-                                    })
-                                    .action("Add to .gitignore", Box::new(git::AddToGitignore))
-                                    .action(
-                                        "Add to .git/info/exclude",
-                                        Box::new(git::AddToGitInfoExclude),
+                            menu.action_disabled_when(!can_undo, "Undo", Box::new(Undo))
+                                .action_disabled_when(!can_redo, "Redo", Box::new(Redo))
+                        })
+                        .separator()
+                        .action("Copy Path", Box::new(zed_actions::workspace::CopyPath))
+                        .action(
+                            "Copy Relative Path",
+                            Box::new(zed_actions::workspace::CopyRelativePath),
+                        )
+                        .when(has_git_repo, |menu| {
+                            menu.separator()
+                                .when(!is_dir && self.has_git_changes(entry_id), |menu| {
+                                    menu.action(
+                                        "Restore File",
+                                        Box::new(git::RestoreFile { skip_prompt: false }),
                                     )
-                                    .when(has_history, |menu| {
-                                        menu.action("View History", Box::new(git::FileHistory))
-                                    })
-                                    .when(!is_dir, |menu| {
-                                        menu.action(
-                                            "Open File Permalink",
-                                            git::OpenFilePermalink.boxed_clone(),
-                                        )
-                                        .action(
-                                            "Copy File Permalink",
-                                            git::CopyFilePermalink.boxed_clone(),
-                                        )
-                                    })
-                            })
-                            .when(!should_hide_rename, |menu| {
-                                menu.separator().action("Rename", Box::new(Rename))
-                            })
-                            .when(!is_root, |menu| {
-                                menu.action("Trash", Box::new(Trash { skip_prompt: false }))
-                            })
-                            .when(!is_root, |menu| {
-                                menu.action("Delete", Box::new(Delete { skip_prompt: false }))
-                            })
-                            .when(is_root, |menu| {
-                                menu.separator()
-                                    .action(
-                                        "Add Folders to Project…",
-                                        Box::new(workspace::AddFolderToProject),
+                                })
+                                .action("Add to .gitignore", Box::new(git::AddToGitignore))
+                                .action(
+                                    "Add to .git/info/exclude",
+                                    Box::new(git::AddToGitInfoExclude),
+                                )
+                                .when(has_history, |menu| {
+                                    menu.action("View History", Box::new(git::FileHistory))
+                                })
+                                .when(!is_dir, |menu| {
+                                    menu.action(
+                                        "Open File Permalink",
+                                        git::OpenFilePermalink.boxed_clone(),
                                     )
-                                    .action("Remove from Project", Box::new(RemoveFromProject))
-                            })
-                            .when(is_dir && !is_root, |menu| {
-                                menu.separator()
-                                    .action("Expand All", Box::new(ExpandSelectedEntryAndChildren))
                                     .action(
-                                        "Collapse All",
-                                        Box::new(CollapseSelectedEntryAndChildren),
+                                        "Copy File Permalink",
+                                        git::CopyFilePermalink.boxed_clone(),
                                     )
-                            })
-                            .when(is_dir && is_root, |menu| {
-                                menu.separator()
-                                    .action("Expand All", Box::new(ExpandAllEntries))
-                                    .action("Collapse All", Box::new(CollapseAllEntries))
-                            })
-                    }
+                                })
+                        })
+                        .when(!should_hide_rename, |menu| {
+                            menu.separator().action("Rename", Box::new(Rename))
+                        })
+                        .when(!is_root, |menu| {
+                            menu.action("Trash", Box::new(Trash { skip_prompt: false }))
+                        })
+                        .when(!is_root, |menu| {
+                            menu.action("Delete", Box::new(Delete { skip_prompt: false }))
+                        })
+                        .when(is_root, |menu| {
+                            menu.separator()
+                                .action(
+                                    "Add Folders to Project…",
+                                    Box::new(workspace::AddFolderToProject),
+                                )
+                                .action("Remove from Project", Box::new(RemoveFromProject))
+                        })
+                        .when(is_dir && !is_root, |menu| {
+                            menu.separator()
+                                .action("Expand All", Box::new(ExpandSelectedEntryAndChildren))
+                                .action("Collapse All", Box::new(CollapseSelectedEntryAndChildren))
+                        })
+                        .when(is_dir && is_root, |menu| {
+                            menu.separator()
+                                .action("Expand All", Box::new(ExpandAllEntries))
+                                .action("Collapse All", Box::new(CollapseAllEntries))
+                        })
                 })
             });
 
@@ -4950,9 +4919,6 @@ impl ProjectPanel {
             .into_iter()
             .filter_map(|selection| {
                 let worktree = project.worktree_for_id(selection.worktree_id, cx)?.read(cx);
-                if !worktree.is_local() {
-                    return None;
-                }
                 let entry = worktree.entry_for_id(selection.entry_id)?;
                 Some((worktree.absolutize(&entry.path), entry.is_dir()))
             })
@@ -7254,7 +7220,6 @@ impl Render for ProjectPanel {
         }
 
         let has_worktree = !self.state.visible_entries.is_empty();
-        let project = self.project.read(cx);
         let panel_settings = ProjectPanelSettings::get_global(cx);
         let indent_size = panel_settings.indent_size;
         let show_indent_guides = panel_settings.indent_guides.show == ShowIndentGuides::Always;
@@ -7268,8 +7233,6 @@ impl Render for ProjectPanel {
                 false
             }
         };
-
-        let is_local = project.is_local();
 
         if has_worktree {
             let item_count = self
@@ -7408,7 +7371,7 @@ impl Render for ProjectPanel {
                 .on_action(cx.listener(Self::remove_from_project))
                 .on_action(cx.listener(Self::compare_marked_files))
                 .on_action(cx.listener(Self::open_context_menu))
-                .when(!project.is_read_only(cx), |el| {
+                .map(|el| {
                     el.on_action(cx.listener(Self::new_file))
                         .on_action(cx.listener(Self::new_directory))
                         .on_action(cx.listener(Self::rename))
@@ -7424,10 +7387,8 @@ impl Render for ProjectPanel {
                         .on_action(cx.listener(Self::undo))
                         .on_action(cx.listener(Self::redo))
                 })
-                .when(project.is_local(), |el| {
-                    el.on_action(cx.listener(Self::reveal_in_finder))
-                        .on_action(cx.listener(Self::open_system))
-                })
+                .on_action(cx.listener(Self::reveal_in_finder))
+                .on_action(cx.listener(Self::open_system))
                 .track_focus(&self.focus_handle(cx))
                 .child(
                     v_flex()
@@ -7791,7 +7752,7 @@ impl Render for ProjectPanel {
                                         }
                                     }),
                                 )
-                                .when(!project.is_read_only(cx), |el| {
+                                .map(|el| {
                                     el.on_click(cx.listener(
                                         |this, event: &gpui::ClickEvent, window, cx| {
                                             if event.click_count() > 1
@@ -7878,7 +7839,7 @@ impl Render for ProjectPanel {
                             .log_err();
                     }),
                 )
-                .when(is_local, |div| {
+                .map(|div| {
                     div.when(panel_settings.drag_and_drop, |div| {
                         div.drag_over::<ExternalPaths>(|style, _, _, cx| {
                             style.bg(cx.theme().colors().drop_target_background)

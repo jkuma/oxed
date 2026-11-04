@@ -1021,12 +1021,11 @@ impl ProjectItem for Editor {
 
     fn for_broken_project_item(
         abs_path: &Path,
-        is_local: bool,
         e: &anyhow::Error,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<InvalidItemView> {
-        Some(InvalidItemView::new(abs_path, is_local, e, window, cx))
+        Some(InvalidItemView::new(abs_path, e, window, cx))
     }
 }
 
@@ -2854,7 +2853,7 @@ mod tests {
         });
 
         let multi_buffer = cx.new(|cx| {
-            let mut multi_buffer = MultiBuffer::new(project.read(cx).capability());
+            let mut multi_buffer = MultiBuffer::new(Capability::ReadWrite);
             multi_buffer.set_excerpts_for_path(
                 PathKey::sorted(0),
                 file_buffer.clone(),

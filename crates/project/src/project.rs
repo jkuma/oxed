@@ -59,9 +59,9 @@ use gpui::{
     WeakEntity, Window,
 };
 use language::{
-    Buffer, BufferEditSource, BufferEvent, Capability, CodeLabel, DiskState, Language,
-    LanguageName, LanguageRegistry, PointUtf16, ToOffset, ToPointUtf16, Toolchain,
-    ToolchainMetadata, ToolchainScope, Transaction, Unclipped, language_settings::InlayHintKind,
+    Buffer, BufferEditSource, BufferEvent, CodeLabel, DiskState, Language, LanguageName,
+    LanguageRegistry, PointUtf16, ToOffset, ToPointUtf16, Toolchain, ToolchainMetadata,
+    ToolchainScope, Transaction, Unclipped, language_settings::InlayHintKind,
 };
 use lsp::{
     CodeActionKind, CompletionContext, CompletionItemKind, DocumentHighlightKind, InsertTextMode,
@@ -74,7 +74,6 @@ use node_runtime::NodeRuntime;
 use parking_lot::Mutex;
 pub use prettier_store::PrettierStore;
 use project_settings::{ProjectSettings, SettingsObserver, SettingsObserverEvent};
-use rpc::ErrorCode;
 use search::{SearchInputKind, SearchQuery, SearchResult};
 use search_history::SearchHistory;
 use settings::{InvalidSettingsError, Settings, SettingsLocation};
@@ -885,19 +884,8 @@ impl std::fmt::Debug for DirectoryLister {
 }
 
 impl DirectoryLister {
-    pub fn is_local(&self, cx: &App) -> bool {
-        match self {
-            DirectoryLister::Local(..) => true,
-            DirectoryLister::Project(project) => project.read(cx).is_local(),
-        }
-    }
-
-    pub fn resolve_tilde<'a>(&self, path: &'a String, cx: &App) -> Cow<'a, str> {
-        if self.is_local(cx) {
-            shellexpand::tilde(path)
-        } else {
-            Cow::from(path)
-        }
+    pub fn resolve_tilde<'a>(&self, path: &'a String) -> Cow<'a, str> {
+        shellexpand::tilde(path)
     }
 
     pub fn default_query(&self, cx: &mut App) -> String {
@@ -1298,11 +1286,6 @@ impl Project {
     /// Reveals the given path in the system file manager.
     pub fn reveal_path(&self, path: &Path, cx: &mut Context<Self>) {
         cx.reveal_path(path);
-    }
-
-    #[inline]
-    pub fn replica_id(&self) -> ReplicaId {
-        ReplicaId::LOCAL
     }
 
     #[inline]
@@ -1712,37 +1695,6 @@ impl Project {
         cx.emit(Event::Closed);
     }
 
-    #[inline]
-    pub fn is_disconnected(&self, _cx: &App) -> bool {
-        false
-    }
-
-    #[inline]
-    pub fn capability(&self) -> Capability {
-        Capability::ReadWrite
-    }
-
-    #[inline]
-    pub fn is_read_only(&self, cx: &App) -> bool {
-        self.is_disconnected(cx) || !self.capability().editable()
-    }
-
-    #[inline]
-    pub fn is_local(&self) -> bool {
-        true
-    }
-
-    #[inline]
-    pub fn is_via_remote_server(&self) -> bool {
-        false
-    }
-
-    /// `!self.is_local()`
-    #[inline]
-    pub fn is_remote(&self) -> bool {
-        !self.is_local()
-    }
-
     pub fn disable_worktree_scanner(&mut self, cx: &mut Context<Self>) {
         self.worktree_store.update(cx, |worktree_store, _cx| {
             worktree_store.disable_scanner();
@@ -1769,9 +1721,6 @@ impl Project {
         project_searchable: bool,
         cx: &mut Context<Self>,
     ) -> Entity<Buffer> {
-        if self.is_remote() {
-            panic!("called create_local_buffer on a remote project")
-        }
         self.buffer_store.update(cx, |buffer_store, cx| {
             buffer_store.create_local_buffer(text, language, project_searchable, cx)
         })
@@ -1827,10 +1776,6 @@ impl Project {
         path: impl Into<ProjectPath>,
         cx: &mut App,
     ) -> Task<Result<Entity<Buffer>>> {
-        if self.is_disconnected(cx) {
-            return Task::ready(Err(anyhow!(ErrorCode::Disconnected)));
-        }
-
         self.buffer_store.update(cx, |buffer_store, cx| {
             buffer_store.open_buffer(path.into(), cx)
         })
@@ -1867,9 +1812,6 @@ impl Project {
         buffer: Entity<Buffer>,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<BufferDiff>>> {
-        if self.is_disconnected(cx) {
-            return Task::ready(Err(anyhow!(ErrorCode::Disconnected)));
-        }
         self.git_store
             .update(cx, |git_store, cx| git_store.open_unstaged_diff(buffer, cx))
     }
@@ -1882,9 +1824,6 @@ impl Project {
         buffer: Entity<Buffer>,
         cx: &mut Context<Self>,
     ) -> Task<Result<(Entity<BufferDiff>, Entity<Buffer>)>> {
-        if self.is_disconnected(cx) {
-            return Task::ready(Err(anyhow!(ErrorCode::Disconnected)));
-        }
         self.git_store
             .update(cx, |git_store, cx| git_store.open_staged_diff(buffer, cx))
     }
@@ -1895,9 +1834,6 @@ impl Project {
         buffer: Entity<Buffer>,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<BufferDiff>>> {
-        if self.is_disconnected(cx) {
-            return Task::ready(Err(anyhow!(ErrorCode::Disconnected)));
-        }
         self.git_store.update(cx, |git_store, cx| {
             git_store.open_uncommitted_diff(buffer, cx)
         })
@@ -1913,9 +1849,6 @@ impl Project {
         worktree_ranges: Vec<Range<Anchor>>,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        if self.is_disconnected(cx) {
-            return Err(anyhow!(ErrorCode::Disconnected));
-        }
         self.git_store.update(cx, |git_store, cx| {
             git_store.stage_hunks(buffer, unstaged_diff, worktree_ranges, cx)
         })
@@ -1931,9 +1864,6 @@ impl Project {
         worktree_ranges: Vec<Range<Anchor>>,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        if self.is_disconnected(cx) {
-            return Err(anyhow!(ErrorCode::Disconnected));
-        }
         self.git_store.update(cx, |git_store, cx| {
             git_store.unstage_uncommitted_hunks(buffer, uncommitted_diff, worktree_ranges, cx)
         })
@@ -1948,9 +1878,6 @@ impl Project {
         index_ranges: Vec<Range<Anchor>>,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        if self.is_disconnected(cx) {
-            return Err(anyhow!(ErrorCode::Disconnected));
-        }
         self.git_store.update(cx, |git_store, cx| {
             git_store.unstage_staged_hunks(staged_diff, index_ranges, cx)
         })
@@ -2026,10 +1953,6 @@ impl Project {
         path: impl Into<ProjectPath>,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<ImageItem>>> {
-        if self.is_disconnected(cx) {
-            return Task::ready(Err(anyhow!(ErrorCode::Disconnected)));
-        }
-
         let open_image_task = self.image_store.update(cx, |image_store, cx| {
             image_store.open_image(path.into(), cx)
         });
@@ -2239,7 +2162,7 @@ impl Project {
                 edits,
                 most_recent_edit,
             } => {
-                if most_recent_edit.replica_id == self.replica_id() {
+                if most_recent_edit.replica_id == ReplicaId::LOCAL {
                     cx.emit(Event::SnippetEdit(*buffer_id, edits.clone()))
                 }
             }
@@ -2937,11 +2860,9 @@ impl Project {
             language_server_id,
         };
         if let Some(server_id) = request.language_server_id {
-            let server_is_capable = !self.is_local()
-                || self.lsp_store.update(cx, |lsp_store, cx| {
-                    lsp_store
-                        .language_server_capable_of_lsp_request(&buffer, server_id, &request, cx)
-                });
+            let server_is_capable = self.lsp_store.update(cx, |lsp_store, cx| {
+                lsp_store.language_server_capable_of_lsp_request(&buffer, server_id, &request, cx)
+            });
             if !server_is_capable {
                 request.language_server_id = None;
             }
@@ -3092,11 +3013,7 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<ResolvedPath>>> {
         let resolve_task = self.resolve_abs_file_path_canonical(path, cx);
-        let path = if self.is_local() {
-            shellexpand::tilde(path).into_owned()
-        } else {
-            path.to_owned()
-        };
+        let path = shellexpand::tilde(path).into_owned();
         cx.spawn(async move |project, cx| {
             let Some(resolved_path) = resolve_task.await? else {
                 return Ok(None);

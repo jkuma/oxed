@@ -159,10 +159,6 @@ pub fn init(cx: &mut App) {
             },
         );
 
-        let project = workspace.project().read(cx);
-        if project.is_read_only(cx) {
-            return;
-        }
         workspace.register_action(
             |workspace, _: &zed_actions::git::CreatePullRequest, window, cx| {
                 if let Some(panel) = workspace.panel::<git_panel::GitPanel>(cx) {

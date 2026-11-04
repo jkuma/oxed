@@ -132,18 +132,14 @@ impl FileFinder {
                     return Some(Task::ready(Some(FoundPath::new(project_path, abs_path?))));
                 }
                 let abs_path = abs_path?;
-                if project.is_local() {
-                    let fs = fs.clone();
-                    Some(cx.background_spawn(async move {
-                        if fs.is_file(&abs_path).await {
-                            Some(FoundPath::new(project_path, abs_path))
-                        } else {
-                            None
-                        }
-                    }))
-                } else {
-                    Some(Task::ready(Some(FoundPath::new(project_path, abs_path))))
-                }
+                let fs = fs.clone();
+                Some(cx.background_spawn(async move {
+                    if fs.is_file(&abs_path).await {
+                        Some(FoundPath::new(project_path, abs_path))
+                    } else {
+                        None
+                    }
+                }))
             })
             .collect::<Vec<_>>();
         cx.spawn_in(window, async move |workspace, cx| {
@@ -1870,13 +1866,7 @@ impl PickerDelegate for FileFinderDelegate {
                 self.matches.push_new_matches(
                     project.worktree_store(),
                     cx,
-                    self.history_items.iter().filter(|history_item| {
-                        project
-                            .worktree_for_id(history_item.project.worktree_id, cx)
-                            .is_some()
-                            || project.is_local()
-                            || project.is_via_remote_server()
-                    }),
+                    self.history_items.iter(),
                     self.currently_opened_path.as_ref(),
                     None,
                     None.into_iter(),

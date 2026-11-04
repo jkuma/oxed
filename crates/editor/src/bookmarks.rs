@@ -3,7 +3,7 @@ use std::{cmp::Reverse, ops::Range};
 use collections::{HashMap, HashSet};
 use futures::{StreamExt as _, channel::mpsc};
 use gpui::{AppContext as _, Entity, EventEmitter, Subscription, Task};
-use language::Buffer;
+use language::{Buffer, Capability};
 use multi_buffer::{
     Anchor, Event as MultiBufferEvent, MultiBuffer, MultiBufferOffset, MultiBufferSnapshot,
     PathKey, ToOffset as _, ToPoint as _,
@@ -377,7 +377,7 @@ impl Editor {
                         return;
                     }
 
-                    let capability = workspace.project().read(cx).capability();
+                    let capability = Capability::ReadWrite;
                     let excerpt_buffer =
                         cx.new(|_cx| MultiBuffer::new(capability).with_title("Bookmarks".into()));
                     let bookmarks_tab_state = cx.new(|cx| {

@@ -112,9 +112,7 @@ impl LocalBufferStore {
         cx: &mut Context<BufferStore>,
     ) {
         cx.subscribe(worktree, |this, worktree, event, cx| {
-            if worktree.read(cx).is_local()
-                && let worktree::Event::UpdatedEntries(changes) = event
-            {
+            if let worktree::Event::UpdatedEntries(changes) = event {
                 Self::local_worktree_entries_changed(this, &worktree, changes, cx);
             }
         })

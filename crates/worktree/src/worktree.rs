@@ -599,14 +599,6 @@ impl Worktree {
         Some(worktree)
     }
 
-    pub fn is_local(&self) -> bool {
-        matches!(self, Worktree::Local(_))
-    }
-
-    pub fn is_remote(&self) -> bool {
-        !self.is_local()
-    }
-
     pub fn settings_location(&self, _: &Context<Self>) -> SettingsLocation<'static> {
         SettingsLocation {
             worktree_id: self.id(),
@@ -990,9 +982,7 @@ impl Worktree {
                 .into()
         } else {
             let full_path = self.abs_path();
-            let mut full_path_string = if self.is_local()
-                && let Ok(stripped) = full_path.strip_prefix(home_dir())
-            {
+            let mut full_path_string = if let Ok(stripped) = full_path.strip_prefix(home_dir()) {
                 self.path_style
                     .join("~", &*stripped.to_string_lossy())
                     .unwrap()

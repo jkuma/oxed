@@ -28,7 +28,7 @@ use gpui::{
     actions, div,
 };
 use itertools::Itertools;
-use language::{Buffer, Language};
+use language::{Buffer, Capability, Language};
 use menu::Confirm;
 use multi_buffer;
 use project::{
@@ -400,8 +400,7 @@ impl ProjectSearch {
         workspace: WeakEntity<Workspace>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let capability = project.read(cx).capability();
-        let excerpts = cx.new(|_| MultiBuffer::new(capability));
+        let excerpts = cx.new(|_| MultiBuffer::new(Capability::ReadWrite));
         let excerpts_subscription = Self::subscribe_to_excerpts(&excerpts, cx);
         let workspace_subscription = Self::subscribe_to_workspace(&workspace, cx);
 

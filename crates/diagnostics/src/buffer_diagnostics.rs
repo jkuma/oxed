@@ -146,7 +146,7 @@ impl BufferDiagnosticsEditor {
             .read(cx)
             .diagnostic_summary_for_path(&project_path, cx);
 
-        let multibuffer = cx.new(|cx| MultiBuffer::new(project_handle.read(cx).capability()));
+        let multibuffer = cx.new(|_| MultiBuffer::new(Capability::ReadWrite));
         let max_severity = Self::max_diagnostics_severity(include_warnings);
         let editor = cx.new(|cx| {
             let mut editor = Editor::for_multibuffer(

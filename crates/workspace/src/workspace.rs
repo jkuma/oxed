@@ -780,7 +780,7 @@ fn prompt_and_open_paths(
     create_new_window: bool,
     cx: &mut App,
 ) {
-    if let Some(workspace_window) = local_workspace_windows(cx).into_iter().next() {
+    if let Some(workspace_window) = workspace_windows(cx).into_iter().next() {
         workspace_window
             .update(cx, |multi_workspace, window, cx| {
                 let workspace = multi_workspace.workspace().clone();
@@ -941,7 +941,6 @@ impl ProjectItemRegistry {
                     .entry_for_path(&project_path, cx)
                     .is_some_and(|entry| entry.is_file());
                 let entry_abs_path = project.read(cx).absolute_path(&project_path, cx);
-                let is_local = project.read(cx).is_local();
                 let project_item =
                     <T::Item as project::ProjectItem>::try_open(project, &project_path, cx)?;
                 let project = project.clone();
@@ -980,7 +979,7 @@ impl ProjectItemRegistry {
                                     if let Some(broken_project_item_view) =
                                         cx.update(|window, cx| {
                                             T::for_broken_project_item(
-                                                abs_path, is_local, &e, window, cx,
+                                                abs_path, &e, window, cx,
                                             )
                                         })?
                                     {
@@ -2933,7 +2932,7 @@ impl Workspace {
         // TODO: If `on_prompt_for_open_path` is set, we should always use it
         // rather than gating on `use_system_path_prompts`. This would let tests
         // inject a mock without also having to disable the setting.
-        if !lister.is_local(cx) || !WorkspaceSettings::get_global(cx).use_system_path_prompts {
+        if !WorkspaceSettings::get_global(cx).use_system_path_prompts {
             let prompt = self.on_prompt_for_open_path.take().unwrap();
             let rx = prompt(self, lister, window, cx);
             self.on_prompt_for_open_path = Some(prompt);
@@ -2980,9 +2979,7 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> oneshot::Receiver<Option<Vec<PathBuf>>> {
-        if self.project.read(cx).is_via_remote_server()
-            || !WorkspaceSettings::get_global(cx).use_system_path_prompts
-        {
+        if !WorkspaceSettings::get_global(cx).use_system_path_prompts {
             let prompt = self.on_prompt_for_new_path.take().unwrap();
             let rx = prompt(self, lister, suggested_name, window, cx);
             self.on_prompt_for_new_path = Some(prompt);
@@ -3050,30 +3047,7 @@ impl Workspace {
         T: 'static,
         F: 'static + FnOnce(&mut Workspace, &mut Window, &mut Context<Workspace>) -> T,
     {
-        if self.project.read(cx).is_local() {
-            Task::ready(Ok(callback(self, window, cx)))
-        } else {
-            let env = self.project.read(cx).cli_environment(cx);
-            let task = Self::new_local(
-                Vec::new(),
-                self.app_state.clone(),
-                None,
-                env,
-                None,
-                OpenMode::Activate,
-                cx,
-            );
-            cx.spawn_in(window, async move |_vh, cx| {
-                let OpenResult {
-                    window: multi_workspace_window,
-                    ..
-                } = task.await?;
-                multi_workspace_window.update(cx, |multi_workspace, window, cx| {
-                    let workspace = multi_workspace.workspace().clone();
-                    workspace.update(cx, |workspace, cx| callback(workspace, window, cx))
-                })
-            })
-        }
+        Task::ready(Ok(callback(self, window, cx)))
     }
 
     pub fn worktrees<'a>(&self, cx: &'a App) -> impl 'a + Iterator<Item = Entity<Worktree>> {
@@ -3330,9 +3304,6 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<bool>> {
-        if self.project.read(cx).is_disconnected(cx) {
-            return Task::ready(Ok(true));
-        }
         let dirty_items = self
             .panes
             .iter()
@@ -3525,19 +3496,17 @@ impl Workspace {
                 let pane = pane.clone();
                 let task = cx.spawn(async move |cx| {
                     let (worktree, project_path) = project_path?;
-                    let (entry_is_directory, worktree_is_local) =
-                        worktree.read_with(cx, |worktree, _| {
-                            let entry = if project_path.path.as_unix_str().is_empty() {
-                                worktree.root_entry()
-                            } else {
-                                worktree.entry_for_path(&project_path.path)
-                            };
-                            (entry.map(|entry| entry.is_dir()), worktree.is_local())
-                        });
+                    let entry_is_directory = worktree.read_with(cx, |worktree, _| {
+                        let entry = if project_path.path.as_unix_str().is_empty() {
+                            worktree.root_entry()
+                        } else {
+                            worktree.entry_for_path(&project_path.path)
+                        };
+                        entry.map(|entry| entry.is_dir())
+                    });
                     let is_directory = match entry_is_directory {
                         Some(is_directory) => is_directory,
-                        None if worktree_is_local => fs.is_dir(&abs_path).await,
-                        None => false,
+                        None => fs.is_dir(&abs_path).await,
                     };
 
                     if is_directory {
@@ -4654,7 +4623,6 @@ impl Workspace {
         // Not a valid URL - treat as a file path
         let project = self.project();
         let path_style = project.read(cx).path_style(cx);
-        let project_is_local = project.read(cx).is_local();
 
         // If it's an absolute path, open it directly
         if path_style.has_root(Path::new(url_or_path)) {
@@ -4664,30 +4632,16 @@ impl Workspace {
 
         let path = Path::new(url_or_path);
         // Try to resolve relative path against base_path first
-        let path_from_base = if let Some(base) = base_path {
-            let resolved_path = path_style.join(base, path).map(PathBuf::from);
-            if project_is_local {
-                if let Some(resolved_path) = resolved_path
-                    && resolved_path.exists()
-                {
-                    open_abs_path(self, resolved_path, cx);
-                    return;
-                }
-                None
-            } else {
-                resolved_path
-            }
-        } else {
-            None
-        };
+        if let Some(base) = base_path
+            && let Some(resolved_path) = path_style.join(base, path).map(PathBuf::from)
+            && resolved_path.exists()
+        {
+            open_abs_path(self, resolved_path, cx);
+            return;
+        }
 
         // Try to resolve against project worktrees
-        let project_path = project.update(cx, |project, cx| {
-            path_from_base
-                .as_deref()
-                .and_then(|base_path| project.find_project_path(base_path, cx))
-                .or_else(|| project.find_project_path(path, cx))
-        });
+        let project_path = project.update(cx, |project, cx| project.find_project_path(path, cx));
         if let Some(project_path) = project_path {
             let url_or_path = url_or_path.to_owned();
             let task = self.open_path(project_path, None, true, window, cx);
@@ -5755,8 +5709,8 @@ impl Workspace {
         self.last_window_title = Some(title);
     }
 
-    fn is_window_edited(&self, cx: &App) -> bool {
-        !self.project.read(cx).is_disconnected(cx) && !self.dirty_items.is_empty()
+    fn is_window_edited(&self) -> bool {
+        !self.dirty_items.is_empty()
     }
 
     fn window_title_context(
@@ -5830,11 +5784,11 @@ impl Workspace {
         }
     }
 
-    fn update_window_edited(&mut self, window: &mut Window, cx: &mut App) {
+    fn update_window_edited(&mut self, window: &mut Window, _cx: &mut App) {
         if !self.owns_window_chrome() {
             return;
         }
-        let is_edited = self.is_window_edited(cx);
+        let is_edited = self.is_window_edited();
         if is_edited != self.window_edited {
             self.window_edited = is_edited;
             window.set_window_edited(self.window_edited);
@@ -5861,7 +5815,7 @@ impl Workspace {
         self.last_window_title = None;
         self.apply_window_title(window, cx);
 
-        self.window_edited = self.is_window_edited(cx);
+        self.window_edited = self.is_window_edited();
         window.set_window_edited(self.window_edited);
     }
 
@@ -6162,86 +6116,68 @@ impl Workspace {
             this.capture_dock_state(window, cx)
         }
 
-        match self.workspace_location(cx) {
-            Some(paths) => {
-                let bookmarks = self.project.update(cx, |project, cx| {
-                    project
-                        .bookmark_store()
-                        .read(cx)
-                        .all_serialized_bookmarks(cx)
-                });
+        let paths = self.workspace_location(cx);
+        let bookmarks = self.project.update(cx, |project, cx| {
+            project
+                .bookmark_store()
+                .read(cx)
+                .all_serialized_bookmarks(cx)
+        });
 
-                let user_toolchains = self
-                    .project
-                    .read(cx)
-                    .user_toolchains(cx)
-                    .unwrap_or_default();
+        let user_toolchains = self
+            .project
+            .read(cx)
+            .user_toolchains(cx)
+            .unwrap_or_default();
 
-                let center_group = build_serialized_pane_group(&self.center.root, window, cx);
-                let docks = build_serialized_docks(self, window, cx);
-                let default_docks = paths.is_empty().then(|| docks.clone());
-                let window_bounds = Some(SerializedWindowBounds(window.window_bounds()));
-                let identity_paths_hint = self
-                    .project
-                    .read(cx)
-                    .worktree_paths(cx)
-                    .main_worktree_path_list()
-                    .clone();
-                let recent_navigation_history = self.persisted_recent_navigation_history.clone();
+        let center_group = build_serialized_pane_group(&self.center.root, window, cx);
+        let docks = build_serialized_docks(self, window, cx);
+        let default_docks = paths.is_empty().then(|| docks.clone());
+        let window_bounds = Some(SerializedWindowBounds(window.window_bounds()));
+        let identity_paths_hint = self
+            .project
+            .read(cx)
+            .worktree_paths(cx)
+            .main_worktree_path_list()
+            .clone();
+        let recent_navigation_history = self.persisted_recent_navigation_history.clone();
 
-                let serialized_workspace = SerializedWorkspace {
-                    id: database_id,
-                    paths,
-                    identity_paths: Some(identity_paths_hint),
-                    center_group,
-                    window_bounds,
-                    display: Default::default(),
-                    docks,
-                    centered_layout: self.centered_layout,
-                    session_id: self.session_id.clone(),
-                    bookmarks,
-                    window_id: Some(window.window_handle().window_id().as_u64()),
-                    user_toolchains,
-                    recent_navigation_history,
-                };
+        let serialized_workspace = SerializedWorkspace {
+            id: database_id,
+            paths,
+            identity_paths: Some(identity_paths_hint),
+            center_group,
+            window_bounds,
+            display: Default::default(),
+            docks,
+            centered_layout: self.centered_layout,
+            session_id: self.session_id.clone(),
+            bookmarks,
+            window_id: Some(window.window_handle().window_id().as_u64()),
+            user_toolchains,
+            recent_navigation_history,
+        };
 
-                let db = WorkspaceDb::global(cx);
-                let kvp = db::kvp::KeyValueStore::global(cx);
-                cx.background_spawn(async move {
-                    if let Some(docks) = default_docks {
-                        persistence::write_default_dock_state(&kvp, docks)
-                            .await
-                            .log_err();
-                    }
-                    db.save_workspace(serialized_workspace).await;
-                })
+        let db = WorkspaceDb::global(cx);
+        let kvp = db::kvp::KeyValueStore::global(cx);
+        cx.background_spawn(async move {
+            if let Some(docks) = default_docks {
+                persistence::write_default_dock_state(&kvp, docks)
+                    .await
+                    .log_err();
             }
-            None => {
-                let docks = build_serialized_docks(self, window, cx);
-                let kvp = db::kvp::KeyValueStore::global(cx);
-                cx.background_spawn(async move {
-                    persistence::write_default_dock_state(&kvp, docks)
-                        .await
-                        .log_err();
-                })
-            }
-        }
+            db.save_workspace(serialized_workspace).await;
+        })
     }
 
-    fn workspace_location(&self, cx: &App) -> Option<PathList> {
-        self.project
-            .read(cx)
-            .is_local()
-            .then(|| PathList::new(&self.root_paths(cx)))
+    fn workspace_location(&self, cx: &App) -> PathList {
+        PathList::new(&self.root_paths(cx))
     }
 
     fn update_history(&self, cx: &mut App) {
         let Some(id) = self.database_id() else {
             return;
         };
-        if !self.project.read(cx).is_local() {
-            return;
-        }
         if let Some(manager) = HistoryManager::global(cx) {
             let paths = PathList::new(&self.root_paths(cx));
             manager.update(cx, |this, cx| {
@@ -8496,19 +8432,11 @@ pub fn activate_any_workspace_window(cx: &mut AsyncApp) -> Option<WindowHandle<M
     })
 }
 
-fn workspace_is_local(workspace: &Entity<Workspace>, cx: &App) -> bool {
-    workspace.read(cx).project.read(cx).is_local()
-}
-
-pub fn local_workspace_windows(cx: &App) -> Vec<WindowHandle<MultiWorkspace>> {
+pub fn workspace_windows(cx: &App) -> Vec<WindowHandle<MultiWorkspace>> {
     cx.windows()
         .into_iter()
         .filter_map(|window| window.downcast::<MultiWorkspace>())
-        .filter(|multi_workspace| {
-            multi_workspace
-                .read(cx)
-                .is_ok_and(|multi_workspace| workspace_is_local(multi_workspace.workspace(), cx))
-        })
+        .filter(|multi_workspace| multi_workspace.read(cx).is_ok())
         .collect()
 }
 
@@ -8526,7 +8454,7 @@ pub async fn find_existing_workspace(
 
     if open_options.workspace_matching != WorkspaceMatching::None {
         cx.update(|cx| {
-            for window in local_workspace_windows(cx) {
+            for window in workspace_windows(cx) {
                 if let Ok(multi_workspace) = window.read(cx) {
                     let workspace = multi_workspace.workspace();
 
@@ -8581,7 +8509,7 @@ pub async fn find_existing_workspace(
 
         if open_options.wait && existing.is_some() && all_paths_are_files {
             cx.update(|cx| {
-                let windows = local_workspace_windows(cx);
+                let windows = workspace_windows(cx);
                 let window = cx
                     .active_window()
                     .and_then(|window| window.downcast::<MultiWorkspace>())
@@ -8757,7 +8685,7 @@ pub fn open_paths(
 
             if all_metadatas.into_iter().all(|file| !file.is_dir) {
                 cx.update(|cx| {
-                    let windows = local_workspace_windows(cx);
+                    let windows = workspace_windows(cx);
                     let window = cx
                         .active_window()
                         .and_then(|window| window.downcast::<MultiWorkspace>())
@@ -15235,7 +15163,6 @@ mod tests {
                         Box::new(cx.new(|cx| {
                             InvalidItemView::new(
                                 Path::new(&format!("/root/{index}.txt")),
-                                true,
                                 &anyhow::anyhow!("failed to open"),
                                 window,
                                 cx,

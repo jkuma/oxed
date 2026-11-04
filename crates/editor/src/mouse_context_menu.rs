@@ -273,7 +273,7 @@ pub fn deploy_context_menu(
                 .separator()
                 .action_disabled_when(
                     !has_reveal_target,
-                    ui::utils::reveal_in_file_manager_label(false),
+                    "Reveal in File Manager",
                     Box::new(RevealInFileManager),
                 )
                 .when(is_markdown, |builder| {

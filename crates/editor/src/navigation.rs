@@ -2168,7 +2168,7 @@ impl Editor {
             return None;
         }
 
-        let capability = workspace.project().read(cx).capability();
+        let capability = Capability::ReadWrite;
         let mut ranges = <Vec<Range<Anchor>>>::new();
 
         // a key to find existing multibuffer editors with the same set of locations

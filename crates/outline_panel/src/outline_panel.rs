@@ -1808,10 +1808,7 @@ impl OutlinePanel {
 
         let context_menu = ContextMenu::build(window, cx, |menu, _, _| {
             menu.context(self.focus_handle.clone())
-                .action(
-                    ui::utils::reveal_in_file_manager_label(false),
-                    Box::new(RevealInFileManager),
-                )
+                .action("Reveal in File Manager", Box::new(RevealInFileManager))
                 .when(is_unfoldable, |menu| {
                     menu.action("Unfold Directory", Box::new(UnfoldDirectory))
                 })
@@ -5672,7 +5669,6 @@ impl EventEmitter<PanelEvent> for OutlinePanel {}
 
 impl Render for OutlinePanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_local = self.project.read(cx).is_local();
         let query = self.query(cx);
         let pinned = self.pinned;
         let settings = OutlinePanelSettings::get_global(cx);
@@ -5716,9 +5712,7 @@ impl Render for OutlinePanel {
             .on_action(cx.listener(Self::fold_directory))
             .on_action(cx.listener(Self::open_excerpts))
             .on_action(cx.listener(Self::open_excerpts_split))
-            .when(is_local, |el| {
-                el.on_action(cx.listener(Self::reveal_in_finder))
-            })
+            .on_action(cx.listener(Self::reveal_in_finder))
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(move |outline_panel, event: &MouseDownEvent, window, cx| {

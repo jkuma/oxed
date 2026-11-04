@@ -554,9 +554,7 @@ impl ImageStoreImpl for Entity<LocalImageStore> {
 impl LocalImageStore {
     fn subscribe_to_worktree(&mut self, worktree: &Entity<Worktree>, cx: &mut Context<Self>) {
         cx.subscribe(worktree, |this, worktree, event, cx| {
-            if worktree.read(cx).is_local()
-                && let worktree::Event::UpdatedEntries(changes) = event
-            {
+            if let worktree::Event::UpdatedEntries(changes) = event {
                 this.local_worktree_entries_changed(&worktree, changes, cx);
             }
         })

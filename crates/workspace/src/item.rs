@@ -1144,7 +1144,6 @@ pub trait ProjectItem: Item {
     /// Allows to open an item that can gracefully display and handle errors.
     fn for_broken_project_item(
         _abs_path: &Path,
-        _is_local: bool,
         _e: &anyhow::Error,
         _window: &mut Window,
         _cx: &mut App,

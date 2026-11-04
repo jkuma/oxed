@@ -2069,10 +2069,13 @@ impl GitStore {
                 }
             }
             WorktreeStoreEvent::WorktreeUpdatedGitRepositories(worktree_id, changed_repos) => {
-                let Some(worktree) = worktree_store.read(cx).worktree_for_id(*worktree_id, cx)
-                else {
+                if worktree_store
+                    .read(cx)
+                    .worktree_for_id(*worktree_id, cx)
+                    .is_none()
+                {
                     return;
-                };
+                }
                 log::debug!("received worktree update for repositories: {changed_repos:?}");
                 self.update_repositories_from_worktree(
                     *worktree_id,
@@ -2081,7 +2084,7 @@ impl GitStore {
                     fs.clone(),
                     cx,
                 );
-                self.local_worktree_git_repos_changed(worktree, changed_repos, cx);
+                self.local_worktree_git_repos_changed(changed_repos, cx);
             }
             WorktreeStoreEvent::WorktreeRemoved(_entity_id, worktree_id) => {
                 self.parked_repositories
@@ -2753,12 +2756,10 @@ impl GitStore {
 
     fn local_worktree_git_repos_changed(
         &mut self,
-        worktree: Entity<Worktree>,
         changed_repos: &UpdatedGitRepositoriesSet,
         cx: &mut Context<Self>,
     ) {
         log::debug!("local worktree repos changed");
-        debug_assert!(worktree.read(cx).is_local());
 
         for repository in self.repositories.values() {
             repository.update(cx, |repository, cx| {

@@ -17,20 +17,12 @@ pub struct InvalidItemView {
     pub abs_path: Arc<Path>,
     /// An error message, happened when opening the item.
     pub error: SharedString,
-    is_local: bool,
     focus_handle: FocusHandle,
 }
 
 impl InvalidItemView {
-    pub fn new(
-        abs_path: &Path,
-        is_local: bool,
-        e: &anyhow::Error,
-        _: &mut Window,
-        cx: &mut App,
-    ) -> Self {
+    pub fn new(abs_path: &Path, e: &anyhow::Error, _: &mut Window, cx: &mut App) -> Self {
         Self {
-            is_local,
             abs_path: Arc::from(abs_path),
             error: format!("{}", e.root_cause()).into(),
             focus_handle: cx.focus_handle(),
@@ -96,7 +88,7 @@ impl Render for InvalidItemView {
                                 .justify_center()
                                 .child(Label::new(self.error.clone()).size(LabelSize::Small)),
                         )
-                        .when(self.is_local, |contents| {
+                        .map(|contents| {
                             contents.child(
                                 h_flex().justify_center().child(
                                     Button::new("open-with-system", "Open in Default App")

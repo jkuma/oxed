@@ -674,7 +674,7 @@ impl PickerDelegate for OpenPathDelegate {
                         let Some(confirmed_path) = self
                             .path_style
                             .join_path_preserving_components(
-                                Path::new(self.lister.resolve_tilde(parent_path, cx).as_ref()),
+                                Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
                                 &candidate.path.string,
                             )
                             .log_err()
@@ -704,7 +704,7 @@ impl PickerDelegate for OpenPathDelegate {
                             let Some(prompted_path) = self
                                 .path_style
                                 .join_path_preserving_components(
-                                    Path::new(self.lister.resolve_tilde(parent_path, cx).as_ref()),
+                                    Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
                                     &user_input.file.string,
                                 )
                                 .log_err()

@@ -4868,11 +4868,8 @@ impl LspStore {
         cx: &mut Context<Self>,
     ) {
         match event {
-            WorktreeStoreEvent::WorktreeAdded(worktree) => {
-                if !worktree.read(cx).is_local() {
-                    return;
-                }
-                cx.subscribe(worktree, |this, worktree, event, cx| match event {
+            WorktreeStoreEvent::WorktreeAdded(worktree) => cx
+                .subscribe(worktree, |this, worktree, event, cx| match event {
                     worktree::Event::UpdatedEntries(changes) => {
                         this.update_local_worktree_language_servers(&worktree, changes, cx);
                     }
@@ -4881,8 +4878,7 @@ impl LspStore {
                     | worktree::Event::Deleted
                     | worktree::Event::UpdatedRootRepoCommonDir { .. } => {}
                 })
-                .detach()
-            }
+                .detach(),
             WorktreeStoreEvent::WorktreeRemoved(_, id) => self.remove_worktree(*id, cx),
             WorktreeStoreEvent::WorktreeUpdatedEntries(worktree_id, changes) => {
                 self.invalidate_diagnostic_summaries_for_removed_entries(*worktree_id, changes, cx);
@@ -8740,27 +8736,23 @@ impl LspStore {
                     })?
                     .await?;
                 let worktree_root = worktree.read_with(cx, |worktree, _| worktree.abs_path());
-                let source_ws = if worktree.read_with(cx, |worktree, _| worktree.is_local()) {
-                    lsp_store
-                        .update(cx, |lsp_store, cx| {
-                            if let Some(local) = lsp_store.as_local_mut() {
-                                local.register_language_server_for_invisible_worktree(
-                                    &worktree,
-                                    language_server_id,
-                                    cx,
-                                )
-                            }
-                            match lsp_store.language_server_statuses.get(&language_server_id) {
-                                Some(status) => status.worktree,
-                                None => None,
-                            }
-                        })
-                        .ok()
-                        .flatten()
-                        .zip(Some(worktree_root.clone()))
-                } else {
-                    None
-                };
+                let source_ws = lsp_store
+                    .update(cx, |lsp_store, cx| {
+                        if let Some(local) = lsp_store.as_local_mut() {
+                            local.register_language_server_for_invisible_worktree(
+                                &worktree,
+                                language_server_id,
+                                cx,
+                            )
+                        }
+                        match lsp_store.language_server_statuses.get(&language_server_id) {
+                            Some(status) => status.worktree,
+                            None => None,
+                        }
+                    })
+                    .ok()
+                    .flatten()
+                    .zip(Some(worktree_root.clone()));
                 let relative_path = if let Some(known_path) = known_relative_path {
                     known_path
                 } else {

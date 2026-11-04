@@ -819,7 +819,6 @@ impl ProjectItem for ImageView {
 
     fn for_broken_project_item(
         abs_path: &Path,
-        is_local: bool,
         e: &anyhow::Error,
         window: &mut Window,
         cx: &mut App,
@@ -827,7 +826,7 @@ impl ProjectItem for ImageView {
     where
         Self: Sized,
     {
-        Some(InvalidItemView::new(abs_path, is_local, e, window, cx))
+        Some(InvalidItemView::new(abs_path, e, window, cx))
     }
 }
 

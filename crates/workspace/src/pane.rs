@@ -2458,14 +2458,10 @@ impl Pane {
                 let new_path = pane.update_in(cx, |pane, window, cx| {
                     pane.activate_item(item_ix, true, true, window, cx);
                     pane.workspace.update(cx, |workspace, cx| {
-                        let lister = if workspace.project().read(cx).is_local() {
-                            DirectoryLister::Local(
-                                workspace.project().clone(),
-                                workspace.app_state().fs.clone(),
-                            )
-                        } else {
-                            DirectoryLister::Project(workspace.project().clone())
-                        };
+                        let lister = DirectoryLister::Local(
+                            workspace.project().clone(),
+                            workspace.app_state().fs.clone(),
+                        );
                         workspace.prompt_for_new_path(lister, Some(suggested_name), window, cx)
                     })
                 })??;
@@ -3295,16 +3291,7 @@ impl Pane {
 
                             let visible_in_project_panel = relative_path.is_some()
                                 && worktree.is_some_and(|worktree| worktree.read(cx).is_visible());
-                            let is_local = pane
-                                .read(cx)
-                                .project
-                                .upgrade()
-                                .is_some_and(|project| project.read(cx).is_local());
-                            let is_remote = pane
-                                .read(cx)
-                                .project
-                                .upgrade()
-                                .is_some_and(|project| project.read(cx).is_remote());
+                            let is_local = pane.read(cx).project.upgrade().is_some();
 
                             let entry_id = entry.to_proto();
 
@@ -3387,7 +3374,7 @@ impl Pane {
                                 .when(is_local, |menu| {
                                     menu.when_some(reveal_path, |menu, reveal_path| {
                                         menu.separator().entry(
-                                            ui::utils::reveal_in_file_manager_label(is_remote),
+                                            "Reveal in File Manager",
                                             Some(Box::new(
                                                 zed_actions::editor::RevealInFileManager,
                                             )),
@@ -4098,17 +4085,7 @@ impl Pane {
         let mut to_pane = cx.entity();
         let mut split_direction = self.drag_split_direction;
         let paths = paths.paths().to_vec();
-        let should_block = self
-            .workspace
-            .update(cx, |workspace, cx| {
-                if workspace.project().read(cx).is_via_remote_server() {
-                    workspace.show_error("Cannot drop local files on a remote project", cx);
-                    return true;
-                }
-                false
-            })
-            .unwrap_or(true);
-        if should_block {
+        if self.workspace.upgrade().is_none() {
             return;
         }
 
@@ -4342,7 +4319,6 @@ impl Render for Pane {
         let Some(project) = self.project.upgrade() else {
             return div().track_focus(&self.focus_handle(cx));
         };
-        let accepts_external_paths = project.read(cx).is_local();
 
         v_flex()
             .key_context(key_context)
@@ -4519,7 +4495,7 @@ impl Render for Pane {
                     .overflow_hidden()
                     .on_drag_move::<DraggedTab>(cx.listener(Self::handle_drag_move))
                     .on_drag_move::<DraggedSelection>(cx.listener(Self::handle_drag_move))
-                    .when(accepts_external_paths, |div| {
+                    .map(|div| {
                         div.on_drag_move::<ExternalPaths>(cx.listener(Self::handle_drag_move))
                     })
                     .map(|div| {
@@ -4570,7 +4546,7 @@ impl Render for Pane {
                             .bg(cx.theme().colors().drop_target_background)
                             .group_drag_over::<DraggedTab>("", |style| style.visible())
                             .group_drag_over::<DraggedSelection>("", |style| style.visible())
-                            .when(accepts_external_paths, |div| {
+                            .map(|div| {
                                 div.group_drag_over::<ExternalPaths>("", |style| style.visible())
                             })
                             .when_some(self.can_drop_predicate.clone(), |this, p| {

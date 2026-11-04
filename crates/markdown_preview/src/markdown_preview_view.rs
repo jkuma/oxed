@@ -26,7 +26,7 @@ use markdown::{
     MarkdownOptions, MarkdownStyle,
 };
 use project::search::SearchQuery;
-use project::{Project, ProjectPath, image_store};
+use project::{Project, ProjectPath};
 use settings::{SeedQuerySetting, Settings, update_settings_file};
 use theme::{SystemAppearance, Theme, ThemeRegistry};
 use theme_settings::ThemeSettings;
@@ -1549,23 +1549,10 @@ fn resolve_preview_image(
             cx,
         );
         if let Some(project_path) = project_path {
-            let is_remote = project
-                .read(cx)
-                .worktree_for_id(project_path.worktree_id, cx)
-                .is_some_and(|worktree| !worktree.read(cx).is_local());
-            if is_remote {
-                return Some(image_store::project_image_source(
-                    project.downgrade(),
-                    project_path,
-                ));
-            }
-
             let path = project.read(cx).absolute_path(&project_path, cx)?;
             return path
                 .exists()
                 .then(|| ImageSource::Resource(Resource::Path(Arc::from(path.as_path()))));
-        } else if project.read(cx).is_remote() {
-            return None;
         }
     }
 
