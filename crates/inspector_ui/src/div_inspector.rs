@@ -505,7 +505,6 @@ impl DivInspector {
             editor.set_show_line_numbers(false, cx);
             editor.set_show_code_actions(false, cx);
             editor.set_show_bookmarks(false, cx);
-            editor.set_show_breakpoints(false, cx);
             editor.set_show_git_diff_gutter(false, cx);
             editor.set_show_runnables(false, cx);
             editor.disable_mouse_wheel_zoom();
@@ -1022,7 +1021,6 @@ mod tests {
         let mut expected = baseline.to_vec();
         expected.extend([
             paths::tasks_file().clone(),
-            paths::debug_scenarios_file().clone(),
             PathBuf::from(ZED_INSPECTOR_STYLE_JSON),
         ]);
         expected.sort();

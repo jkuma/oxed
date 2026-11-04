@@ -29,7 +29,6 @@ test-support = [
     "prettier/test-support",
     "worktree/test-support",
     "gpui/test-support",
-    "dap/test-support",
 ]
 
 [dependencies]
@@ -43,7 +42,6 @@ base64.workspace = true
 buffer_diff.workspace = true
 clock.workspace = true
 collections.workspace = true
-dap.workspace = true
 encoding_rs.workspace = true
 fancy-regex.workspace = true
 file_content.workspace = true
@@ -103,7 +101,6 @@ ztracing.workspace = true
 [dev-dependencies]
 collections = { workspace = true, features = ["test-support"] }
 buffer_diff = { workspace = true, features = ["test-support"] }
-dap = { workspace = true, features = ["test-support"] }
 fs = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 language = { workspace = true, features = ["test-support"] }

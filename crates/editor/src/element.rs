@@ -61,10 +61,7 @@ use multi_buffer::{
     MultiBufferRow, MultiBufferSnapshot, RowInfo, ToOffset,
 };
 
-use project::{
-    debugger::breakpoint_store::{Breakpoint, BreakpointSessionState},
-    project_settings::{InlineBlameLocation, ProjectSettings},
-};
+use project::project_settings::{InlineBlameLocation, ProjectSettings};
 use settings::{
     GitGutterSetting, GitHunkStyleSetting, IndentGuideBackgroundColoring, IndentGuideColoring,
     Settings,
@@ -99,12 +96,10 @@ use workspace::{
 #[derive(Clone, Copy, Default)]
 struct LineHighlightSpec {
     selection: bool,
-    breakpoint: bool,
     _active_stack_frame: bool,
 }
 
 enum LineNumberStyle {
-    Breakpoint,
     DiffAdded,
     DiffDeleted,
     Active,
@@ -112,23 +107,17 @@ enum LineNumberStyle {
 }
 
 impl LineNumberStyle {
-    fn new(is_active: bool, is_breakpoint: bool, diff_status: Option<DiffHunkStatus>) -> Self {
-        match (
-            is_active,
-            is_breakpoint,
-            diff_status.map(|status| status.kind),
-        ) {
-            (_, true, _) => Self::Breakpoint,
-            (true, _, _) => Self::Active,
-            (_, _, Some(DiffHunkStatusKind::Added)) => Self::DiffAdded,
-            (_, _, Some(DiffHunkStatusKind::Deleted)) => Self::DiffDeleted,
-            (_, _, _) => Self::Inactive,
+    fn new(is_active: bool, diff_status: Option<DiffHunkStatus>) -> Self {
+        match (is_active, diff_status.map(|status| status.kind)) {
+            (true, _) => Self::Active,
+            (_, Some(DiffHunkStatusKind::Added)) => Self::DiffAdded,
+            (_, Some(DiffHunkStatusKind::Deleted)) => Self::DiffDeleted,
+            (_, _) => Self::Inactive,
         }
     }
 
     fn color(self, colors: &theme::ThemeColors) -> Hsla {
         match self {
-            Self::Breakpoint => colors.debugger_accent,
             Self::DiffAdded => colors.version_control_added,
             Self::DiffDeleted => colors.version_control_deleted,
             Self::Active => colors.editor_active_line_number,
@@ -407,10 +396,6 @@ impl EditorElement {
         register_action(editor, window, Editor::select_page_up);
         register_action(editor, window, Editor::cancel);
         register_action(editor, window, Editor::blame_hover);
-        register_action(editor, window, Editor::debugger_hover_expand_selected);
-        register_action(editor, window, Editor::debugger_hover_collapse_selected);
-        register_action(editor, window, Editor::debugger_hover_select_next);
-        register_action(editor, window, Editor::debugger_hover_select_previous);
         register_action(editor, window, Editor::next_snippet_tabstop);
         register_action(editor, window, Editor::previous_snippet_tabstop);
         register_action(editor, window, Editor::copy);
@@ -605,7 +590,6 @@ impl EditorElement {
         register_action(editor, window, Editor::toggle_line_numbers);
         register_action(editor, window, Editor::toggle_relative_line_numbers);
         register_action(editor, window, Editor::toggle_indent_guides);
-        register_action(editor, window, Editor::toggle_inline_values);
         if editor.read(cx).lsp_data_enabled() {
             register_action(editor, window, Editor::toggle_inlay_hints);
             if editor.read(cx).can_accept_inlay_hint(cx) {
@@ -690,10 +674,6 @@ impl EditorElement {
         register_action(editor, window, Editor::edit_bookmark);
         register_action(editor, window, Editor::go_to_next_bookmark);
         register_action(editor, window, Editor::go_to_previous_bookmark);
-        register_action(editor, window, Editor::toggle_breakpoint);
-        register_action(editor, window, Editor::edit_log_breakpoint);
-        register_action(editor, window, Editor::enable_breakpoint);
-        register_action(editor, window, Editor::disable_breakpoint);
         register_action(editor, window, Editor::toggle_read_only);
         register_action(editor, window, Editor::reload_file);
 
@@ -2488,9 +2468,9 @@ impl EditorElement {
         self.editor.update(cx, |editor, cx| {
             gutter.layout_item_skipping_folds(
                 row,
-                |cx, window| {
+                |cx, _| {
                     editor
-                        .render_gutter_hover_button(position, row, window, cx)
+                        .render_gutter_hover_button(position, row, cx)
                         .into_any_element()
                 },
                 window,
@@ -2499,41 +2479,10 @@ impl EditorElement {
         })
     }
 
-    fn layout_breakpoints(
-        &self,
-        gutter: &Gutter,
-        breakpoints: &HashMap<DisplayRow, (Anchor, Breakpoint, Option<BreakpointSessionState>)>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Vec<AnyElement> {
-        if self.split_side == Some(SplitSide::Left) {
-            return Vec::new();
-        }
-
-        self.editor.update(cx, |editor, cx| {
-            breakpoints
-                .iter()
-                .filter_map(|(row, (text_anchor, bp, state))| {
-                    gutter.layout_item_skipping_folds(
-                        *row,
-                        |cx, _| {
-                            editor
-                                .render_breakpoint(*text_anchor, *row, &bp, *state, cx)
-                                .into_any_element()
-                        },
-                        window,
-                        cx,
-                    )
-                })
-                .collect_vec()
-        })
-    }
-
     fn layout_run_indicators(
         &self,
         gutter: &Gutter,
         run_indicators: &HashSet<DisplayRow>,
-        breakpoints: &HashMap<DisplayRow, (Anchor, Breakpoint, Option<BreakpointSessionState>)>,
         window: &mut Window,
         cx: &mut App,
     ) -> Vec<AnyElement> {
@@ -2579,7 +2528,6 @@ impl EditorElement {
                                 .render_run_indicator(
                                     &self.style,
                                     Some(*display_row) == active_task_indicator_row,
-                                    breakpoints.get(&display_row).map(|(anchor, _, _)| *anchor),
                                     task_status,
                                     *display_row,
                                     cx,
@@ -2743,12 +2691,8 @@ impl EditorElement {
                 write!(&mut line_number, "{number}").unwrap();
 
                 let spec = active_rows.get(&display_row);
-                let color = LineNumberStyle::new(
-                    spec.is_some(),
-                    spec.is_some_and(|spec| spec.breakpoint),
-                    row_info.diff_status,
-                )
-                .color(cx.theme().colors());
+                let color = LineNumberStyle::new(spec.is_some(), row_info.diff_status)
+                    .color(cx.theme().colors());
 
                 let shaped_line =
                     self.shape_line_number(SharedString::from(&line_number), color, window);
@@ -4243,7 +4187,7 @@ impl EditorElement {
             horizontal_offset: Pixels,
         }
 
-        let mut max_size = size(
+        let max_size = size(
             (120. * em_width) // Default size
                 .min(hitbox.size.width / 2.) // Shrink to half of the editor width
                 .max(MIN_POPOVER_CHARACTER_WIDTH * em_width), // Apply minimum width of 20 characters
@@ -4251,31 +4195,6 @@ impl EditorElement {
                 .min(hitbox.size.height / 2.) // Shrink to half of the editor height
                 .max(MIN_POPOVER_LINE_HEIGHT * line_height), // Apply minimum height of 4 lines
         );
-
-        let (is_single_debugger_hover, stable_debugger_hover_origin) = {
-            let editor = self.editor.read(cx);
-            (
-                editor.hover_state.is_single_debugger_hover(),
-                editor.hover_state.stable_debugger_hover_origin(),
-            )
-        };
-        if is_single_debugger_hover {
-            let available_height = stable_debugger_hover_origin
-                .map(|origin| {
-                    // Prefer scrolling below the existing origin to moving a row under the mouse.
-                    // After a resize, leave enough room for at least one row and its padding.
-                    (hitbox.bottom() - origin.y).max(line_height + px(10.))
-                })
-                .unwrap_or(hitbox.size.height)
-                .min(hitbox.size.height);
-            // The content container's limits exclude the popover's one-pixel border.
-            max_size.width = max_size
-                .width
-                .min((hitbox.size.width - px(2.)).max(Pixels::ZERO));
-            max_size.height = max_size
-                .height
-                .min((available_height - px(2.)).max(Pixels::ZERO));
-        }
 
         // Don't show hover popovers when context menu is open to avoid overlap
         let has_context_menu = self.editor.read(cx).mouse_context_menu.is_some();
@@ -4314,7 +4233,7 @@ impl EditorElement {
 
         let mut overall_height = Pixels::ZERO;
 
-        let mut measured_hover_popovers = hover_popovers
+        let measured_hover_popovers = hover_popovers
             .into_iter()
             .with_position()
             .map(|(position, mut hover_popover)| {
@@ -4428,41 +4347,6 @@ impl EditorElement {
                 bounds.is_contained_within(hitbox) && !intersects_menu(bounds)
             })
         };
-
-        if is_single_debugger_hover
-            && measured_hover_popovers.len() == 1
-            && let Some(popover) = measured_hover_popovers.pop()
-        {
-            let mut popover_origin = stable_debugger_hover_origin.unwrap_or_else(|| {
-                if can_place_below(std::slice::from_ref(&popover)) {
-                    point(
-                        hovered_point.x + popover.horizontal_offset,
-                        hovered_point.y + line_height,
-                    )
-                } else {
-                    point(
-                        hovered_point.x + popover.horizontal_offset,
-                        hovered_point.y - popover.size.height,
-                    )
-                }
-            });
-
-            // Preserve the origin while it fits, but keep expanded or resized hovers reachable.
-            popover_origin.x = popover_origin.x.clamp(
-                hitbox.left(),
-                (hitbox.right() - popover.size.width).max(hitbox.left()),
-            );
-            popover_origin.y = popover_origin.y.clamp(
-                hitbox.top(),
-                (hitbox.bottom() - popover.size.height).max(hitbox.top()),
-            );
-
-            window.defer_draw(popover.element, popover_origin, 2, None);
-            self.editor.update(cx, |editor, _| {
-                editor.hover_state.stable_debugger_hover_origin = Some(popover_origin);
-            });
-            return;
-        }
 
         if can_place_above {
             // try placing above hovered point
@@ -5420,8 +5304,8 @@ impl EditorElement {
                 bookmark.paint(window, cx);
             }
 
-            for breakpoint in layout.breakpoints.iter_mut() {
-                breakpoint.paint(window, cx);
+            for gutter_hover_button in layout.gutter_hover_buttons.iter_mut() {
+                gutter_hover_button.paint(window, cx);
             }
 
             for test_indicator in layout.test_indicators.iter_mut() {
@@ -8774,17 +8658,16 @@ impl Element for EditorElement {
                         })
                         .unwrap_or_else(|| (Vec::new(), Vec::new(), HashMap::default()));
 
-                    let (selections, mut active_rows, newest_selection_head) = self
-                        .layout_selections(
-                            start_anchor,
-                            end_anchor,
-                            &local_selections,
-                            &snapshot,
-                            start_row,
-                            end_row,
-                            window,
-                            cx,
-                        );
+                    let (selections, active_rows, newest_selection_head) = self.layout_selections(
+                        start_anchor,
+                        end_anchor,
+                        &local_selections,
+                        &snapshot,
+                        start_row,
+                        end_row,
+                        window,
+                        cx,
+                    );
 
                     // relative rows are based on newest selection, even outside the visible area
                     let current_selection_head = self.editor.update(cx, |editor, cx| {
@@ -8811,16 +8694,6 @@ impl Element for EditorElement {
                     let run_indicator_rows = self.editor.update(cx, |editor, cx| {
                         editor.active_run_indicators(start_row..end_row, window, cx)
                     });
-
-                    let mut breakpoint_rows = self.editor.update(cx, |editor, cx| {
-                        editor.active_breakpoints(start_row..end_row, window, cx)
-                    });
-
-                    for (display_row, (_, bp, state)) in &breakpoint_rows {
-                        if bp.is_enabled() && state.is_none_or(|s| s.verified) {
-                            active_rows.entry(*display_row).or_default().breakpoint = true;
-                        }
-                    }
 
                     let gutter = Gutter {
                         line_height,
@@ -9438,13 +9311,7 @@ impl Element for EditorElement {
                     );
 
                     let test_indicators = if gutter_settings.runnables {
-                        self.layout_run_indicators(
-                            &gutter,
-                            &run_indicator_rows,
-                            &breakpoint_rows,
-                            window,
-                            cx,
-                        )
+                        self.layout_run_indicators(&gutter, &run_indicator_rows, window, cx)
                     } else {
                         Vec::new()
                     };
@@ -9455,7 +9322,6 @@ impl Element for EditorElement {
                     let bookmark_rows = self.editor.update(cx, |editor, cx| {
                         let mut rows = editor.active_bookmarks(start_row..end_row, window, cx);
                         rows.retain(|k| !run_indicator_rows.contains(k));
-                        rows.retain(|k| !breakpoint_rows.contains_key(k));
                         rows
                     });
 
@@ -9465,17 +9331,7 @@ impl Element for EditorElement {
                         Vec::new()
                     };
 
-                    let show_breakpoints = snapshot
-                        .show_breakpoints
-                        .unwrap_or(gutter_settings.breakpoints);
-
-                    breakpoint_rows.retain(|k, _| !run_indicator_rows.contains(k));
-                    let mut breakpoints = if show_breakpoints {
-                        self.layout_breakpoints(&gutter, &breakpoint_rows, window, cx)
-                    } else {
-                        Vec::new()
-                    };
-
+                    let mut gutter_hover_buttons = Vec::new();
                     let gutter_hover_button = self
                         .editor
                         .read(cx)
@@ -9485,14 +9341,13 @@ impl Element for EditorElement {
                         .map(|phantom| phantom.display_row);
 
                     if let Some(row) = gutter_hover_button
-                        && !breakpoint_rows.contains_key(&row)
                         && !run_indicator_rows.contains(&row)
                         && !bookmark_rows.contains(&row)
-                        && (show_bookmarks || show_breakpoints)
+                        && show_bookmarks
                     {
                         let position = snapshot
                             .display_point_to_anchor(DisplayPoint::new(row, 0), Bias::Right);
-                        breakpoints.extend(
+                        gutter_hover_buttons.extend(
                             self.layout_gutter_hover_button(&gutter, position, row, window, cx),
                         );
                     }
@@ -9746,7 +9601,7 @@ impl Element for EditorElement {
                         mouse_context_menu,
                         test_indicators,
                         bookmarks,
-                        breakpoints,
+                        gutter_hover_buttons,
                         crease_toggles,
                         crease_trailers,
                         tab_invisible,
@@ -9961,7 +9816,7 @@ pub struct EditorLayout {
     selections: Vec<(PlayerColor, Vec<SelectionLayout>)>,
     test_indicators: Vec<AnyElement>,
     bookmarks: Vec<AnyElement>,
-    breakpoints: Vec<AnyElement>,
+    gutter_hover_buttons: Vec<AnyElement>,
     crease_toggles: Vec<Option<AnyElement>>,
     expand_toggles: Vec<Option<(AnyElement, gpui::Point<Pixels>)>>,
     diff_hunk_controls: Vec<AnyElement>,

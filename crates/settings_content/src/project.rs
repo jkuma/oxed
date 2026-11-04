@@ -56,10 +56,6 @@ pub struct ProjectSettingsContent {
     #[serde(default)]
     pub lsp: LspSettingsMap,
 
-    /// Configuration for Debugger-related features
-    #[serde(default)]
-    pub dap: HashMap<Arc<str>, DapSettingsContent>,
-
     /// Configuration for how direnv configuration should be loaded
     pub load_direnv: Option<DirenvSettings>,
 
@@ -72,7 +68,7 @@ crate::fallible_options::flattened_deserialize!(ProjectSettingsContent {
     options: {
         load_direnv, git_hosting_providers,
     },
-    defaults: { lsp, dap },
+    defaults: { lsp },
 });
 
 /// When to scan content of linked directories.
@@ -452,15 +448,6 @@ pub enum SemanticTokenFontStyle {
     #[default]
     Normal,
     Italic,
-}
-
-#[with_fallible_options]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-#[serde(rename_all = "snake_case")]
-pub struct DapSettingsContent {
-    pub binary: Option<String>,
-    pub args: Option<Vec<String>>,
-    pub env: Option<HashMap<String, String>>,
 }
 
 #[with_fallible_options]

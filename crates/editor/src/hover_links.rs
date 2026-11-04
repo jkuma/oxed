@@ -3044,7 +3044,6 @@ mod tests {
         init_test(cx, |settings| {
             settings.defaults.inlay_hints = Some(InlayHintSettingsContent {
                 enabled: Some(true),
-                show_value_hints: Some(false),
                 edit_debounce_ms: Some(0),
                 scroll_debounce_ms: Some(0),
                 show_type_hints: Some(true),

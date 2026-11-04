@@ -7,10 +7,10 @@ pub mod highlight_map;
 pub mod language_config;
 
 pub use grammar::{
-    BracketsConfig, BracketsPatternConfig, DebugVariablesConfig, DebuggerTextObject, Grammar,
-    GrammarId, HighlightsConfig, IndentConfig, InjectionConfig, InjectionPatternConfig,
-    NEXT_GRAMMAR_ID, OutlineConfig, OverrideConfig, OverrideEntry, ParseableLanguage,
-    RedactionConfig, RunnableCapture, RunnableConfig, TextObject, TextObjectConfig,
+    BracketsConfig, BracketsPatternConfig, Grammar, GrammarId, HighlightsConfig, IndentConfig,
+    InjectionConfig, InjectionPatternConfig, NEXT_GRAMMAR_ID, OutlineConfig, OverrideConfig,
+    OverrideEntry, ParseableLanguage, RedactionConfig, RunnableCapture, RunnableConfig, TextObject,
+    TextObjectConfig,
 };
 pub use highlight_map::{CaptureId, HighlightId, HighlightMap};
 pub use language_config::{

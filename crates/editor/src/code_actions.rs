@@ -71,8 +71,7 @@ impl Editor {
                 }
 
                 cx.spawn_in(window, {
-                    let buffer = buffer.clone();
-                    async move |editor, cx| {
+                    async move |_, cx| {
                         let task_context = match workspace {
                             Some(ws) => task_context_task
                                 .await
@@ -83,7 +82,7 @@ impl Editor {
 
                         let resolved_tasks =
                             tasks
-                                .zip(task_context.clone())
+                                .zip(task_context)
                                 .map(|(tasks, task_context)| ResolvedTasks {
                                     templates: tasks.resolve(&task_context).collect(),
                                     position: snapshot.buffer_snapshot().anchor_before(Point::new(
@@ -91,19 +90,14 @@ impl Editor {
                                         tasks.column,
                                     )),
                                 });
-                        let debug_scenarios = editor
-                            .update(cx, |editor, cx| {
-                                editor.debug_scenarios(&resolved_tasks, &buffer, cx)
-                            })?
-                            .await;
-                        anyhow::Ok((resolved_tasks, debug_scenarios, task_context))
+                        anyhow::Ok(resolved_tasks)
                     }
                 })
             }
         };
 
         let toggle_task = cx.spawn_in(window, async move |editor, cx| {
-            let (resolved_tasks, debug_scenarios, task_context) = runnable_task.await?;
+            let resolved_tasks = runnable_task.await?;
 
             let code_actions = if let Some(CodeActionSource::RunMenu(_)) = &deployed_from {
                 None
@@ -135,16 +129,10 @@ impl Editor {
                         .is_some_and(|tasks| tasks.templates.len() == 1)
                     && code_actions
                         .as_ref()
-                        .is_none_or(|actions| actions.is_empty())
-                    && debug_scenarios.is_empty();
+                        .is_none_or(|actions| actions.is_empty());
 
                 crate::hover_popover::hide_hover(editor, cx);
-                let actions = CodeActionContents::new(
-                    resolved_tasks,
-                    code_actions,
-                    debug_scenarios,
-                    task_context.unwrap_or_default(),
-                );
+                let actions = CodeActionContents::new(resolved_tasks, code_actions);
 
                 // Don't show the menu if there are no actions available
                 if actions.is_empty() {
@@ -274,21 +262,6 @@ impl Editor {
                     )
                     .await
                 }))
-            }
-            CodeActionsItem::DebugScenario(scenario) => {
-                let context = actions_menu.actions.context.into();
-
-                workspace.update(cx, |workspace, cx| {
-                    workspace.start_debug_session(
-                        scenario,
-                        context,
-                        Some(buffer),
-                        None,
-                        window,
-                        cx,
-                    );
-                });
-                Some(Task::ready(Ok(())))
             }
         }
     }
@@ -460,47 +433,6 @@ impl Editor {
             })
             .shared(),
         );
-    }
-
-    fn debug_scenarios(
-        &mut self,
-        resolved_tasks: &Option<ResolvedTasks>,
-        buffer: &Entity<Buffer>,
-        cx: &mut App,
-    ) -> Task<Vec<task::DebugScenario>> {
-        maybe!({
-            let project = self.project()?;
-            let dap_store = project.read(cx).dap_store();
-            let mut scenarios = vec![];
-            let resolved_tasks = resolved_tasks.as_ref()?;
-            let buffer = buffer.read(cx);
-            let language = buffer.language()?;
-            let debug_adapter = LanguageSettings::for_buffer(&buffer, cx)
-                .debuggers
-                .first()
-                .map(SharedString::from)
-                .or_else(|| language.config().debuggers.first().map(SharedString::from))?;
-
-            dap_store.update(cx, |dap_store, cx| {
-                for (_, task) in &resolved_tasks.templates {
-                    let maybe_scenario = dap_store.debug_scenario_for_build_task(
-                        task.original_task().clone(),
-                        debug_adapter.clone().into(),
-                        task.display_label().to_owned().into(),
-                        cx,
-                    );
-                    scenarios.push(maybe_scenario);
-                }
-            });
-            Some(cx.background_spawn(async move {
-                futures::future::join_all(scenarios)
-                    .await
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>()
-            }))
-        })
-        .unwrap_or_else(|| Task::ready(vec![]))
     }
 }
 

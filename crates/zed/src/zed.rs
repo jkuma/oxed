@@ -343,17 +343,9 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     })
     .detach();
 
-    // Tasks and debugger are not available.
+    // Tasks are not available.
     CommandPaletteFilter::update_global(cx, |filter, _| {
-        filter.hide_namespace("debugger");
-        filter.hide_action_types(&[
-            TypeId::of::<editor::actions::DisableBreakpoint>(),
-            TypeId::of::<editor::actions::EditLogBreakpoint>(),
-            TypeId::of::<editor::actions::EnableBreakpoint>(),
-            TypeId::of::<editor::actions::SpawnNearestTask>(),
-            TypeId::of::<editor::actions::ToggleBreakpoint>(),
-            TypeId::of::<workspace::ShutdownDebugAdapters>(),
-        ]);
+        filter.hide_action_types(&[TypeId::of::<editor::actions::SpawnNearestTask>()]);
     });
 
     init_cursor_hide_mode(cx);
@@ -4835,7 +4827,6 @@ mod tests {
                 "call_hierarchy",
                 "cli",
                 "command_palette",
-                "debugger",
                 "dev",
                 "diagnostics",
                 "editor",

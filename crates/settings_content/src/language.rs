@@ -430,10 +430,6 @@ pub struct LanguageSettingsContent {
     pub show_completion_documentation: Option<bool>,
     /// Controls how completions are processed for this language.
     pub completions: Option<CompletionSettingsContent>,
-    /// Preferred debuggers for this language.
-    ///
-    /// Default: []
-    pub debuggers: Option<Vec<String>>,
     /// Whether to enable word diff highlighting in the editor.
     ///
     /// When enabled, changed words within modified lines are highlighted
@@ -527,10 +523,6 @@ pub struct InlayHintSettingsContent {
     ///
     /// Default: false
     pub enabled: Option<bool>,
-    /// Global switch to toggle inline values on and off when debugging.
-    ///
-    /// Default: true
-    pub show_value_hints: Option<bool>,
     /// Whether type hints should be shown.
     ///
     /// Default: true

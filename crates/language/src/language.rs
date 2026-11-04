@@ -49,14 +49,13 @@ use language_core::highlight_cache::{MAX_TEXT_HIGHLIGHT_ENTRY_BYTES, TextHighlig
 use language_core::highlight_map::HighlightCaptureRef;
 pub use language_core::{
     BlockCommentConfig, BracketPair, BracketPairConfig, BracketPairContent, BracketsConfig,
-    BracketsPatternConfig, CodeLabel, CodeLabelBuilder, DebugVariablesConfig, DebuggerTextObject,
-    DecreaseIndentConfig, Grammar, GrammarId, HighlightsConfig, IndentConfig, InjectionConfig,
-    InjectionPatternConfig, JsxTagAutoCloseConfig, LanguageConfig, LanguageConfigOverride,
-    LanguageId, LanguageMatcher, OrderedListConfig, OutlineConfig, Override, OverrideConfig,
-    OverrideEntry, RedactionConfig, RunnableCapture, RunnableConfig, SoftWrap, Symbol,
-    TaskListConfig, TextObject, TextObjectConfig, WrapCharactersConfig, default_true,
-    deserialize_regex, deserialize_regex_vec, regex_json_schema, regex_vec_json_schema,
-    serialize_regex,
+    BracketsPatternConfig, CodeLabel, CodeLabelBuilder, DecreaseIndentConfig, Grammar, GrammarId,
+    HighlightsConfig, IndentConfig, InjectionConfig, InjectionPatternConfig, JsxTagAutoCloseConfig,
+    LanguageConfig, LanguageConfigOverride, LanguageId, LanguageMatcher, OrderedListConfig,
+    OutlineConfig, Override, OverrideConfig, OverrideEntry, RedactionConfig, RunnableCapture,
+    RunnableConfig, SoftWrap, Symbol, TaskListConfig, TextObject, TextObjectConfig,
+    WrapCharactersConfig, default_true, deserialize_regex, deserialize_regex_vec,
+    regex_json_schema, regex_vec_json_schema, serialize_regex,
 };
 pub use language_registry::{
     LanguageLoader, LanguageName, LanguageServerStatusUpdate, LoadedLanguage, ServerHealth,
@@ -1025,12 +1024,6 @@ impl Language {
     pub fn with_text_object_query(self, source: &str) -> Result<Self> {
         self.with_grammar_query_and_name(|grammar, name| {
             grammar.with_text_object_query(source, name)
-        })
-    }
-
-    pub fn with_debug_variables_query(self, source: &str) -> Result<Self> {
-        self.with_grammar_query_and_name(|grammar, name| {
-            grammar.with_debug_variables_query(source, name)
         })
     }
 

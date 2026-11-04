@@ -653,7 +653,6 @@ impl Editor {
         &self,
         _style: &EditorStyle,
         is_active: bool,
-        active_breakpoint: Option<Anchor>,
         task_status: Option<RunnableTaskStatus>,
         row: DisplayRow,
         cx: &mut Context<Self>,
@@ -688,13 +687,7 @@ impl Editor {
                 );
             }))
             .on_right_click(cx.listener(move |editor, event: &ClickEvent, window, cx| {
-                editor.set_gutter_context_menu(
-                    row,
-                    active_breakpoint,
-                    event.position(),
-                    window,
-                    cx,
-                );
+                editor.set_gutter_context_menu(row, None, event.position(), window, cx);
             }))
     }
 

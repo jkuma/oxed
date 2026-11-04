@@ -395,16 +395,6 @@ pub struct InsertSnippet {
 }
 
 actions!(
-    debugger,
-    [
-        /// Runs program execution to the current cursor position.
-        RunToCursor,
-        /// Evaluates the selected text in the debugger context.
-        EvaluateSelectedText
-    ]
-);
-
-actions!(
     go_to_line,
     [
         /// Toggles the go to line dialog.
@@ -628,14 +618,6 @@ actions!(
         HalfPageUp,
         /// Shows hover information for the symbol at cursor.
         Hover,
-        /// Expands the selected debugger hover entry.
-        DebuggerHoverExpandSelected,
-        /// Collapses the selected debugger hover entry.
-        DebuggerHoverCollapseSelected,
-        /// Selects the next debugger hover entry.
-        DebuggerHoverSelectNext,
-        /// Selects the previous debugger hover entry.
-        DebuggerHoverSelectPrevious,
         /// Increases indentation of selected lines.
         Indent,
         /// Inserts a UUID v4 at cursor position.
@@ -868,16 +850,8 @@ actions!(
         ToggleBookmarkWithLabel,
         /// Edits the bookmark's label at the current line.
         EditBookmark,
-        /// Toggles a breakpoint at the current line.
-        ToggleBreakpoint,
         /// Toggles the case of selected text.
         ToggleCase,
-        /// Disables the breakpoint at the current line.
-        DisableBreakpoint,
-        /// Enables the breakpoint at the current line.
-        EnableBreakpoint,
-        /// Edits the log message for a breakpoint.
-        EditLogBreakpoint,
         /// Toggles automatic signature help.
         ToggleAutoSignatureHelp,
         /// Toggles inline git blame display.
@@ -898,8 +872,6 @@ actions!(
         ToggleCodeLens,
         /// Toggles semantic highlights display.
         ToggleSemanticHighlights,
-        /// Toggles inline values display.
-        ToggleInlineValues,
         /// Toggles inline diagnostics display.
         ToggleInlineDiagnostics,
         /// Toggles line numbers display.

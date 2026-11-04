@@ -119,8 +119,6 @@
       "alt-g m": "git::OpenModifiedFiles",
       "menu": "editor::OpenContextMenu",
       "shift-f10": "editor::OpenContextMenu",
-      "f9": "editor::ToggleBreakpoint",
-      "shift-f9": "editor::EditLogBreakpoint",
     },
   },
   {
@@ -412,8 +410,7 @@
       "alt-/": "which_key::ShowPendingBindings",
       // Move focus between the major regions of the window (editor, open
       // panels, status bar). Accessibility navigation; mirrors VS Code's
-      // "Focus Next/Previous Part". `ctrl-f6` mirrors `f6` so region navigation
-      // stays available even while a debug session rebinds plain `f6` to Pause.
+      // "Focus Next/Previous Part".
       "f6": "workspace::FocusNextPart",
       "shift-f6": "workspace::FocusPreviousPart",
       "ctrl-f6": "workspace::FocusNextPart",

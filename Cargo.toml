@@ -15,7 +15,6 @@ members = [
     "crates/command_palette",
     "crates/command_palette_hooks",
     "crates/component",
-    "crates/dap",
     "crates/db",
     "crates/diagnostics",
     "crates/editor",
@@ -181,7 +180,6 @@ collections = { path = "crates/collections", version = "0.1.0" }
 command_palette = { path = "crates/command_palette" }
 command_palette_hooks = { path = "crates/command_palette_hooks" }
 component = { path = "crates/component" }
-dap = { path = "crates/dap" }
 db = { path = "crates/db" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
 diagnostics = { path = "crates/diagnostics" }
@@ -360,7 +358,6 @@ core-foundation-sys = "0.8.6"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 perf-event = { package = "perf-event2", version = "0.7.4" }
 ctor = "1.0.12"
-dap-types = { git = "https://github.com/zed-industries/dap-types", rev = "1b461b310481d01e02b2603c16d7144b926339f8" }
 derive_more = { version = "2.1", features = ["deref", "deref_mut", "from_str"] }
 dialoguer = { version = "0.12", default-features = false }
 diffy = "0.4.2"

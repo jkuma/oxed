@@ -330,7 +330,6 @@ impl CommitView {
 
             editor.rhs_editor().update(cx, |editor, cx| {
                 editor.set_show_bookmarks(false, cx);
-                editor.set_show_breakpoints(false, cx);
             });
 
             editor
@@ -1336,7 +1335,6 @@ impl Item for CommitView {
                     editor.set_diff_hunk_renderer(Some(Arc::new(HiddenDiffHunkRenderer)), cx);
                     editor.rhs_editor().update(cx, |editor, cx| {
                         editor.set_show_bookmarks(false, cx);
-                        editor.set_show_breakpoints(false, cx);
                         editor.register_addon(CommitDiffAddon {
                             file_statuses,
                             commit_view,

@@ -2,7 +2,6 @@
 
 mod bookmark_store;
 mod color_extractor;
-mod debugger;
 mod dynamic_registration;
 mod git_store;
 mod image_store;

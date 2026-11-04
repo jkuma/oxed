@@ -150,8 +150,6 @@ pub struct LanguageSettings {
     pub show_completion_documentation: bool,
     /// Completion settings for this language.
     pub completions: CompletionSettings,
-    /// Preferred debuggers for this language.
-    pub debuggers: Vec<String>,
     /// Whether to enable word diff highlighting in the editor.
     ///
     /// When enabled, changed words within modified lines are highlighted
@@ -412,10 +410,6 @@ pub struct InlayHintSettings {
     ///
     /// Default: false
     pub enabled: bool,
-    /// Global switch to toggle inline values on and off when debugging.
-    ///
-    /// Default: true
-    pub show_value_hints: bool,
     /// Whether type hints should be shown.
     ///
     /// Default: true
@@ -646,7 +640,6 @@ impl settings::Settings for AllLanguageSettings {
                 indent_list_on_tab: settings.indent_list_on_tab.unwrap(),
                 inlay_hints: InlayHintSettings {
                     enabled: inlay_hints.enabled.unwrap(),
-                    show_value_hints: inlay_hints.show_value_hints.unwrap(),
                     show_type_hints: inlay_hints.show_type_hints.unwrap(),
                     show_parameter_hints: inlay_hints.show_parameter_hints.unwrap(),
                     show_other_hints: inlay_hints.show_other_hints.unwrap(),
@@ -682,7 +675,6 @@ impl settings::Settings for AllLanguageSettings {
                     lsp_fetch_timeout_ms: completions.lsp_fetch_timeout_ms.unwrap(),
                     lsp_insert_mode: completions.lsp_insert_mode.unwrap(),
                 },
-                debuggers: settings.debuggers.unwrap(),
                 word_diff_enabled: settings.word_diff_enabled.unwrap(),
             }
         }

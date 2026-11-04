@@ -109,7 +109,7 @@ impl EditorElement {
                 .snapshot
                 .display_point_to_anchor(valid_point, Bias::Left);
 
-            // Breakpoints and bookmarks are keyed by absolute file path, so the
+            // Bookmarks are keyed by absolute file path, so the
             // gutter button would be a no-op for buffers without a worktree file
             // (e.g. untitled buffers). Hide it there.
             if position_map
