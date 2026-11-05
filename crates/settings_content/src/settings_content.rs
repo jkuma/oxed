@@ -483,7 +483,7 @@ pub struct GitPanelSettingsContent {
     pub button: Option<bool>,
     /// Where to dock the panel.
     ///
-    /// Default: right
+    /// Default: left
     pub dock: Option<DockPosition>,
     /// Default width of the panel in pixels.
     ///
@@ -689,23 +689,6 @@ pub struct ScrollbarSettings {
 
 #[with_fallible_options]
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
-pub struct PanelSettingsContent {
-    /// Whether to show the panel button in the status bar.
-    ///
-    /// Default: true
-    pub button: Option<bool>,
-    /// Where to dock the panel.
-    ///
-    /// Default: right
-    pub dock: Option<DockPosition>,
-    /// Default width of the panel in pixels.
-    ///
-    /// Default: 240
-    pub default_width: Option<PixelSetting>,
-}
-
-#[with_fallible_options]
-#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
 pub struct CommandPaletteSettingsContent {
     /// Whether to use command history ranking for sorting in the command palette.
     ///
@@ -823,7 +806,7 @@ pub struct OutlinePanelSettingsContent {
     pub default_width: Option<PixelSetting>,
     /// The position of outline panel
     ///
-    /// Default: right
+    /// Default: left
     pub dock: Option<DockSide>,
     /// Whether to show file icons in the outline panel.
     ///
