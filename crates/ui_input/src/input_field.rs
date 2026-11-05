@@ -15,7 +15,6 @@ pub struct InputFieldStyle {
 /// An Input Field component that can be used to create text fields like search inputs, form fields, etc.
 ///
 /// It wraps a single line [`Editor`] and allows for common field properties like labels, placeholders, icons, etc.
-
 pub struct InputField {
     /// An optional label for the text field.
     ///

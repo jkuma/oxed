@@ -133,7 +133,7 @@ Other entities can then register a callback to handle these events by doing `cx.
 
 ## Build guidelines
 
-- Lint touched crates with `cargo clippy --no-deps -p <crate>`; `./script/clippy` builds every target with all features, including Zed-only ones that no longer compile here.
+- Lint touched crates with `cargo clippy --no-deps -p <crate>`, or the whole workspace with `./script/clippy`, which denies warnings.
 
 # Oxed fork
 
