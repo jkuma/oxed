@@ -105,31 +105,31 @@ impl OpenRequest {
         this.open_behavior = request.open_behavior;
 
         for url in request.urls {
-            if let Some(server_name) = url.strip_prefix("zed-cli://") {
+            if let Some(server_name) = url.strip_prefix("oxed-cli://") {
                 this.kind = Some(OpenRequestKind::CliConnection(connect_to_cli(server_name)?));
             } else if let Some(file) = url.strip_prefix("file://") {
                 this.parse_file_path(file)
-            } else if let Some(file) = url.strip_prefix("zed://file") {
+            } else if let Some(file) = url.strip_prefix("oxed://file") {
                 this.parse_file_path(file)
-            } else if let Some(extension_id) = url.strip_prefix("zed://extension/") {
+            } else if let Some(extension_id) = url.strip_prefix("oxed://extension/") {
                 this.kind = Some(OpenRequestKind::Extension {
                     extension_id: extension_id.to_string(),
                 });
-            } else if url == "zed://" || url == "zed://open" || url == "zed://open/" {
+            } else if url == "oxed://" || url == "oxed://open" || url == "oxed://open/" {
                 this.kind = Some(OpenRequestKind::FocusApp);
-            } else if let Some(schema_path) = url.strip_prefix("zed://schemas/") {
+            } else if let Some(schema_path) = url.strip_prefix("oxed://schemas/") {
                 this.kind = Some(OpenRequestKind::BuiltinJsonSchema {
                     schema_path: schema_path.to_string(),
                 });
-            } else if url == "zed://settings" || url == "zed://settings/" {
+            } else if url == "oxed://settings" || url == "oxed://settings/" {
                 this.kind = Some(OpenRequestKind::Setting { setting_path: None });
-            } else if let Some(setting_path) = url.strip_prefix("zed://settings/") {
+            } else if let Some(setting_path) = url.strip_prefix("oxed://settings/") {
                 this.kind = Some(OpenRequestKind::Setting {
                     setting_path: Some(setting_path.to_string()),
                 });
-            } else if let Some(clone_path) = url.strip_prefix("zed://git/clone") {
+            } else if let Some(clone_path) = url.strip_prefix("oxed://git/clone") {
                 this.parse_git_clone_url(clone_path)?
-            } else if let Some(commit_path) = url.strip_prefix("zed://git/commit/") {
+            } else if let Some(commit_path) = url.strip_prefix("oxed://git/commit/") {
                 this.parse_git_commit_url(commit_path)?
             } else {
                 log::error!("unhandled url: {}", url);
@@ -1043,7 +1043,7 @@ mod tests {
     fn test_parse_focus_app_url(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
 
-        for url in ["zed://", "zed://open", "zed://open/"] {
+        for url in ["oxed://", "oxed://open", "oxed://open/"] {
             let request = OpenRequest::parse(RawOpenRequest {
                 urls: vec![url.into()],
                 ..Default::default()
@@ -1067,7 +1067,7 @@ mod tests {
 
         // Test basic git commit URL
         let request = OpenRequest::parse(RawOpenRequest {
-            urls: vec!["zed://git/commit/abc123?repo=path/to/repo".into()],
+            urls: vec!["oxed://git/commit/abc123?repo=path/to/repo".into()],
             ..Default::default()
         })
         .unwrap();
@@ -1083,7 +1083,7 @@ mod tests {
 
         // Test with URL encoded path
         let request = OpenRequest::parse(RawOpenRequest {
-            urls: vec!["zed://git/commit/def456?repo=path%20with%20spaces".into()],
+            urls: vec!["oxed://git/commit/def456?repo=path%20with%20spaces".into()],
             ..Default::default()
         })
         .unwrap();
@@ -1099,7 +1099,7 @@ mod tests {
         // Test with empty path
         assert!(
             OpenRequest::parse(RawOpenRequest {
-                urls: vec!["zed://git/commit/abc123?repo=".into()],
+                urls: vec!["oxed://git/commit/abc123?repo=".into()],
                 ..Default::default()
             },)
             .unwrap_err()
@@ -1109,7 +1109,7 @@ mod tests {
 
         // Test error case: missing SHA
         let result = OpenRequest::parse(RawOpenRequest {
-            urls: vec!["zed://git/commit/abc123?foo=bar".into()],
+            urls: vec!["oxed://git/commit/abc123?foo=bar".into()],
             ..Default::default()
         });
         assert!(result.is_err());
@@ -1456,7 +1456,7 @@ mod tests {
         let _app_state = init_test(cx);
 
         let request = OpenRequest::parse(RawOpenRequest {
-            urls: vec!["zed://git/clone/?repo=https://github.com/zed-industries/zed.git".into()],
+            urls: vec!["oxed://git/clone/?repo=https://github.com/zed-industries/zed.git".into()],
             ..Default::default()
         })
         .unwrap();
@@ -1474,7 +1474,7 @@ mod tests {
         let _app_state = init_test(cx);
 
         let request = OpenRequest::parse(RawOpenRequest {
-            urls: vec!["zed://git/clone?repo=https://github.com/zed-industries/zed.git".into()],
+            urls: vec!["oxed://git/clone?repo=https://github.com/zed-industries/zed.git".into()],
             ..Default::default()
         })
         .unwrap();
@@ -1493,7 +1493,7 @@ mod tests {
 
         let request = OpenRequest::parse(RawOpenRequest {
             urls: vec![
-                "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git".into(),
+                "oxed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git".into(),
             ],
             ..Default::default()
         })

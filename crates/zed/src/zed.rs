@@ -67,13 +67,13 @@ use util::{ResultExt, asset_str, maybe};
 use uuid::Uuid;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+use workspace::Pane;
 use workspace::{
-    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
+    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Workspace, WorkspaceSettings,
     create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
     open_new,
 };
 use workspace::{CloseProject, CloseWindow, with_active_or_new_workspace};
-use workspace::{Pane, notifications::DetachAndPromptErr};
 use zed_actions::{About, OpenBrowser, OpenDocs, OpenSettingsFile, OpenZedUrl, Quit};
 
 const DOCS_URL: &str = "https://zed.dev/docs/";
@@ -814,32 +814,6 @@ fn register_actions(
                     theme_settings::reset_buffer_font_size(cx);
                 }
             }
-        })
-        .register_action(|_, _: &install_cli::RegisterZedScheme, window, cx| {
-            cx.spawn_in(window, async move |workspace, cx| {
-                install_cli::register_zed_scheme(cx).await?;
-                workspace.update_in(cx, |workspace, _, cx| {
-                    struct RegisterZedScheme;
-
-                    workspace.show_toast(
-                        Toast::new(
-                            NotificationId::unique::<RegisterZedScheme>(),
-                            format!(
-                                "zed:// links will now open in {}.",
-                                ReleaseChannel::global(cx).display_name()
-                            ),
-                        ),
-                        cx,
-                    )
-                })?;
-                Ok(())
-            })
-            .detach_and_prompt_err(
-                "Error registering zed:// scheme",
-                window,
-                cx,
-                |_, _, _| None,
-            );
         })
         .register_action(open_project_settings_file)
         .register_action(
@@ -4655,7 +4629,6 @@ mod tests {
                 "branches",
                 "buffer_search",
                 "call_hierarchy",
-                "cli",
                 "command_palette",
                 "dev",
                 "diagnostics",

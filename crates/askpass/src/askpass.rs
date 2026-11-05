@@ -342,12 +342,6 @@ pub fn main(socket: &str) {
     connect_and_write_prompt(socket, buffer)
 }
 
-/// Runs Zed in askpass mode using prompts passed as arguments.
-pub fn main_from_args(socket: &str, args: impl IntoIterator<Item = String>) {
-    let prompt = args.into_iter().collect::<Vec<_>>().join("\0");
-    connect_and_write_prompt(socket, prompt.into_bytes())
-}
-
 fn connect_and_write_prompt(socket: &str, mut buffer: Vec<u8>) {
     use std::io::{self, Read, Write};
     use std::os::unix::net::UnixStream;

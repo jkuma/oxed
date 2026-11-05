@@ -11,7 +11,7 @@ Exec=$APP_CLI %U
 Icon=$APP_ICON
 Categories=Utility;TextEditor;Development;IDE;
 Keywords=oxed;editor;lsp;
-MimeType=text/plain;application/x-zerosize;
+MimeType=text/plain;application/x-zerosize;x-scheme-handler/oxed;
 Actions=NewWorkspace;
 
 [Desktop Action NewWorkspace]

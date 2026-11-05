@@ -1532,16 +1532,6 @@ impl App {
         self.platform.open_url(url);
     }
 
-    /// Registers the given URL scheme (e.g. `zed` for `zed://` urls) to be
-    /// opened by the current app.
-    ///
-    /// On some platforms (e.g. macOS) you may be able to register URL schemes
-    /// as part of app distribution, but this method exists to let you register
-    /// schemes at runtime.
-    pub fn register_url_scheme(&self, scheme: &str) -> Task<Result<()>> {
-        self.platform.register_url_scheme(scheme)
-    }
-
     /// Sets the application's process-wide identity and user-visible name.
     ///
     /// The identifier is used for platform identity mechanisms such as the

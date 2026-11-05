@@ -97,12 +97,9 @@ pub fn config_dir() -> &'static PathBuf {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
             custom_dir.join("config")
         } else {
-            if let Ok(flatpak_xdg_config) = std::env::var("FLATPAK_XDG_CONFIG_HOME") {
-                flatpak_xdg_config.into()
-            } else {
-                dirs::config_dir().expect("failed to determine XDG_CONFIG_HOME directory")
-            }
-            .join(APP_NAME_LOWERCASE)
+            dirs::config_dir()
+                .expect("failed to determine XDG_CONFIG_HOME directory")
+                .join(APP_NAME_LOWERCASE)
         }
     })
 }
@@ -113,12 +110,9 @@ pub fn data_dir() -> &'static PathBuf {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
             custom_dir.clone()
         } else {
-            if let Ok(flatpak_xdg_data) = std::env::var("FLATPAK_XDG_DATA_HOME") {
-                flatpak_xdg_data.into()
-            } else {
-                dirs::data_local_dir().expect("failed to determine XDG_DATA_HOME directory")
-            }
-            .join(APP_NAME_LOWERCASE)
+            dirs::data_local_dir()
+                .expect("failed to determine XDG_DATA_HOME directory")
+                .join(APP_NAME_LOWERCASE)
         }
     })
 }
@@ -126,12 +120,9 @@ pub fn data_dir() -> &'static PathBuf {
 pub fn state_dir() -> &'static PathBuf {
     static STATE_DIR: OnceLock<PathBuf> = OnceLock::new();
     STATE_DIR.get_or_init(|| {
-        if let Ok(flatpak_xdg_state) = std::env::var("FLATPAK_XDG_STATE_HOME") {
-            flatpak_xdg_state.into()
-        } else {
-            dirs::state_dir().expect("failed to determine XDG_STATE_HOME directory")
-        }
-        .join(APP_NAME_LOWERCASE)
+        dirs::state_dir()
+            .expect("failed to determine XDG_STATE_HOME directory")
+            .join(APP_NAME_LOWERCASE)
     })
 }
 
@@ -139,12 +130,9 @@ pub fn state_dir() -> &'static PathBuf {
 pub fn temp_dir() -> &'static PathBuf {
     static TEMP_DIR: OnceLock<PathBuf> = OnceLock::new();
     TEMP_DIR.get_or_init(|| {
-        if let Ok(flatpak_xdg_cache) = std::env::var("FLATPAK_XDG_CACHE_HOME") {
-            flatpak_xdg_cache.into()
-        } else {
-            dirs::cache_dir().expect("failed to determine XDG_CACHE_HOME directory")
-        }
-        .join(APP_NAME_LOWERCASE)
+        dirs::cache_dir()
+            .expect("failed to determine XDG_CACHE_HOME directory")
+            .join(APP_NAME_LOWERCASE)
     })
 }
 

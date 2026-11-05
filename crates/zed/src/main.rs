@@ -706,7 +706,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                                     .project()
                                     .update(cx, |project, _| project.lsp_store())
                             })?;
-                            let uri = format!("zed://schemas/{}", schema_path);
+                            let uri = format!("oxed://schemas/{}", schema_path);
                             let json_schema_content =
                                 json_schema_store::handle_schema_request(lsp_store, uri, cx)
                                     .await?;
@@ -755,8 +755,8 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 });
             }
             OpenRequestKind::Setting { setting_path } => {
-                // zed://settings/languages/$(language)/tab_size  - DONT SUPPORT
-                // zed://settings/languages/Rust/tab_size  - SUPPORT
+                // oxed://settings/languages/$(language)/tab_size  - DONT SUPPORT
+                // oxed://settings/languages/Rust/tab_size  - SUPPORT
                 // languages.$(language).tab_size
                 // [ languages $(language) tab_size]
                 cx.spawn(async move |cx| {
@@ -1123,7 +1123,7 @@ struct Args {
     /// Use `path:line:row` syntax to open a file at a specific location.
     /// Non-existing paths and directories will ignore `:line:row` suffix.
     ///
-    /// URLs can either be `file://` or `zed://` scheme, or relative to <https://zed.dev>.
+    /// URLs can either be `file://` or `oxed://` scheme, or relative to <https://zed.dev>.
     paths_or_urls: Vec<String>,
 
     /// Pairs of file paths to diff. Can be specified multiple times.
@@ -1191,8 +1191,8 @@ fn parse_url_arg(arg: &str) -> String {
         Ok(path) => format!("file://{}", path.display()),
         Err(_) => {
             if arg.starts_with("file://")
-                || arg.starts_with("zed://")
-                || arg.starts_with("zed-cli://")
+                || arg.starts_with("oxed://")
+                || arg.starts_with("oxed-cli://")
             {
                 arg.into()
             } else {
