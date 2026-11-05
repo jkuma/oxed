@@ -2,7 +2,7 @@ use crate::Tooltip;
 use crate::prelude::*;
 use crate::utils::format_number_with_commas;
 
-#[derive(IntoElement, RegisterComponent)]
+#[derive(IntoElement)]
 pub struct DiffStat {
     id: ElementId,
     added: usize,
@@ -55,39 +55,5 @@ impl RenderOnce for DiffStat {
             .when_some(tooltip, |this, tooltip| {
                 this.tooltip(Tooltip::text(tooltip))
             })
-    }
-}
-
-impl Component for DiffStat {
-    fn scope() -> ComponentScope {
-        ComponentScope::VersionControl
-    }
-
-    fn description() -> &'static str {
-        "A compact summary of additions and deletions for a diff, \
-        displayed as colored insertion and deletion counts."
-    }
-
-    fn preview(_window: &mut Window, cx: &mut App) -> AnyElement {
-        let container = || {
-            h_flex()
-                .py_4()
-                .w_72()
-                .justify_center()
-                .border_1()
-                .border_color(cx.theme().colors().border_variant)
-                .bg(cx.theme().colors().panel_background)
-        };
-
-        let diff_stat_example = vec![single_example(
-            "Default",
-            container()
-                .child(DiffStat::new("id", 1_234, 5_678))
-                .into_any_element(),
-        )];
-
-        example_group(diff_stat_example)
-            .vertical()
-            .into_any_element()
     }
 }

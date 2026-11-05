@@ -1500,19 +1500,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "component"
-version = "0.1.0"
-dependencies = [
- "collections",
- "documented",
- "gpui",
- "inventory",
- "parking_lot",
- "strum",
- "theme",
-]
-
-[[package]]
 name = "compression-codecs"
 version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2336,32 +2323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "documented"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c278cf01d971a2ce2e4a97f2af1c13706e111c2c05636a88f93520b61c75b3cb"
-dependencies = [
- "documented-macros",
- "phf",
- "thiserror 2.0.17",
-]
-
-[[package]]
-name = "documented-macros"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3605d4f0b4326a3a1909b6d258b47478c0d47bb668ad2cb7d4a6e2d22e852f5c"
-dependencies = [
- "convert_case 0.11.0",
- "itertools 0.15.0",
- "optfield",
- "proc-macro2",
- "quote",
- "strum",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2888,7 +2849,6 @@ dependencies = [
  "cloud_api_types",
  "collections",
  "command_palette_hooks",
- "component",
  "db",
  "editor",
  "extension",
@@ -3583,7 +3543,6 @@ dependencies = [
  "async-channel 2.5.0",
  "buffer_diff",
  "collections",
- "component",
  "ctor",
  "db",
  "editor",
@@ -4836,15 +4795,6 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -6259,7 +6209,6 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 name = "notifications"
 version = "0.1.0"
 dependencies = [
- "component",
  "gpui",
  "ui",
  "workspace",
@@ -6636,9 +6585,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "collections",
- "component",
  "db",
- "documented",
  "fs",
  "fuzzy",
  "gpui",
@@ -6747,17 +6694,6 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
-
-[[package]]
-name = "optfield"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "969ccca8ffc4fb105bd131a228107d5c9dd89d9d627edf3295cbe979156f9712"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
 
 [[package]]
 name = "option-ext"
@@ -9389,7 +9325,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "collections",
- "component",
  "editor",
  "fs",
  "futures",
@@ -11163,8 +11098,6 @@ name = "ui"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "component",
- "documented",
  "gpui",
  "gpui_macros",
  "gpui_util",
@@ -11186,7 +11119,6 @@ dependencies = [
 name = "ui_input"
 version = "0.1.0"
 dependencies = [
- "component",
  "gpui",
  "ui",
 ]
@@ -11195,10 +11127,8 @@ dependencies = [
 name = "ui_macros"
 version = "0.1.0"
 dependencies = [
- "component",
  "quote",
  "syn 2.0.117",
- "ui",
 ]
 
 [[package]]
@@ -13374,7 +13304,6 @@ dependencies = [
  "async-recursion",
  "chrono",
  "collections",
- "component",
  "db",
  "dirs",
  "fs",

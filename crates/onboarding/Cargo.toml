@@ -19,9 +19,7 @@ default = []
 [dependencies]
 anyhow.workspace = true
 collections.workspace = true
-component.workspace = true
 db.workspace = true
-documented.workspace = true
 fs.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true

@@ -866,7 +866,6 @@ pub fn prompt_for_open_path_and_open(
 }
 
 pub fn init(cx: &mut App) {
-    component::init();
     theme_preview::init(cx);
     toast_layer::init(cx);
 

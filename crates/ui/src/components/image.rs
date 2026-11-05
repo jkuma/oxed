@@ -29,7 +29,7 @@ impl VectorName {
 /// A [`Vector`] is different from an [`crate::Icon`] in that it is intended
 /// to be displayed at a specific size, or series of sizes, rather
 /// than conforming to the standard size of an icon.
-#[derive(IntoElement, RegisterComponent)]
+#[derive(IntoElement)]
 pub struct Vector {
     path: Arc<str>,
     color: Color,
@@ -88,68 +88,6 @@ impl RenderOnce for Vector {
             .path(self.path)
             .text_color(self.color.color(cx))
             .with_transformation(self.transformation)
-    }
-}
-
-impl Component for Vector {
-    fn scope() -> ComponentScope {
-        ComponentScope::Images
-    }
-
-    fn name() -> &'static str {
-        "Vector"
-    }
-
-    fn description() -> &'static str {
-        "A vector image component that can be displayed at specific sizes."
-    }
-
-    fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {
-        let size = rems_from_px(60_f32);
-
-        v_flex()
-            .gap_6()
-            .children(vec![
-                example_group_with_title(
-                    "Basic Usage",
-                    vec![
-                        single_example(
-                            "Default",
-                            Vector::square(VectorName::ZedLogo, size).into_any_element(),
-                        ),
-                        single_example(
-                            "Custom Size",
-                            h_flex()
-                                .h(rems_from_px(120_f32))
-                                .justify_center()
-                                .child(Vector::new(
-                                    VectorName::ZedLogo,
-                                    rems_from_px(120_f32),
-                                    rems_from_px(200_f32),
-                                ))
-                                .into_any_element(),
-                        ),
-                    ],
-                ),
-                example_group_with_title(
-                    "Colored",
-                    vec![
-                        single_example(
-                            "Accent Color",
-                            Vector::square(VectorName::ZedLogo, size)
-                                .color(Color::Accent)
-                                .into_any_element(),
-                        ),
-                        single_example(
-                            "Error Color",
-                            Vector::square(VectorName::ZedLogo, size)
-                                .color(Color::Error)
-                                .into_any_element(),
-                        ),
-                    ],
-                ),
-            ])
-            .into_any_element()
     }
 }
 

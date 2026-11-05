@@ -13,7 +13,7 @@ enum ChoiceCardKind {
 /// The card owns its focus, click handling, and accessibility semantics. Place related cards in
 /// a container with the `RadioGroup` (for radio cards) or `Group` role so assistive technology
 /// announces them together.
-#[derive(IntoElement, RegisterComponent)]
+#[derive(IntoElement)]
 pub struct ChoiceCard {
     id: ElementId,
     kind: ChoiceCardKind,
@@ -222,116 +222,5 @@ impl RenderOnce for ChoiceCard {
                         )
                     }),
             )
-    }
-}
-
-impl Component for ChoiceCard {
-    fn scope() -> ComponentScope {
-        ComponentScope::Input
-    }
-
-    fn description() -> &'static str {
-        "A clickable card for a single choice, with a radio or checkbox indicator, a label, and an optional description."
-    }
-
-    fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {
-        v_flex()
-            .gap_6()
-            .child(example_group_with_title(
-                "Radio",
-                vec![
-                    single_example(
-                        "Unselected",
-                        Self::radio("choice-radio-unselected", "Unselected option", false)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Selected",
-                        Self::radio("choice-radio-selected", "Selected option", true)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "With Description",
-                        Self::radio("choice-radio-description", "Option", true)
-                            .description("A longer explanation of what this option does.")
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Invalid",
-                        Self::radio("choice-radio-invalid", "Invalid option", false)
-                            .invalid(true)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Selected and Invalid",
-                        Self::radio("choice-radio-selected-invalid", "Invalid option", true)
-                            .invalid(true)
-                            .into_any_element(),
-                    ),
-                ],
-            ))
-            .child(example_group_with_title(
-                "Checkbox",
-                vec![
-                    single_example(
-                        "Unselected",
-                        Self::checkbox("choice-checkbox-unselected", "Unselected option", false)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Selected",
-                        Self::checkbox("choice-checkbox-selected", "Selected option", true)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "With Description",
-                        Self::checkbox("choice-checkbox-description", "Option", true)
-                            .description("A longer explanation of what this option does.")
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Invalid",
-                        Self::checkbox("choice-checkbox-invalid", "Invalid option", false)
-                            .invalid(true)
-                            .into_any_element(),
-                    ),
-                    single_example(
-                        "Selected and Invalid",
-                        Self::checkbox("choice-checkbox-selected-invalid", "Invalid option", true)
-                            .invalid(true)
-                            .into_any_element(),
-                    ),
-                ],
-            ))
-            .child(example_group_with_title(
-                "Long Text",
-                vec![
-                    single_example(
-                        "Radio",
-                        Self::radio(
-                            "choice-radio-long-text",
-                            "Allow the agent to read and modify every file in this project, including files ignored by version control",
-                            true,
-                        )
-                        .description(
-                            "The agent will be able to create, edit, and delete files without asking for confirmation each time. You can revoke this permission at any point from the agent settings.",
-                        )
-                        .into_any_element(),
-                    ),
-                    single_example(
-                        "Checkbox",
-                        Self::checkbox(
-                            "choice-checkbox-long-text",
-                            "Include terminal output, diagnostics, and recently opened buffers as additional context",
-                            false,
-                        )
-                        .description(
-                            "Additional context can improve results for larger tasks, but it increases the size of each request and may take longer to process.",
-                        )
-                        .into_any_element(),
-                    )
-                ],
-            ))
-            .into_any_element()
     }
 }

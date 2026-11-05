@@ -22,7 +22,6 @@ askpass.workspace = true
 async-channel.workspace = true
 buffer_diff.workspace = true
 collections.workspace = true
-component.workspace = true
 db.workspace = true
 editor.workspace = true
 file_icons.workspace = true

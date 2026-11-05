@@ -1,7 +1,7 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
-use cloud_api_types::{ExtensionApiManifest, ExtensionMetadata, ExtensionProvides};
-use extension::{ExtensionManifest, SchemaVersion};
+use cloud_api_types::{ExtensionMetadata, ExtensionProvides};
+use extension::ExtensionManifest;
 use extension_host::{ExtensionOperation, ExtensionStatus, ExtensionStore};
 use gpui::{Anchor, ElementId, Entity, Point, SharedString, prelude::*};
 use release_channel::ReleaseChannel;
@@ -94,7 +94,7 @@ impl ExtensionCardSource {
     }
 }
 
-#[derive(IntoElement, RegisterComponent)]
+#[derive(IntoElement)]
 pub struct ExtensionCard {
     details: ExtensionCardDetails,
     actions: ExtensionCardActions,
@@ -380,152 +380,6 @@ pub(crate) fn extension_provides_label(provides: ExtensionProvides) -> &'static 
         ExtensionProvides::IndexedDocsProviders => "Indexed Docs Providers",
         ExtensionProvides::Snippets => "Snippets",
         ExtensionProvides::DebugAdapters => "Debug Adapters",
-    }
-}
-
-impl Component for ExtensionCard {
-    fn scope() -> ComponentScope {
-        ComponentScope::DataDisplay
-    }
-
-    fn description() -> &'static str {
-        "A card that displays an extension's details, installation state, and available actions."
-    }
-
-    fn preview(_window: &mut Window, cx: &mut App) -> AnyElement {
-        fn remote_extension(
-            id: &'static str,
-            name: &'static str,
-            version: &'static str,
-            description: &'static str,
-            download_count: u64,
-            provides: impl IntoIterator<Item = ExtensionProvides>,
-        ) -> ExtensionMetadata {
-            ExtensionMetadata {
-                id: id.into(),
-                manifest: ExtensionApiManifest {
-                    name: name.to_owned(),
-                    version: version.into(),
-                    description: Some(description.to_owned()),
-                    authors: vec!["Zed Industries".to_owned()],
-                    repository: "https://github.com/zed-industries/zed".to_owned(),
-                    schema_version: Some(1),
-                    wasm_api_version: None,
-                    provides: BTreeSet::from_iter(provides),
-                },
-                published_at: Default::default(),
-                download_count,
-            }
-        }
-
-        fn dev_extension() -> Arc<ExtensionManifest> {
-            Arc::new(ExtensionManifest {
-                // Fake ID which will never be accepted during publishing
-                id: "zed-demo-theme".into(),
-                name: "Local Theme".to_owned(),
-                version: "0.1.0".into(),
-                schema_version: SchemaVersion::ZERO,
-                description: Some("A locally installed extension under development.".to_owned()),
-                repository: Some("https://github.com/zed-industries/zed".to_owned()),
-                authors: vec!["Extension Developer".to_owned()],
-                lib: Default::default(),
-                themes: Vec::new(),
-                icon_themes: Vec::new(),
-                languages: Vec::new(),
-                grammars: Default::default(),
-                language_servers: Default::default(),
-                snippets: None,
-                capabilities: Vec::new(),
-            })
-        }
-
-        let examples = vec![
-            single_example(
-                "Available to Install",
-                ExtensionCard::remote(
-                    &remote_extension(
-                        "preview-toml",
-                        "TOML",
-                        "0.6.2",
-                        "TOML language support.",
-                        482_391,
-                        [ExtensionProvides::Languages],
-                    ),
-                    PublishedExtensionState::Store(ExtensionStatus::NotInstalled),
-                    cx,
-                )
-                .into_any_element(),
-            ),
-            single_example(
-                "Installed",
-                ExtensionCard::remote(
-                    &remote_extension(
-                        "preview-python",
-                        "Python",
-                        "0.5.1",
-                        "Python language support powered by basedpyright.",
-                        1_284_613,
-                        [
-                            ExtensionProvides::Languages,
-                            ExtensionProvides::LanguageServers,
-                            ExtensionProvides::ContextServers,
-                        ],
-                    ),
-                    PublishedExtensionState::Store(ExtensionStatus::Installed("0.5.1".into())),
-                    cx,
-                )
-                .into_any_element(),
-            ),
-            single_example(
-                "Update Available",
-                ExtensionCard::remote(
-                    &remote_extension(
-                        "preview-rust",
-                        "Rust",
-                        "0.4.0",
-                        "Rust language support powered by rust-analyzer.",
-                        2_947_028,
-                        [
-                            ExtensionProvides::Languages,
-                            ExtensionProvides::LanguageServers,
-                        ],
-                    ),
-                    PublishedExtensionState::Store(ExtensionStatus::Installed("0.3.1".into())),
-                    cx,
-                )
-                .into_any_element(),
-            ),
-            single_example(
-                "Development Extension",
-                ExtensionCard::manifest(
-                    dev_extension(),
-                    ExtensionStatus::Installed("0.1.0".into()),
-                    LocalExtensionKind::Dev,
-                )
-                .into_any_element(),
-            ),
-            single_example(
-                "Overridden by Development Extension",
-                ExtensionCard::remote(
-                    &remote_extension(
-                        "preview-overridden-theme",
-                        "Local Theme",
-                        "1.3.0",
-                        "The published version of a locally developed extension.",
-                        36_512,
-                        [ExtensionProvides::Themes],
-                    ),
-                    PublishedExtensionState::OverriddenByDevExtension,
-                    cx,
-                )
-                .into_any_element(),
-            ),
-        ];
-
-        div()
-            .w_128()
-            .child(example_group(examples).vertical())
-            .into_any_element()
     }
 }
 

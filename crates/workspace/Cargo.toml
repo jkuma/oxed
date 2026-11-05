@@ -29,7 +29,6 @@ anyhow.workspace = true
 async-recursion.workspace = true
 chrono.workspace = true
 collections.workspace = true
-component.workspace = true
 db.workspace = true
 dirs.workspace = true
 futures-lite.workspace = true

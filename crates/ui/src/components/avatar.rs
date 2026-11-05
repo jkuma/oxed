@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-use documented::Documented;
 use gpui::{AnyElement, AnyView, Hsla, ImageSource, Img, IntoElement, Styled, img};
 
 /// An element that renders a user avatar with customizable appearance options.
@@ -14,7 +13,7 @@ use gpui::{AnyElement, AnyView, Hsla, ImageSource, Img, IntoElement, Styled, img
 ///     .grayscale(true)
 ///     .border_color(gpui::red());
 /// ```
-#[derive(IntoElement, Documented, RegisterComponent)]
+#[derive(IntoElement)]
 pub struct Avatar {
     image: Img,
     size: Option<AbsoluteLength>,
@@ -241,76 +240,5 @@ impl RenderOnce for AvatarAvailabilityIndicator {
                 CollaboratorAvailability::Free => cx.theme().status().created,
                 CollaboratorAvailability::Busy => cx.theme().status().deleted,
             })
-    }
-}
-
-// View this component preview using `workspace: open component-preview`
-impl Component for Avatar {
-    fn scope() -> ComponentScope {
-        ComponentScope::Collaboration
-    }
-
-    fn description() -> &'static str {
-        Avatar::DOCS
-    }
-
-    fn preview(_window: &mut Window, cx: &mut App) -> AnyElement {
-        let example_avatar = "https://avatars.githubusercontent.com/u/1714999?v=4";
-
-        v_flex()
-                .gap_6()
-                .children(vec![
-                    example_group(vec![
-                        single_example("Default", Avatar::new(example_avatar).into_any_element()),
-                        single_example(
-                            "Grayscale",
-                            Avatar::new(example_avatar)
-                                .grayscale(true)
-                                .into_any_element(),
-                        ),
-                        single_example(
-                            "Border",
-                            Avatar::new(example_avatar)
-                                .border_color(cx.theme().colors().border)
-                                .into_any_element(),
-                        ).description("Can be used to create visual space by setting the border color to match the background, which creates the appearance of a gap around the avatar."),
-                    ]),
-                    example_group_with_title(
-                        "Indicator Styles",
-                        vec![
-                            single_example(
-                                "Muted",
-                                Avatar::new(example_avatar)
-                                    .indicator(AvatarAudioStatusIndicator::new(AudioStatus::Muted))
-                                    .into_any_element(),
-                            ).description("Indicates the collaborator's mic is muted."),
-                            single_example(
-                                "Deafened",
-                                Avatar::new(example_avatar)
-                                    .indicator(AvatarAudioStatusIndicator::new(
-                                        AudioStatus::Deafened,
-                                    ))
-                                    .into_any_element(),
-                            ).description("Indicates that both the collaborator's mic and audio are muted."),
-                            single_example(
-                                "Availability: Free",
-                                Avatar::new(example_avatar)
-                                    .indicator(AvatarAvailabilityIndicator::new(
-                                        CollaboratorAvailability::Free,
-                                    ))
-                                    .into_any_element(),
-                            ).description("Indicates that the person is free, usually meaning they are not in a call."),
-                            single_example(
-                                "Availability: Busy",
-                                Avatar::new(example_avatar)
-                                    .indicator(AvatarAvailabilityIndicator::new(
-                                        CollaboratorAvailability::Busy,
-                                    ))
-                                    .into_any_element(),
-                            ).description("Indicates that the person is busy, usually meaning they are in a channel or direct call."),
-                        ],
-                    ),
-                ])
-                .into_any_element()
     }
 }
