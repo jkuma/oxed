@@ -19,3 +19,6 @@ test-support = ["dep:parking_lot"]
 parking_lot = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec.workspace = true
+
+[dev-dependencies]
+parking_lot.workspace = true
