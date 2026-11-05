@@ -145,9 +145,9 @@
   // after the mouse moves away from the hover target.
   // Only applies when `hover_popover_sticky` is enabled.
   "hover_popover_hiding_delay": 300,
-  // Whether to confirm before quitting Zed.
+  // Whether to confirm before quitting Oxed.
   "confirm_quit": false,
-  // Whether to restore last closed project when fresh Zed instance is opened
+  // Whether to restore last closed project when fresh Oxed instance is opened
   // May take 3 values:
   //  1. All workspaces open during last session
   //         "restore_on_startup": "last_session"
@@ -247,23 +247,23 @@
   //
   // Default: " — "
   "window_title_separator": " — ",
-  // On Linux, what draws Zed's window decorations (titlebar).
+  // On Linux, what draws Oxed's window decorations (titlebar).
   // This setting has no effect on other platforms:
-  // 1. Zed draws its own window decorations.
+  // 1. Oxed draws its own window decorations.
   //    "client"
   // 2. The window manager or compositor draws the window decorations.
   //    Not supported by GNOME Wayland.
   //    "server"
   //
-  // This requires restarting Zed for changes to take effect.
+  // This requires restarting Oxed for changes to take effect.
   //
   // Default: "client"
   "window_decorations": "client",
-  // Whether to optimize Zed's interface for assistive technology such as screen
+  // Whether to optimize Oxed's interface for assistive technology such as screen
   // readers.
   "accessible_mode": false,
   // Whether to use the system provided dialogs for Open and Save As.
-  // When set to false, Zed will use the built-in keyboard-first pickers.
+  // When set to false, Oxed will use the built-in keyboard-first pickers.
   "use_system_path_prompts": true,
   // Whether the cursor blinks in the editor.
   "cursor_blink": true,
@@ -485,11 +485,11 @@
   "use_on_type_format": true,
   // Whether to automatically add matching closing characters when typing
   // opening parenthesis, bracket, brace, single or double quote characters.
-  // For example, when you type '(', Zed will add a closing ) at the correct position.
+  // For example, when you type '(', Oxed will add a closing ) at the correct position.
   "use_autoclose": true,
   // Whether to automatically surround selected text when typing opening parenthesis,
   // bracket, brace, single or double quote characters.
-  // For example, when you select text and type '(', Zed will surround the text with ().
+  // For example, when you select text and type '(', Oxed will surround the text with ().
   "use_auto_surround": true,
   // Controls automatic indentation behavior when typing.
   // - "syntax_aware": Adjusts indentation based on syntax context (default)
@@ -1122,7 +1122,7 @@
   //
   // 1. Never automatically save:
   //     "autosave": "off",
-  // 2. Save when changing focus away from the Zed window:
+  // 2. Save when changing focus away from the Oxed window:
   //     "autosave": "on_window_change",
   // 3. Save when changing focus away from a specific buffer:
   //     "autosave": "on_focus_change",
@@ -1257,11 +1257,11 @@
     // Default: true
     "skip_focus_for_active_in_search": true,
     // Whether to use gitignored files when searching.
-    // Only the file Zed had indexed will be used, not necessary all the gitignored files.
+    // Only the file Oxed had indexed will be used, not necessary all the gitignored files.
     //
     // Can accept 3 values:
     //   * "all": Use all gitignored files
-    //   * "indexed": Use only the files Zed had indexed
+    //   * "indexed": Use only the files Oxed had indexed
     //   * "smart": Be smart and search for ignored when called from a gitignored worktree
     "include_ignored": "smart",
     // Whether to pre-fill the file finder's query with the text selected in the
@@ -1310,7 +1310,7 @@
   "format_on_save": "off",
   // How to perform a buffer format. This setting can take multiple values:
   //
-  // 1. Default. Format files using Zed's Prettier integration (if applicable),
+  // 1. Default. Format files using Oxed's Prettier integration (if applicable),
   //    or falling back to formatting via language server:
   //     "formatter": "auto"
   // 2. Format code using the current language server:
@@ -1324,7 +1324,7 @@
   //         "arguments": ["--stdin-filepath", "{buffer_path}"]
   //       }
   //     }
-  // 5. Format code using Zed's Prettier integration:
+  // 5. Format code using Oxed's Prettier integration:
   //     "formatter": "prettier"
   // 6. Format code using a code action
   //     "formatter": {"code_action": "source.fixAll.eslint"}
@@ -1394,7 +1394,7 @@
     //
     // Default: true
     "include_warnings": true,
-    // Settings for using LSP pull diagnostics mechanism in Zed.
+    // Settings for using LSP pull diagnostics mechanism in Oxed.
     "lsp_pull_diagnostics": {
       // Whether to pull for diagnostics or not.
       "enabled": true,
@@ -1421,7 +1421,7 @@
       "max_severity": null,
     },
   },
-  // Files or globs of files that will be excluded by Zed entirely. They will be skipped during file
+  // Files or globs of files that will be excluded by Oxed entirely. They will be skipped during file
   // scans, file searches, and not be displayed in the project file tree. Takes precedence over `file_scan_inclusions`.
   "file_scan_exclusions": [
     "**/.git",
@@ -1436,9 +1436,9 @@
     "**/.classpath",
     "**/.settings",
   ],
-  // Files or globs of files that will be included by Zed, even when ignored by git. This is useful
+  // Files or globs of files that will be included by Oxed, even when ignored by git. This is useful
   // for files that are not tracked by git, but are still important to your project. Note that globs
-  // that are overly broad can slow down Zed's file scanning. `file_scan_exclusions` takes
+  // that are overly broad can slow down Oxed's file scanning. `file_scan_exclusions` takes
   // precedence over these inclusions.
   "file_scan_inclusions": [".env*"],
   // Maximum directory depth to eagerly index outside of git repositories;
@@ -1607,7 +1607,7 @@
     "JSONC": [
       "**/.oxed/*.json",
       "**/.vscode/**/*.json",
-      "**/{zed,Zed}/{settings,keymap}.json",
+      "**/oxed/{settings,keymap}.json",
       "tsconfig*.json",
     ],
     "Markdown": [".rules", ".cursorrules", ".windsurfrules", ".clinerules"],
@@ -1616,20 +1616,20 @@
   // Settings for which version of Node.js and NPM to use when installing
   // language servers.
   //
-  // Note: changing this setting currently requires restarting Zed.
+  // Note: changing this setting currently requires restarting Oxed.
   "node": {
-    // By default, Zed will look for `node` and `npm` on your `$PATH`, and use the
+    // By default, Oxed will look for `node` and `npm` on your `$PATH`, and use the
     // existing executables if their version is recent enough. Set this to `true`
-    // to prevent this, and force Zed to always download and install its own
+    // to prevent this, and force Oxed to always download and install its own
     // version of Node.
     "ignore_system_version": false,
     // You can also specify alternative paths to Node and NPM. If you specify
-    // `path`, but not `npm_path`, Zed will assume that `npm` is located at
+    // `path`, but not `npm_path`, Oxed will assume that `npm` is located at
     // `${path}/../npm`.
     "path": null,
     "npm_path": null,
   },
-  // The extensions that Zed should automatically install on startup.
+  // The extensions that Oxed should automatically install on startup.
   //
   // If you don't want any of these extensions, add this field to your settings
   // and change the value to `false`.
@@ -1681,7 +1681,7 @@
     // When LSP servers give an `InsertReplaceEdit` completion, they provides two ranges: `insert` and `replace`. Usually, `insert`
     // contains the word prefix before your cursor and `replace` contains the whole word.
     //
-    // Effectively, this setting just changes whether Zed will use the received range for `insert` or `replace`, so the results may
+    // Effectively, this setting just changes whether Oxed will use the received range for `insert` or `replace`, so the results may
     // differ depending on the underlying LSP server.
     //
     // Possible values:
@@ -1958,7 +1958,7 @@
     // Default: false
     "trust_all_worktrees": false,
   },
-  // Zed's Prettier integration settings.
+  // Oxed's Prettier integration settings.
   // Allows to enable/disable formatting with Prettier
   // and configure default Prettier, used when no project-level Prettier installation is found.
   "prettier": {
@@ -1984,7 +1984,7 @@
   "lsp": {
     // Specify the LSP name as a key here.
     // "rust-analyzer": {
-    //     // These initialization options are merged into Zed's defaults
+    //     // These initialization options are merged into Oxed's defaults
     //     "initialization_options": {
     //         "check": {
     //             "command": "clippy" // rust-analyzer.check.command (default: "check")
@@ -2076,13 +2076,13 @@
     // Delay in milliseconds before showing the which-key popup.
     "delay_ms": 1000,
   },
-  // Settings overrides to use when using Zed Preview.
-  // Mostly useful for developers who are managing multiple instances of Zed.
+  // Settings overrides to use when using Oxed Preview.
+  // Mostly useful for developers who are managing multiple instances of Oxed.
   "preview": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Zed Nightly.
-  // Mostly useful for developers who are managing multiple instances of Zed.
+  // Settings overrides to use when using Oxed Nightly.
+  // Mostly useful for developers who are managing multiple instances of Oxed.
   "nightly": {
     // "theme": "Andromeda"
     "instrumentation": {
@@ -2091,13 +2091,13 @@
       },
     },
   },
-  // Settings overrides to use when using Zed Stable.
-  // Mostly useful for developers who are managing multiple instances of Zed.
+  // Settings overrides to use when using Oxed Stable.
+  // Mostly useful for developers who are managing multiple instances of Oxed.
   "stable": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Zed Dev.
-  // Mostly useful for developers who are managing multiple instances of Zed.
+  // Settings overrides to use when using Oxed Dev.
+  // Mostly useful for developers who are managing multiple instances of Oxed.
   "dev": {
     // "theme": "Andromeda"
     "instrumentation": {
@@ -2120,7 +2120,7 @@
   // Supported URI scheme: `http`, `https`, `socks4`, `socks4a`, `socks5`,
   // `socks5h`. `http` will be used when no scheme is specified.
   //
-  // By default no proxy will be used, or Zed will try get proxy settings from
+  // By default no proxy will be used, or Oxed will try get proxy settings from
   // environment variables. If certain hosts should not be proxied,
   // set the `no_proxy` environment variable and provide a comma-separated list.
   //
@@ -2142,7 +2142,7 @@
   // Each profile has an optional `base` ("user" or "default") and a `settings`
   // object. When `base` is "user" (the default), the profile applies on top of
   // your user settings. When `base` is "default", user settings are ignored and
-  // the profile applies on top of Zed's defaults.
+  // the profile applies on top of Oxed's defaults.
   //
   // Examples:
   // "profiles": {

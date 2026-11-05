@@ -325,7 +325,7 @@ pub fn get_shell_safe_zed_path(shell_kind: shell::ShellKind) -> anyhow::Result<S
 
     zed_path
         .try_shell_safe(shell_kind)
-        .context("Failed to shell-escape Zed executable path.")
+        .context("Failed to shell-escape Oxed executable path.")
 }
 
 pub async fn load_login_shell_environment() -> Result<()> {

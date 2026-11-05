@@ -156,21 +156,12 @@
     },
   },
   {
-    "context": "Editor && !agent_diff",
+    "context": "Editor",
     "bindings": {
       "ctrl-k ctrl-r": "git::Restore",
       "ctrl-alt-y": "git::ToggleStaged",
       "alt-y": "git::StageAndNext",
       "alt-shift-y": "git::UnstageAndNext",
-    },
-  },
-  {
-    "context": "Elicitation || (Elicitation > Editor)",
-    "use_key_equivalents": true,
-    "bindings": {
-      "enter": "menu::Confirm",
-      "tab": "menu::SelectNext",
-      "shift-tab": "menu::SelectPrevious",
     },
   },
 
@@ -431,7 +422,7 @@
       "ctrl-n": "workspace::NewFile",
       "shift-new": "workspace::NewWindow",
       "ctrl-shift-n": "workspace::NewWindow",
-      "f10": ["app_menu::OpenApplicationMenu", "Zed"],
+      "f10": ["app_menu::OpenApplicationMenu", "Oxed"],
       "alt-1": ["workspace::ActivatePane", 0],
       "alt-2": ["workspace::ActivatePane", 1],
       "alt-3": ["workspace::ActivatePane", 2],
@@ -599,7 +590,7 @@
     },
   },
   {
-    "context": "!AcpThread > Editor && mode == full",
+    "context": "Editor && mode == full",
     "bindings": {
       "alt-enter": "editor::OpenExcerpts",
       "shift-enter": "editor::ExpandExcerpts",
@@ -783,7 +774,7 @@
     },
   },
   {
-    "context": "AskPass > Editor",
+    "context": "PasswordPrompt > Editor",
     "bindings": {
       "enter": "menu::Confirm",
     },
@@ -975,7 +966,7 @@
     },
   },
   {
-    "context": "InvalidBuffer",
+    "context": "InvalidItem",
     "use_key_equivalents": true,
     "bindings": {
       "ctrl-shift-enter": "workspace::OpenWithSystem",

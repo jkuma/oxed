@@ -160,7 +160,7 @@ impl NodeRuntime {
                 Ok(instance) => {
                     log::log!(
                         log_level,
-                        "using Zed managed Node.js at {} since {}",
+                        "using Oxed managed Node.js at {} since {}",
                         instance.installation_path.display(),
                         why_using_managed
                     );
@@ -650,7 +650,7 @@ impl ManagedNodeRuntime {
                         true
                     } else {
                         log::warn!(
-                            "Zed managed Node.js binary at {} failed check with output: {:?}",
+                            "Oxed managed Node.js binary at {} failed check with output: {:?}",
                             node_binary.display(),
                             output
                         );
@@ -659,7 +659,7 @@ impl ManagedNodeRuntime {
                 }
                 Err(err) => {
                     log::warn!(
-                        "Zed managed Node.js binary at {} failed check, so re-downloading it. \
+                        "Oxed managed Node.js binary at {} failed check, so re-downloading it. \
                         Error: {}",
                         node_binary.display(),
                         err
