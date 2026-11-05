@@ -279,7 +279,7 @@ impl Render for Onboarding {
                                     .child(
                                         h_flex()
                                             .gap_4()
-                                            .child(Vector::square(VectorName::ZedLogo, rems(2.5)))
+                                            .child(Vector::square(VectorName::OxedLogo, rems(2.5)))
                                             .child(
                                                 v_flex()
                                                     .child(
@@ -287,10 +287,12 @@ impl Render for Onboarding {
                                                             .size(HeadlineSize::Small),
                                                     )
                                                     .child(
-                                                        Label::new("The editor for what's next")
-                                                            .color(Color::Muted)
-                                                            .size(LabelSize::Small)
-                                                            .italic(),
+                                                        Label::new(
+                                                            "A minimal, LSP-first code editor.",
+                                                        )
+                                                        .color(Color::Muted)
+                                                        .size(LabelSize::Small)
+                                                        .italic(),
                                                     ),
                                             ),
                                     )

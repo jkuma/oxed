@@ -13,7 +13,7 @@ use crate::traits::transformable::Transformable;
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum VectorName {
-    ZedLogo,
+    OxedLogo,
 }
 
 impl VectorName {
@@ -97,6 +97,6 @@ mod tests {
 
     #[test]
     fn vector_path() {
-        assert_eq!(VectorName::ZedLogo.path().as_ref(), "images/zed_logo.svg");
+        assert_eq!(VectorName::OxedLogo.path().as_ref(), "images/oxed_logo.svg");
     }
 }

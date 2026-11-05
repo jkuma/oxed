@@ -8,7 +8,6 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum IconName {
-    AiZed,
     ArrowCircle,
     ArrowDown,
     ArrowLeft,
@@ -118,6 +117,7 @@ pub enum IconName {
     MicMute,
     Minimize,
     Option,
+    Oxed,
     PageDown,
     PageUp,
     Pencil,
@@ -164,7 +164,6 @@ pub enum IconName {
     Warning,
     WholeWord,
     XCircle,
-    ZedPredict,
 }
 
 impl IconName {
