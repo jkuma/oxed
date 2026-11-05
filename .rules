@@ -139,7 +139,7 @@ Other entities can then register a callback to handle these events by doing `cx.
 
 Oxed is a standalone, Linux-only fork of Zed. It does not track upstream: remove code that Oxed does not need instead of hiding it.
 
-* Removing a feature means deleting its crates, its call sites, its settings, its keymap entries, its assets and its tests. Hiding mechanisms (`UNAVAILABLE_ACTIONS` in `crates/settings/src/keymap_file.rs`, the `CommandPaletteFilter` block in `initialize_workspace`, the page filter in `settings_data`, `#[ignore]`d tests) are transitional: shrink them as the code behind them goes away.
+* Removing a feature means deleting its crates, its call sites, its settings, its keymap entries, its assets and its tests. Do not hide a removed feature instead (`CommandPaletteFilter`, `#[ignore]`d tests, keymap contexts that no view sets).
 * Some kept crates still call `SomeGlobal::global(cx)` for features that are not initialized anymore; such a call panics at runtime, not at compile time.
 * Run `cargo test -p zed --bin oxed` after any removal: it loads the default keymaps and initializes every panel, and catches startup crashes the type checker misses.
 * Linux is the only target: do not add code, `cfg` branches or dependencies for macOS, Windows, FreeBSD or wasm. The exception is `crates/extension_api`, which extensions compile to wasm.

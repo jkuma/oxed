@@ -334,7 +334,6 @@ clap = { version = "4.4", features = ["derive", "wrap_help"] }
 clap_complete = "4.4"
 clap_complete_nushell = "4.4"
 console = "0.16"
-const_format = "0.2"
 convert_case = "0.11.0"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 perf-event = { package = "perf-event2", version = "0.7.4" }

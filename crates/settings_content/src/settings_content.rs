@@ -217,16 +217,12 @@ pub struct SettingsContent {
     /// The settings for the markdown preview.
     pub markdown_preview: Option<MarkdownPreviewSettingsContent>,
 
-    pub repl: Option<ReplSettingsContent>,
-
     /// Determines when the mouse cursor should be hidden in response to
     /// keyboard input. Applies globally across all input surfaces (editors,
     /// terminals, palettes, etc.).
     ///
     /// Default: on_typing_and_action
     pub hide_mouse: Option<HideMouseMode>,
-
-    pub journal: Option<JournalSettingsContent>,
 
     /// A map of log scopes to the desired log level.
     /// Useful for filtering out noisy logs or enabling more verbose logging.
@@ -306,8 +302,8 @@ fallible_options::flattened_deserialize!(SettingsContent {
         call_hierarchy, command_palette, file_finder, git_panel, tabs, tab_bar, tab_switcher, status_bar, preview_tabs,
         base_keymap, diagnostics,
         git,
-        global_lsp_settings, image_viewer, markdown_preview, repl, hide_mouse,
-        journal, log, line_indicator_format, outline_panel, project_panel,
+        global_lsp_settings, image_viewer, markdown_preview, hide_mouse,
+        log, line_indicator_format, outline_panel, project_panel,
         node, proxy, reduce_motion, session,
         title_bar, which_key, modeline_lines,
         instrumentation,
@@ -487,7 +483,7 @@ pub struct GitPanelSettingsContent {
     pub button: Option<bool>,
     /// Where to dock the panel.
     ///
-    /// Default: right (Agentic layout), left (Classic layout)
+    /// Default: right
     pub dock: Option<DockPosition>,
     /// Default width of the panel in pixels.
     ///
@@ -700,7 +696,7 @@ pub struct PanelSettingsContent {
     pub button: Option<bool>,
     /// Where to dock the panel.
     ///
-    /// Default: right (Agentic layout), left (Classic layout)
+    /// Default: right
     pub dock: Option<DockPosition>,
     /// Default width of the panel in pixels.
     ///
@@ -814,28 +810,6 @@ pub struct CallHierarchySettingsContent {
     pub modal_max_width: Option<ModalWidthContent>,
 }
 
-/// Settings specific to journaling
-#[with_fallible_options]
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
-pub struct JournalSettingsContent {
-    /// The path of the directory where journal entries are stored.
-    ///
-    /// Default: `~`
-    pub path: Option<String>,
-    /// What format to display the hours in.
-    ///
-    /// Default: hour12
-    pub hour_format: Option<HourFormat>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum HourFormat {
-    #[default]
-    Hour12,
-    Hour24,
-}
-
 #[with_fallible_options]
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
 pub struct OutlinePanelSettingsContent {
@@ -849,7 +823,7 @@ pub struct OutlinePanelSettingsContent {
     pub default_width: Option<PixelSetting>,
     /// The position of outline panel
     ///
-    /// Default: right (Agentic layout), left (Classic layout)
+    /// Default: right
     pub dock: Option<DockSide>,
     /// Whether to show file icons in the outline panel.
     ///
@@ -1023,36 +997,6 @@ pub enum ImageFileSizeUnit {
     Binary,
     /// Displays file size in decimal units (e.g., KB, MB).
     Decimal,
-}
-
-/// Settings for configuring REPL display and behavior.
-#[with_fallible_options]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-pub struct ReplSettingsContent {
-    /// Maximum number of lines to keep in REPL's scrollback buffer.
-    /// Clamped with [4, 256] range.
-    ///
-    /// Default: 32
-    pub max_lines: Option<usize>,
-    /// Maximum number of columns to keep in REPL's scrollback buffer.
-    /// Clamped with [20, 512] range.
-    ///
-    /// Default: 128
-    pub max_columns: Option<usize>,
-    /// Whether to show small single-line outputs inline instead of in a block.
-    ///
-    /// Default: true
-    pub inline_output: Option<bool>,
-    /// Maximum number of characters for an output to be shown inline.
-    /// Only applies when `inline_output` is true.
-    ///
-    /// Default: 50
-    pub inline_output_max_length: Option<usize>,
-    /// Maximum number of lines of output to display before scrolling.
-    /// Set to 0 to disable output height limits.
-    ///
-    /// Default: 0
-    pub output_max_height_lines: Option<usize>,
 }
 
 /// Settings for configuring the tab switcher behaviour.

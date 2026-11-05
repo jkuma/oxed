@@ -1364,7 +1364,6 @@ pub struct Workspace {
     _subscriptions: Vec<Subscription>,
     _schedule_serialize_workspace: Option<Task<()>>,
     _serialize_workspace_task: Option<Task<()>>,
-    _schedule_serialize_ssh_paths: Option<Task<()>>,
     pane_history_timestamp: Arc<AtomicUsize>,
     bounds: Bounds<Pixels>,
     pub centered_layout: bool,
@@ -1480,12 +1479,6 @@ impl Workspace {
                     if this.rename_persisted_navigation_history_paths(old_abs_path, new_abs_path) {
                         this.serialize_workspace(window, cx);
                     }
-                }
-
-                project::Event::DisconnectedFromRemote {
-                    server_not_running: _,
-                } => {
-                    this.update_window_edited();
                 }
 
                 project::Event::Closed => {
@@ -1738,7 +1731,6 @@ impl Workspace {
             app_state,
             _schedule_serialize_workspace: None,
             _serialize_workspace_task: None,
-            _schedule_serialize_ssh_paths: None,
             _subscriptions: subscriptions,
             pane_history_timestamp,
             workspace_actions: Default::default(),

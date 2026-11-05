@@ -100,7 +100,6 @@ mod tests {
 
     use super::*;
 
-    #[allow(unused_variables)]
     async fn compress_zip(src_dir: &Path, dst: &Path, keep_file_permissions: bool) -> Result<()> {
         let mut out = smol::fs::File::create(dst).await?;
         let mut writer = ZipFileWriter::new(&mut out);

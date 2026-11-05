@@ -6909,7 +6909,6 @@ dependencies = [
 name = "paths"
 version = "0.1.0"
 dependencies = [
- "const_format",
  "dirs",
  "ignore",
  "util",

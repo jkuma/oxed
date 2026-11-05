@@ -168,7 +168,6 @@ pub struct Project {
     _subscriptions: Vec<gpui::Subscription>,
     buffers_needing_diff: HashSet<WeakEntity<Buffer>>,
     git_diff_debouncer: DebouncedDelay<Self>,
-    remotely_created_models: Arc<Mutex<RemotelyCreatedModels>>,
     node: Option<NodeRuntime>,
     search_history: SearchHistory,
     search_included_history: SearchHistory,
@@ -179,33 +178,6 @@ pub struct Project {
     toolchain_store: Option<Entity<ToolchainStore>>,
 }
 
-#[derive(Default)]
-struct RemotelyCreatedModels {
-    worktrees: Vec<Entity<Worktree>>,
-    buffers: Vec<Entity<Buffer>>,
-    retain_count: usize,
-}
-
-struct RemotelyCreatedModelGuard {
-    remote_models: std::sync::Weak<Mutex<RemotelyCreatedModels>>,
-}
-
-impl Drop for RemotelyCreatedModelGuard {
-    fn drop(&mut self) {
-        if let Some(remote_models) = self.remote_models.upgrade() {
-            let mut remote_models = remote_models.lock();
-            assert!(
-                remote_models.retain_count > 0,
-                "RemotelyCreatedModelGuard dropped too many times"
-            );
-            remote_models.retain_count -= 1;
-            if remote_models.retain_count == 0 {
-                remote_models.buffers.clear();
-                remote_models.worktrees.clear();
-            }
-        }
-    }
-}
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     LanguageServerAdded(LanguageServerId, LanguageServerName, Option<WorktreeId>),
@@ -247,9 +219,6 @@ pub enum Event {
     DiagnosticsUpdated {
         paths: Vec<ProjectPath>,
         language_server_id: LanguageServerId,
-    },
-    DisconnectedFromRemote {
-        server_not_running: bool,
     },
     Closed,
     DeletedEntry(WorktreeId, ProjectEntryId),
@@ -1064,7 +1033,6 @@ impl Project {
                 node: Some(node),
                 search_history: Self::new_search_history(),
                 environment,
-                remotely_created_models: Default::default(),
 
                 search_included_history: Self::new_search_history(),
                 search_excluded_history: Self::new_search_history(),
@@ -1899,13 +1867,6 @@ impl Project {
     }
 
     fn register_buffer(&mut self, buffer: &Entity<Buffer>, cx: &mut Context<Self>) -> Result<()> {
-        {
-            let mut remotely_created_models = self.remotely_created_models.lock();
-            if remotely_created_models.retain_count > 0 {
-                remotely_created_models.buffers.push(buffer.clone())
-            }
-        }
-
         self.request_buffer_diff_recalculation(buffer, cx);
 
         cx.subscribe(buffer, |this, buffer, event, cx| {
@@ -2131,7 +2092,6 @@ impl Project {
     ) {
         match event {
             WorktreeStoreEvent::WorktreeAdded(worktree) => {
-                self.on_worktree_added(worktree, cx);
                 cx.emit(Event::WorktreeAdded(worktree.read(cx).id()));
             }
             WorktreeStoreEvent::WorktreeRemoved(_, id) => {
@@ -2150,13 +2110,6 @@ impl Project {
             WorktreeStoreEvent::WorktreeUpdatedRootRepoCommonDir(worktree_id) => {
                 cx.emit(Event::WorktreeUpdatedRootRepoCommonDir(*worktree_id));
             }
-        }
-    }
-
-    fn on_worktree_added(&mut self, worktree: &Entity<Worktree>, _: &mut Context<Self>) {
-        let mut remotely_created_models = self.remotely_created_models.lock();
-        if remotely_created_models.retain_count > 0 {
-            remotely_created_models.worktrees.push(worktree.clone())
         }
     }
 
@@ -2496,14 +2449,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<LocationLink>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.definitions(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2514,14 +2461,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<LocationLink>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.declarations(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2532,14 +2473,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<LocationLink>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.type_definitions(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2550,14 +2485,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<LocationLink>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.implementations(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2568,14 +2497,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<Location>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.references(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2586,14 +2509,8 @@ impl Project {
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<CallHierarchyItem>>>> {
         let position = position.to_point_utf16(buffer.read(cx));
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.prepare_call_hierarchy(buffer, position, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -2602,15 +2519,8 @@ impl Project {
         item: CallHierarchyItem,
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<IncomingCall>>>> {
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self
-            .lsp_store
-            .update(cx, |lsp_store, cx| lsp_store.incoming_calls(item, cx));
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
-        })
+        self.lsp_store
+            .update(cx, |lsp_store, cx| lsp_store.incoming_calls(item, cx))
     }
 
     pub fn outgoing_calls(
@@ -2618,15 +2528,8 @@ impl Project {
         item: CallHierarchyItem,
         cx: &mut Context<Self>,
     ) -> Task<Result<Option<Vec<OutgoingCall>>>> {
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self
-            .lsp_store
-            .update(cx, |lsp_store, cx| lsp_store.outgoing_calls(item, cx));
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
-        })
+        self.lsp_store
+            .update(cx, |lsp_store, cx| lsp_store.outgoing_calls(item, cx))
     }
 
     pub fn document_highlights<T: ToPointUtf16>(
@@ -2853,14 +2756,8 @@ impl Project {
         <R::LspRequest as lsp::request::Request>::Result: Send,
         <R::LspRequest as lsp::request::Request>::Params: Send,
     {
-        let guard = self.retain_remotely_created_models(cx);
-        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+        self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.request_lsp(buffer_handle, server, request, cx)
-        });
-        cx.background_spawn(async move {
-            let result = task.await;
-            drop(guard);
-            result
         })
     }
 
@@ -3404,37 +3301,6 @@ impl Project {
         self.git_store.update(cx, |git_store, cx| {
             git_store.get_file_permalink(project_path, cx)
         })
-    }
-
-    fn retain_remotely_created_models(
-        &mut self,
-        cx: &mut Context<Self>,
-    ) -> RemotelyCreatedModelGuard {
-        Self::retain_remotely_created_models_impl(
-            &self.remotely_created_models,
-            &self.buffer_store,
-            &self.worktree_store,
-            cx,
-        )
-    }
-
-    fn retain_remotely_created_models_impl(
-        models: &Arc<Mutex<RemotelyCreatedModels>>,
-        buffer_store: &Entity<BufferStore>,
-        worktree_store: &Entity<WorktreeStore>,
-        cx: &mut App,
-    ) -> RemotelyCreatedModelGuard {
-        {
-            let mut remotely_create_models = models.lock();
-            if remotely_create_models.retain_count == 0 {
-                remotely_create_models.buffers = buffer_store.read(cx).buffers().collect();
-                remotely_create_models.worktrees = worktree_store.read(cx).worktrees().collect();
-            }
-            remotely_create_models.retain_count += 1;
-        }
-        RemotelyCreatedModelGuard {
-            remote_models: Arc::downgrade(&models),
-        }
     }
 
     /// Iterator of all open buffers that have unsaved changes

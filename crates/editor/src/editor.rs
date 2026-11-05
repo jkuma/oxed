@@ -2471,10 +2471,6 @@ impl Editor {
             EditorMode::Full { .. } => "full",
         };
 
-        if EditorSettings::jupyter_enabled(cx) {
-            key_context.add("jupyter");
-        }
-
         key_context.set("mode", mode);
         if self.pending_rename.is_some() {
             key_context.add("renaming");

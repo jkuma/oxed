@@ -20,6 +20,7 @@ esac
 
 echo "Bundling Oxed $version ($channel)"
 
+export RELEASE_VERSION="$version"
 cargo --config .cargo/bundle-config.toml build --release --package zed --bin oxed
 cargo --config .cargo/bundle-config.toml build --release --package cli
 
