@@ -762,6 +762,11 @@ impl ExtensionStore {
                     .get(url.as_ref(), Default::default(), true)
                     .await
                     .context("downloading extension")?;
+                anyhow::ensure!(
+                    response.status().is_success(),
+                    "downloading extension failed with status {}",
+                    response.status()
+                );
 
                 let content_length = response
                     .headers()
