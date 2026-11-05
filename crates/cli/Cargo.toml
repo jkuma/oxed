@@ -18,7 +18,6 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-no-bundled-uninstall = ["cli"]
 default = ["cli"]
 cli = [
     "dep:askpass",

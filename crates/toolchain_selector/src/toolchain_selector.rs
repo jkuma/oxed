@@ -509,25 +509,7 @@ impl Render for AddToolchainState {
                                                         window,
                                                         cx,
                                                     );
-                                                }))
-                                                .map(|this| {
-                                                    if false {
-                                                        this.with_animation(
-                                                            "inspecting-user-toolchain",
-                                                            Animation::new(Duration::from_millis(
-                                                                500,
-                                                            ))
-                                                            .repeat()
-                                                            .with_easing(pulsating_between(
-                                                                0.4, 0.8,
-                                                            )),
-                                                            |label, delta| label.alpha(delta),
-                                                        )
-                                                        .into_any()
-                                                    } else {
-                                                        this.into_any_element()
-                                                    }
-                                                }),
+                                                })),
                                         )
                                     })),
                             )

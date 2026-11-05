@@ -111,11 +111,6 @@ struct Args {
     /// Generate shell completions for Zed
     #[arg(long, value_names = ["SHELL"])]
     completions: Option<Shell>,
-    /// Uninstall Zed from user system
-    #[cfg(not(feature = "no-bundled-uninstall"))]
-    #[arg(long)]
-    uninstall: bool,
-
     /// Used for SSH/Git password authentication, to remove the need for netcat as a dependency,
     /// by having Zed act like netcat communicating over a Unix socket.
     #[arg(long, hide = true)]
@@ -459,26 +454,6 @@ fn run() -> Result<()> {
             &format!("{} --system-specs", path.display()),
         ];
         anyhow::bail!(msg.join("\n"));
-    }
-
-    #[cfg(not(feature = "no-bundled-uninstall"))]
-    if args.uninstall {
-        static UNINSTALL_SCRIPT: &[u8] = include_bytes!("../../../script/uninstall.sh");
-
-        let tmp_dir = tempfile::tempdir()?;
-        let script_path = tmp_dir.path().join("uninstall.sh");
-        fs::write(&script_path, UNINSTALL_SCRIPT)?;
-
-        use std::os::unix::fs::PermissionsExt as _;
-        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
-
-        let status = std::process::Command::new("sh")
-            .arg(&script_path)
-            .env("ZED_CHANNEL", &*release_channel::RELEASE_CHANNEL_NAME)
-            .status()
-            .context("Failed to execute uninstall script")?;
-
-        std::process::exit(status.code().unwrap_or(1));
     }
 
     let (server, server_name) =
