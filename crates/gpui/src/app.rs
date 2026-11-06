@@ -42,8 +42,8 @@ use crate::InspectorElementRegistry;
 use crate::asset_cache::CachedLoad;
 use crate::{
     Action, ActionBuildError, ActionRegistry, ActivityGuard, Any, AnyView, AnyWindowHandle,
-    AppContext, AppLifecyclePhase, Arena, ArenaBox, Asset, AssetSource, BackgroundExecutor, Bounds,
-    ClipboardItem, ClipboardReadError, CursorStyle, DispatchPhase, DisplayChanges, DisplayEvent,
+    AppContext, Arena, ArenaBox, Asset, AssetSource, BackgroundExecutor, Bounds,
+    ClipboardItem, CursorStyle, DispatchPhase, DisplayChanges, DisplayEvent,
     DisplayId, EventEmitter, ExternalDragPayload, FocusHandle, FocusMap, ForegroundExecutor,
     Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MissingGlyph, OwnedMenu,
     PathPromptOptions, Pixels, Platform, PlatformDisplay, PlatformKeyboardLayout,
@@ -170,31 +170,6 @@ impl Drop for AppRefMut<'_> {
 /// You won't interact with this type much outside of initial configuration and startup.
 pub struct Application(Rc<AppCell>);
 
-/// A strong handle to an [`Application`] started with [`Application::run_embedded`].
-///
-/// Dropping this handle releases the app, so an embedder must hold it for as long as the
-/// app should run. While held, it is the embedder's entry point back into GPUI each time
-/// the external run loop gives it control.
-pub struct ApplicationHandle {
-    app: Rc<AppCell>,
-}
-
-impl ApplicationHandle {
-    /// Invoke `f` with the app context. Must not be called re-entrantly from code that
-    /// is already inside an update; the app state is a `RefCell` and will panic on a
-    /// double borrow.
-    pub fn update<R>(&self, f: impl FnOnce(&mut App) -> R) -> R {
-        let cx = &mut *self.app.borrow_mut();
-        f(cx)
-    }
-
-    /// An [`AsyncApp`] for use across await points. It holds the app weakly; keeping the
-    /// app alive remains this handle's job.
-    pub fn to_async(&self) -> AsyncApp {
-        self.update(|cx| cx.to_async())
-    }
-}
-
 /// Represents an application before it is fully launched. Once your app is
 /// configured, you'll start the app with `App::run`.
 impl Application {
@@ -264,9 +239,6 @@ impl Application {
 
     /// Start the application. The provided callback will be called once the
     /// app is fully launched.
-    ///
-    /// On WebAssembly, this returns immediately and retains the app for the lifetime
-    /// of the Wasm instance. Use [`Self::run_embedded`] to control its lifetime explicitly.
     pub fn run<F>(self, on_finish_launching: F)
     where
         F: 'static + FnOnce(&mut App),
@@ -281,32 +253,6 @@ impl Application {
             crate::hot_reload::init(cx);
             on_finish_launching(cx);
         }));
-    }
-
-    /// Start the application for an embedder that drives the run loop itself.
-    ///
-    /// On ordinary platforms `Platform::run` blocks for the lifetime of the app, and the
-    /// app state is kept alive by [`Application::run`]'s stack frame. Embedded platforms —
-    /// where the run loop belongs to someone else, e.g. GPUI compiled into a Wasm guest,
-    /// or a GPUI view hosted inside a foreign native application — implement
-    /// `Platform::run` to invoke the launch callback and return immediately. This method
-    /// supports that shape: it returns an [`ApplicationHandle`] that keeps the app alive
-    /// and lets the embedder re-enter it whenever the external run loop yields control.
-    pub fn run_embedded<F>(self, on_finish_launching: F) -> ApplicationHandle
-    where
-        F: 'static + FnOnce(&mut App),
-    {
-        let this = self.0.clone();
-        let platform = self.0.borrow().platform.clone();
-        platform.run(Box::new(move || {
-            let cx = &mut *this.borrow_mut();
-            // Some platforms only connect to their display server in `run`.
-            cx.displays_changed();
-            #[cfg(gpui_hot_reload)]
-            crate::hot_reload::init(cx);
-            on_finish_launching(cx);
-        }));
-        ApplicationHandle { app: self.0 }
     }
 
     /// Register a handler to be invoked when the platform instructs the application
@@ -336,7 +282,6 @@ impl Application {
 }
 
 type Handler = Box<dyn FnMut(&mut App) -> bool + 'static>;
-type AppLifecycleHandler = Box<dyn FnMut(AppLifecyclePhase, &mut App) -> bool + 'static>;
 type DisplayHandler = Box<dyn FnMut(DisplayEvent, &mut App) -> bool + 'static>;
 
 /// The properties of a display that GPUI reports changes to.
@@ -564,8 +509,6 @@ pub struct App {
     displays: HashMap<DisplayId, DisplayState>,
     pub(crate) system_sleep_observers: SubscriberSet<(), Handler>,
     pub(crate) system_wake_observers: SubscriberSet<(), Handler>,
-    app_lifecycle_observers: SubscriberSet<(), AppLifecycleHandler>,
-    memory_warning_observers: SubscriberSet<(), Handler>,
     pub(crate) release_listeners: SubscriberSet<EntityId, ReleaseListener>,
     pub(crate) global_observers: SubscriberSet<TypeId, Handler>,
     pub(crate) quit_observers: SubscriberSet<(), QuitHandler>,
@@ -705,8 +648,6 @@ impl App {
                 displays: read_displays(platform.as_ref()),
                 system_sleep_observers: SubscriberSet::new(),
                 system_wake_observers: SubscriberSet::new(),
-                app_lifecycle_observers: SubscriberSet::new(),
-                memory_warning_observers: SubscriberSet::new(),
                 global_observers: SubscriberSet::new(),
                 quit_observers: SubscriberSet::new(),
                 restart_observers: SubscriberSet::new(),
@@ -800,32 +741,6 @@ impl App {
             }
         }));
 
-        platform.on_app_lifecycle(Box::new({
-            let app = Rc::downgrade(&app);
-            move |phase| {
-                if let Some(app) = app.upgrade() {
-                    app.borrow_mut().update(|cx| {
-                        cx.app_lifecycle_observers
-                            .clone()
-                            .retain(&(), |callback| callback(phase, cx));
-                    });
-                }
-            }
-        }));
-
-        platform.on_memory_warning(Box::new({
-            let app = Rc::downgrade(&app);
-            move || {
-                if let Some(app) = app.upgrade() {
-                    app.borrow_mut().update(|cx| {
-                        cx.memory_warning_observers
-                            .clone()
-                            .retain(&(), |callback| callback(cx));
-                    });
-                }
-            }
-        }));
-
         platform.on_quit(Box::new({
             let cx = Rc::downgrade(&app);
             move || {
@@ -893,9 +808,7 @@ impl App {
 
     /// Quit the application gracefully.
     ///
-    /// Native applications give handlers registered with [`Context::on_app_quit`]
-    /// [`SHUTDOWN_TIMEOUT`] to complete. WebAssembly runs them asynchronously as best-effort cleanup
-    /// because its event-loop thread cannot block.
+    /// Handlers registered with [`Context::on_app_quit`] get [`SHUTDOWN_TIMEOUT`] to complete.
     pub fn shutdown(&mut self) {
         // Requested first so the final hang poll overlaps with the quit
         // handlers. It's awaited alongside them, within `SHUTDOWN_TIMEOUT`.
@@ -1416,42 +1329,6 @@ impl App {
         subscription
     }
 
-    /// Observes mobile application lifecycle changes. Desktop platforms do not
-    /// emit these events. On iOS these currently describe the single connected
-    /// scene, not individual windows.
-    ///
-    /// Save important changes incrementally: neither disconnection nor quit is
-    /// guaranteed before the system terminates a backgrounded application.
-    /// Dropping the returned subscription removes the observer.
-    pub fn on_app_lifecycle(
-        &self,
-        mut callback: impl FnMut(AppLifecyclePhase, &mut App) + 'static,
-    ) -> Subscription {
-        let (subscription, activate) = self.app_lifecycle_observers.insert(
-            (),
-            Box::new(move |phase, cx| {
-                callback(phase, cx);
-                true
-            }),
-        );
-        activate();
-        subscription
-    }
-
-    /// Observes mobile memory-pressure warnings so applications can release
-    /// expendable caches. Dropping the subscription removes the observer.
-    pub fn on_memory_warning(&self, mut callback: impl FnMut(&mut App) + 'static) -> Subscription {
-        let (subscription, activate) = self.memory_warning_observers.insert(
-            (),
-            Box::new(move |cx| {
-                callback(cx);
-                true
-            }),
-        );
-        activate();
-        subscription
-    }
-
     /// Returns the appearance of the application's windows.
     pub fn window_appearance(&self) -> WindowAppearance {
         self.platform.window_appearance()
@@ -1465,19 +1342,6 @@ impl App {
     /// Reads data from the platform clipboard.
     pub fn read_from_clipboard(&self) -> Option<ClipboardItem> {
         self.platform.read_from_clipboard()
-    }
-
-    /// Reads data from the platform clipboard, resolving once the contents
-    /// are available.
-    ///
-    /// Prefer this over [`App::read_from_clipboard`] in code that can await:
-    /// on platforms where clipboard access is asynchronous and
-    /// permission-gated (e.g. web), the synchronous read always returns
-    /// `None` while this method performs a real read.
-    pub fn read_from_clipboard_async(
-        &self,
-    ) -> Task<Result<Option<ClipboardItem>, ClipboardReadError>> {
-        self.platform.read_from_clipboard_async()
     }
 
     /// Sets the text rendering mode for the application.

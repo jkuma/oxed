@@ -24,8 +24,6 @@ impl<T> PriorityQueues<T> {
 }
 
 struct PriorityQueueState<T> {
-    // std's Wasm atomic backend unlocks and notifies without acquiring another
-    // lock. parking_lot can park during those operations, even after try_lock.
     queues: Mutex<PriorityQueues<T>>,
     condvar: Condvar,
     receiver_count: AtomicUsize,

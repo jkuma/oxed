@@ -358,23 +358,6 @@ pub trait Platform: 'static {
     /// Registers the callback invoked when the system resumes from sleep.
     fn on_system_wake(&self, callback: Box<dyn FnMut()>);
 
-    // Mobile platform methods. On mobile the OS owns the application
-    // lifecycle: apps are backgrounded, foregrounded, and killed at the
-    // system's discretion, and must react rather than decide.
-
-    /// Registers a callback invoked whenever the application's lifecycle
-    /// phase changes. See [`AppLifecyclePhase`] for the phase vocabulary and
-    /// its mapping onto iOS and Android.
-    ///
-    /// Desktop platforms never invoke this.
-    fn on_app_lifecycle(&self, _callback: Box<dyn FnMut(AppLifecyclePhase)>) {}
-
-    /// Registers a callback invoked when the OS signals memory pressure
-    /// (iOS `didReceiveMemoryWarning`, Android `onTrimMemory`).
-    ///
-    /// Desktop platforms never invoke this.
-    fn on_memory_warning(&self, _callback: Box<dyn FnMut()>) {}
-
     /// The platform's gesture recognition services, if it provides any
     /// beyond gpui's portable recognizers. See
     /// [`PlatformGestures`](crate::PlatformGestures).
@@ -456,17 +439,6 @@ pub trait Platform: 'static {
 
     fn read_from_clipboard(&self) -> Option<ClipboardItem>;
     fn write_to_clipboard(&self, item: ClipboardItem);
-
-    /// Reads the clipboard, resolving once its contents are available.
-    ///
-    /// Most platforms read synchronously and return a ready task. Platforms
-    /// whose clipboard access is inherently asynchronous and permission-gated
-    /// (e.g. the browser's async clipboard API) override this method; on those
-    /// platforms [`Platform::read_from_clipboard`] cannot return the clipboard
-    /// contents, so callers that can await should prefer this method.
-    fn read_from_clipboard_async(&self) -> Task<Result<Option<ClipboardItem>, ClipboardReadError>> {
-        Task::ready(Ok(self.read_from_clipboard()))
-    }
 
     fn read_from_primary(&self) -> Option<ClipboardItem>;
     fn write_to_primary(&self, item: ClipboardItem);
@@ -993,35 +965,6 @@ impl PlatformFrameSignal {
             None
         }
     }
-}
-
-/// The application's lifecycle phase, as owned and reported by a mobile OS.
-///
-/// `Inactive` means visible but not receiving input (a system dialog on
-/// top), while `Background` means not visible at all, with process death
-/// possible at any time thereafter.
-///
-/// | Phase        | iOS                          | Android      |
-/// |--------------|------------------------------|--------------|
-/// | `Active`     | `didBecomeActive`            | `onResume`   |
-/// | `Inactive`   | `willResignActive`           | `onPause`    |
-/// | `Background` | `didEnterBackground`         | `onStop`     |
-/// | `Foreground` | `willEnterForeground`        | `onStart`    |
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum AppLifecyclePhase {
-    /// Foreground and receiving input.
-    Active,
-    /// Foreground (visible) but not receiving input.
-    Inactive,
-    /// Not visible. The GPU surface may be destroyed while backgrounded and
-    /// the process may be killed without further notice.
-    Background,
-    /// Becoming visible again, before input is restored.
-    Foreground,
-    /// The native scene has disconnected. Its windows may reconnect later.
-    /// This is not a process-termination notification or a guaranteed final
-    /// opportunity to save state.
-    Disconnected,
 }
 
 /// Regions of a window that are obscured or reserved by the system.
@@ -2807,40 +2750,6 @@ pub struct ClipboardItem {
     /// The entries in this clipboard item.
     pub entries: Vec<ClipboardEntry>,
 }
-
-/// An error produced by [`Platform::read_from_clipboard_async`].
-///
-/// Callers surface these failures to users, so the variants distinguish
-/// conditions that call for different user-facing guidance.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ClipboardReadError {
-    /// The platform clipboard is not available in this context, e.g. the
-    /// browser does not expose the async clipboard API or the page is not a
-    /// secure context.
-    Unavailable,
-    /// The platform refused access, e.g. the user declined the browser's
-    /// clipboard permission prompt or paste confirmation.
-    Denied(String),
-    /// The clipboard contents could not be converted into a
-    /// [`ClipboardItem`].
-    UnsupportedContent,
-}
-
-impl std::fmt::Display for ClipboardReadError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unavailable => formatter.write_str("the clipboard is unavailable"),
-            Self::Denied(message) => {
-                write!(formatter, "clipboard access was denied: {message}")
-            }
-            Self::UnsupportedContent => {
-                formatter.write_str("the clipboard contents are unsupported")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ClipboardReadError {}
 
 /// Either a ClipboardString or a ClipboardImage
 #[derive(Clone, Debug, Eq, PartialEq)]
