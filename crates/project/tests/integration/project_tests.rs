@@ -19937,9 +19937,6 @@ fn assert_entry_git_state(
     );
 }
 
-#[cfg(any())]
-const GIT_STATUS_CONFLICTED: &str = "UU";
-
 #[allow(clippy::disallowed_methods)]
 fn git_cmd(work_dir: &Path) -> Command {
     let mut cmd = Command::new("git");
@@ -20067,61 +20064,6 @@ fn git_checkout(name: &str, work_dir: &Path) {
         "git checkout failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-}
-
-#[cfg(any())]
-#[allow(clippy::disallowed_methods)]
-#[track_caller]
-fn git_rev_parse(rev: &str, work_dir: &Path) -> String {
-    let output = git_cmd(work_dir)
-        .args(["rev-parse", rev])
-        .output()
-        .expect("Failed to run git rev-parse");
-    assert!(
-        output.status.success(),
-        "git rev-parse failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
-#[cfg(any())]
-#[allow(clippy::disallowed_methods)]
-#[track_caller]
-fn git_cherry_pick_expect_conflict(commit: &str, work_dir: &Path) {
-    let output = git_cmd(work_dir)
-        .args(["cherry-pick", "--no-commit", commit])
-        .output()
-        .expect("Failed to run git cherry-pick");
-    assert!(
-        !output.status.success(),
-        "git cherry-pick unexpectedly succeeded"
-    );
-}
-
-#[cfg(any())]
-#[allow(clippy::disallowed_methods)]
-#[track_caller]
-fn git_status(work_dir: &Path) -> collections::HashMap<String, String> {
-    let output = git_cmd(work_dir)
-        .args(["status", "--porcelain=v1"])
-        .output()
-        .expect("Failed to run git status");
-    assert!(
-        output.status.success(),
-        "git status failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .map(|line| {
-            let status = line[..2].to_string();
-            let path = line[3..].to_string();
-            (path, status)
-        })
-        .collect()
 }
 
 #[gpui::test]
