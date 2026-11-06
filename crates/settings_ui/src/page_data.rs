@@ -149,21 +149,6 @@ fn general_page(cx: &App) -> SettingsPage {
                 files: USER,
             }),
             SettingsPageItem::SettingItem(SettingItem {
-                title: "On Last Window Closed",
-                description: "What to do when the last window is closed.",
-                field: Box::new(SettingField {
-                    json_path: Some("on_last_window_closed"),
-                    pick: |settings_content| {
-                        settings_content.workspace.on_last_window_closed.as_ref()
-                    },
-                    write: |settings_content, value, _| {
-                        settings_content.workspace.on_last_window_closed = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
                 title: "Use System Path Prompts",
                 description: "Use native OS dialogs for 'Open' and 'Save As'.",
                 field: Box::new(SettingField {

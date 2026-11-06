@@ -75,7 +75,7 @@ pub struct WorkspaceSettingsContent {
     pub drop_target_size: Option<f32>,
     /// Whether to close the window when using 'close active item' on a workspace with no tabs
     ///
-    /// Default: auto ("off")
+    /// Default: keep_window_open
     pub when_closing_with_no_tabs: Option<CloseWindowWhenNoItems>,
     /// Whether to optimize Zed's interface for assistive technology such as
     /// screen readers.
@@ -102,10 +102,6 @@ pub struct WorkspaceSettingsContent {
     /// Values: empty_tab, launchpad
     /// Default: launchpad
     pub on_new_window: Option<OnNewWindow>,
-    /// What to do when the last window is closed
-    ///
-    /// Default: auto ("app quit")
-    pub on_last_window_closed: Option<OnLastWindowClosed>,
     /// Whether to resize all the panels in a dock when resizing the dock.
     ///
     /// Default: ["left"]
@@ -388,12 +384,11 @@ pub enum WindowDecorations {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum CloseWindowWhenNoItems {
-    /// Match platform conventions, which keep the window open
-    #[default]
-    PlatformDefault,
     /// Close the window when there are no tabs
     CloseWindow,
     /// Leave the window open when there are no tabs
+    #[default]
+    #[serde(alias = "platform_default")]
     KeepWindowOpen,
 }
 
@@ -401,9 +396,7 @@ impl CloseWindowWhenNoItems {
     pub fn should_close(&self) -> bool {
         match self {
             CloseWindowWhenNoItems::CloseWindow => true,
-            CloseWindowWhenNoItems::PlatformDefault | CloseWindowWhenNoItems::KeepWindowOpen => {
-                false
-            }
+            CloseWindowWhenNoItems::KeepWindowOpen => false,
         }
     }
 }
@@ -700,28 +693,6 @@ pub enum OnNewWindow {
     JsonSchema,
     MergeFrom,
     PartialEq,
-    Debug,
-    strum::VariantArray,
-    strum::VariantNames,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum OnLastWindowClosed {
-    /// Match platform conventions, which quit the application
-    #[default]
-    PlatformDefault,
-    /// Quit the application the last window is closed
-    QuitApp,
-}
-
-#[derive(
-    Copy,
-    Clone,
-    Default,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    MergeFrom,
-    PartialEq,
     Eq,
     Debug,
     strum::VariantArray,
@@ -736,15 +707,6 @@ pub enum TextRenderingMode {
     Subpixel,
     /// Use grayscale text rendering.
     Grayscale,
-}
-
-impl OnLastWindowClosed {
-    pub fn is_quit_app(&self) -> bool {
-        match self {
-            OnLastWindowClosed::PlatformDefault => false,
-            OnLastWindowClosed::QuitApp => true,
-        }
-    }
 }
 
 #[with_fallible_options]

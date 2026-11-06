@@ -222,7 +222,7 @@ impl Application {
     }
 
     /// Configures when the application should automatically quit.
-    /// By default, [`QuitMode::Default`] is used.
+    /// By default, [`QuitMode::LastWindowClosed`] is used.
     pub fn with_quit_mode(self, mode: QuitMode) -> Self {
         self.0.borrow_mut().quit_mode = mode;
         self
@@ -404,10 +404,8 @@ impl MissingGlyphCallbackSlot {
 /// Defines when the application should automatically quit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum QuitMode {
-    /// Use [`QuitMode::Explicit`] on macOS and [`QuitMode::LastWindowClosed`] on other platforms.
-    #[default]
-    Default,
     /// Quit automatically when the last window is closed.
+    #[default]
     LastWindowClosed,
     /// Quit only when requested via [`App::quit`].
     Explicit,
@@ -1522,7 +1520,7 @@ impl App {
     }
 
     /// Configures when the application should automatically quit.
-    /// By default, [`QuitMode::Default`] is used.
+    /// By default, [`QuitMode::LastWindowClosed`] is used.
     pub fn set_quit_mode(&mut self, mode: QuitMode) {
         self.quit_mode = mode;
     }
@@ -2707,7 +2705,6 @@ impl App {
                     let quit_on_empty = match cx.quit_mode {
                         QuitMode::Explicit => false,
                         QuitMode::LastWindowClosed => true,
-                        QuitMode::Default => true,
                     };
 
                     if quit_on_empty && cx.windows.is_empty() {
