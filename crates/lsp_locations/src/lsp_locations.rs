@@ -472,7 +472,6 @@ impl LspLocationsPicker {
             Picker::uniform_list(delegate, window, cx)
                 .popover()
                 .initial_width(rems(48.))
-                .resizable(true)
         });
         let subscription = cx.subscribe(&picker, |_, _, _: &DismissEvent, cx| {
             cx.emit(DismissEvent);

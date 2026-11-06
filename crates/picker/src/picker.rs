@@ -103,12 +103,12 @@ struct PendingUpdateMatches {
 #[derive(Clone, Copy)]
 enum Presentation {
     /// A self-contained modal: draws its own elevated background and dismisses
-    /// when it loses focus. May optionally be resized (persisting its size).
+    /// when it loses focus. May optionally be resized (persisting its size);
+    /// resizing only makes sense for modals.
     Modal { resizable: bool },
-    /// A popover placed by its host from its top-left corner: draws its own
-    /// elevated background and dismisses when it loses focus. May optionally be
-    /// resized from its right and bottom edges (persisting its size).
-    Popover { resizable: bool },
+    /// A popover attached to a menu/trigger: draws its own elevated background
+    /// and dismisses when it loses focus, but is never resizable.
+    Popover,
     /// Embedded inside a larger container (e.g. another modal) that provides its
     /// own chrome and handles dismissal.
     Embedded,
@@ -728,26 +728,22 @@ impl<D: PickerDelegate> Picker<D> {
     }
 
     /// Presents the picker as a popover surface: it draws its own elevated
-    /// background (like a modal) and is not resizable unless
-    /// [`resizable`](Self::resizable) is called afterwards. Use this for pickers
-    /// shown inside a menu/popover or anchored to a point.
+    /// background (like a modal) but is not resizable. Use this for pickers
+    /// shown inside a menu/popover.
     pub fn popover(mut self) -> Self {
         self.set_popover();
         self
     }
 
     pub(crate) fn set_popover(&mut self) {
-        self.presentation = Presentation::Popover { resizable: false };
+        self.presentation = Presentation::Popover;
     }
 
     /// Controls whether the user can drag to resize the picker (and whether its
-    /// size is persisted). Applies to modal and popover pickers; no-op for
-    /// embedded ones. Defaults to `true` for modal pickers with a preview and
-    /// `false` otherwise.
+    /// size is persisted). Only applies to modal pickers; no-op otherwise.
+    /// Defaults to `true` for pickers with a preview and `false` otherwise.
     pub fn resizable(mut self, resizable: bool) -> Self {
-        if let Presentation::Modal { resizable: r } | Presentation::Popover { resizable: r } =
-            &mut self.presentation
-        {
+        if let Presentation::Modal { resizable: r } = &mut self.presentation {
             *r = resizable;
         }
         self
@@ -758,21 +754,13 @@ impl<D: PickerDelegate> Picker<D> {
     fn draws_own_container(&self) -> bool {
         matches!(
             self.presentation,
-            Presentation::Modal { .. } | Presentation::Popover { .. }
+            Presentation::Modal { .. } | Presentation::Popover
         )
     }
 
+    /// Whether the picker can be resized (only ever true for modals).
     fn is_resizable(&self) -> bool {
-        matches!(
-            self.presentation,
-            Presentation::Modal { resizable: true } | Presentation::Popover { resizable: true }
-        )
-    }
-
-    /// Whether the picker is centered by its host, so it can also grow from its
-    /// left edge.
-    fn is_centered(&self) -> bool {
-        matches!(self.presentation, Presentation::Modal { .. })
+        matches!(self.presentation, Presentation::Modal { resizable: true })
     }
 
     pub fn list_measure_all(mut self) -> Self {
@@ -2040,26 +2028,6 @@ mod tests {
                 "leaving the mode should clear the selection"
             );
         });
-    }
-
-    #[gpui::test]
-    async fn test_popover_is_resizable_only_on_request(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        for (resizable, expected) in [(None, false), (Some(true), true), (Some(false), false)] {
-            let (picker, cx) = cx.add_window_view(|window, cx| {
-                let picker =
-                    Picker::uniform_list(TestDelegate::new(vec![true]), window, cx).popover();
-                match resizable {
-                    Some(resizable) => picker.resizable(resizable),
-                    None => picker,
-                }
-            });
-            picker.read_with(cx, |picker, _| {
-                assert_eq!(picker.is_resizable(), expected);
-                assert!(!picker.is_centered(), "a popover grows from its top-left");
-            });
-        }
     }
 }
 

@@ -82,14 +82,12 @@ impl<D: PickerDelegate> Render for Picker<D> {
             .relative()
             .child(content)
             .when(self.is_resizable(), |this| {
-                this.when(self.is_centered(), |this| {
-                    this.left(self.shape.horizontal_offset(window))
-                        .child(self.render_resize(Left, window, cx))
-                        .child(self.render_resize(LeftCorner(layout), window, cx))
-                })
-                .child(self.render_resize(Right(layout), window, cx))
-                .child(self.render_resize(Bottom(layout), window, cx))
-                .child(self.render_resize(RightCorner(layout), window, cx))
+                this.left(self.shape.horizontal_offset(window))
+                    .child(self.render_resize(Left, window, cx))
+                    .child(self.render_resize(Right(layout), window, cx))
+                    .child(self.render_resize(Bottom(layout), window, cx))
+                    .child(self.render_resize(LeftCorner(layout), window, cx))
+                    .child(self.render_resize(RightCorner(layout), window, cx))
             })
     }
 }
