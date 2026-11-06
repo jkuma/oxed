@@ -497,6 +497,7 @@ mod tests {
 
         open_file(&workspace, "index.html", cx).await;
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
+        cx.run_until_parked();
 
         app_state
             .fs
@@ -511,6 +512,8 @@ mod tests {
             )
             .await
             .unwrap();
+        // The removal event must start the reload debounce before the clock moves past it.
+        cx.run_until_parked();
         cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
         cx.run_until_parked();
         cx.update(|_, cx| {
