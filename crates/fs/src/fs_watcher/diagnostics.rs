@@ -192,7 +192,7 @@ impl WatchRecording {
                     .filter_map(|path| {
                         let registration = state.watchers.get(path.watcher_ids.first()?)?;
                         Some(WatchRoot {
-                            path: registration.path.as_path().to_string_lossy().into_owned(),
+                            path: registration.path.to_string_lossy().into_owned(),
                             registrations: path.watcher_ids.len(),
                         })
                     })

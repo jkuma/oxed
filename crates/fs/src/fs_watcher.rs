@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
-use util::{ResultExt, paths::SanitizedPath};
+use util::ResultExt;
 
 use crate::{Fs, PathEvent, PathEventKind, Watcher};
 
@@ -68,7 +68,7 @@ pub(crate) async fn watch(
         {
             target = parent.join(target);
             if let Ok(canonical) = fs.canonicalize(&target).await {
-                target = SanitizedPath::new(&canonical).as_path().to_path_buf();
+                target = canonical;
             }
         }
         watcher.add(&target).ok();
@@ -142,13 +142,13 @@ impl FsWatcher {
 
     fn add_existing_path(&self, path: Arc<Path>) -> anyhow::Result<()> {
         let case_insensitive = !self.fs.is_path_case_sensitive(&path);
-        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
+        let key = WatchKey::for_registration(&path, case_insensitive);
         let existing = self.registrations.lock().get(&key).cloned();
         if let Some(existing) = existing {
             log::trace!("path to watch is already registered: {path:?}");
             return existing.os_watcher.rewatch_if_stale(
                 &mut existing.os_watcher.state.lock(),
-                SanitizedPath::new(&path),
+                &path,
                 &key,
             );
         }
@@ -217,10 +217,7 @@ impl Watcher for FsWatcher {
         log::trace!("watcher add: {path:?}");
 
         let path: Arc<Path> = path.into();
-        if path_covered_by_recursive_registration(
-            &self.registrations.lock(),
-            SanitizedPath::new(&path),
-        ) {
+        if path_covered_by_recursive_registration(&self.registrations.lock(), &path) {
             log::trace!("path to watch is covered by an existing registration: {path:?}");
             return Ok(());
         }
@@ -246,7 +243,7 @@ impl Watcher for FsWatcher {
         log::trace!("remove watched path: {path:?}");
         self.pending_registrations.lock().remove(path);
 
-        let sanitized = SanitizedPath::new(path);
+        let sanitized = Path::new(path);
         let registration = {
             let mut registrations = self.registrations.lock();
             registrations
@@ -265,10 +262,9 @@ impl Watcher for FsWatcher {
 /// poll watches are recursive.
 fn path_covered_by_recursive_registration(
     registrations: &HashMap<WatchKey, FsWatcherRegistration>,
-    path: &SanitizedPath,
+    path: &Path,
 ) -> bool {
-    path.as_path().ancestors().skip(1).any(|ancestor| {
-        let ancestor = SanitizedPath::unchecked_new(ancestor);
+    path.ancestors().skip(1).any(|ancestor| {
         [WatchKey::exact(ancestor), WatchKey::folded(ancestor)]
             .iter()
             .any(|key| {
@@ -320,7 +316,7 @@ fn register_existing_path(
     } else {
         native_watcher
     };
-    let root_path = SanitizedPath::new_arc(path.as_ref());
+    let root_path: Arc<Path> = Arc::from(path.as_ref());
     let path_for_callback = path.clone();
     let Some(registration_id) =
         os_watcher.add(path, case_insensitive, move |event: &notify::Event| {
@@ -474,10 +470,10 @@ pub(crate) fn case_insensitive_path(_path: &Path) -> bool {
 
 /// Whether `path` is `root` or sits beneath it, folding case on case-insensitive
 /// volumes so a differently-cased spelling still matches.
-fn path_is_under(path: &SanitizedPath, root: &SanitizedPath, case_insensitive: bool) -> bool {
+fn path_is_under(path: &Path, root: &Path, case_insensitive: bool) -> bool {
     if case_insensitive {
-        let path = path.as_path().to_string_lossy().to_lowercase();
-        let root = root.as_path().to_string_lossy().to_lowercase();
+        let path = path.to_string_lossy().to_lowercase();
+        let root = root.to_string_lossy().to_lowercase();
         Path::new(&path).starts_with(Path::new(&root))
     } else {
         path.starts_with(root)
@@ -506,17 +502,17 @@ enum WatchKey {
 }
 
 impl WatchKey {
-    fn exact(path: &SanitizedPath) -> Self {
-        Self::Exact(Arc::from(path.as_path()))
+    fn exact(path: &Path) -> Self {
+        Self::Exact(Arc::from(path))
     }
 
-    fn folded(path: &SanitizedPath) -> Self {
-        let lossy = path.as_path().to_string_lossy();
+    fn folded(path: &Path) -> Self {
+        let lossy = path.to_string_lossy();
         let folded = lossy.to_lowercase();
         Self::Folded(folded.into())
     }
 
-    fn for_registration(path: &SanitizedPath, case_insensitive: bool) -> Self {
+    fn for_registration(path: &Path, case_insensitive: bool) -> Self {
         if case_insensitive {
             Self::folded(path)
         } else {
@@ -559,7 +555,7 @@ async fn poll_path_until_created(
             })
             .await
         };
-        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
+        let key = WatchKey::for_registration(&path, case_insensitive);
 
         if registrations.lock().contains_key(&key) {
             pending_registrations.lock().remove(path.as_ref());
@@ -648,7 +644,7 @@ fn enqueue_path_events(
 fn push_notify_event(
     tx: &smol::channel::Sender<()>,
     pending_path_events: &Arc<Mutex<Vec<PathEvent>>>,
-    root_path: &SanitizedPath,
+    root_path: &Path,
     case_insensitive: bool,
     watched_root: &Path,
     event: &notify::Event,
@@ -663,9 +659,9 @@ fn push_notify_event(
         .paths
         .iter()
         .filter_map(|event_path| {
-            let event_path = SanitizedPath::new(event_path);
+            let event_path = Path::new(event_path);
             path_is_under(event_path, root_path, case_insensitive).then(|| PathEvent {
-                path: event_path.as_path().to_path_buf(),
+                path: event_path.to_path_buf(),
                 kind,
             })
         })
@@ -746,7 +742,7 @@ pub struct WatcherRegistrationId(u32);
 struct WatcherRegistrationState {
     callback: Arc<dyn Fn(&notify::Event) + Send + Sync>,
     key: WatchKey,
-    path: Arc<SanitizedPath>,
+    path: Arc<Path>,
 }
 
 struct PathRegistrationState {
@@ -782,12 +778,11 @@ impl WatchPaths {
 
     /// True if a recursive registration on a strict ancestor already covers
     /// `path`. Only poll watches are recursive.
-    fn covered_by_recursive_ancestor(&self, path: &SanitizedPath, recursive: bool) -> bool {
+    fn covered_by_recursive_ancestor(&self, path: &Path, recursive: bool) -> bool {
         if !recursive {
             return false;
         }
-        path.as_path().ancestors().skip(1).any(|ancestor| {
-            let ancestor = SanitizedPath::unchecked_new(ancestor);
+        path.ancestors().skip(1).any(|ancestor| {
             self.0.contains_key(&WatchKey::exact(ancestor))
                 || self.0.contains_key(&WatchKey::folded(ancestor))
         })
@@ -796,9 +791,8 @@ impl WatchPaths {
     /// Collects the watcher ids of every registration whose directory is an
     /// ancestor of (or equal to) `path`. Both exact and folded keys are probed,
     /// so a real-cased event path matches a folded registration and vice versa.
-    fn watcher_ids_covering(&self, path: &SanitizedPath, ids: &mut Vec<WatcherRegistrationId>) {
-        for ancestor in path.as_path().ancestors() {
-            let ancestor = SanitizedPath::unchecked_new(ancestor);
+    fn watcher_ids_covering(&self, path: &Path, ids: &mut Vec<WatcherRegistrationId>) {
+        for ancestor in path.ancestors() {
             if let Some(registration) = self.0.get(&WatchKey::exact(ancestor)) {
                 ids.extend_from_slice(&registration.watcher_ids);
             }
@@ -833,7 +827,7 @@ impl WatcherState {
         }
     }
 
-    fn remove_registration(&mut self, id: WatcherRegistrationId) -> Option<Arc<SanitizedPath>> {
+    fn remove_registration(&mut self, id: WatcherRegistrationId) -> Option<Arc<Path>> {
         let registration_state = self.watchers.remove(&id)?;
         let path_state = self.paths.get_mut(&registration_state.key)?;
         path_state.watcher_ids.retain(|&existing| existing != id);
@@ -955,7 +949,6 @@ impl OsWatcher {
         case_insensitive: bool,
         cb: impl Fn(&notify::Event) + Send + Sync + 'static,
     ) -> anyhow::Result<Option<WatcherRegistrationId>> {
-        let path = SanitizedPath::from_arc(path);
         let key = WatchKey::for_registration(&path, case_insensitive);
         let mut state = self.state.lock();
         let path_already_covered = state
@@ -971,7 +964,7 @@ impl OsWatcher {
                     WatchDiagnosticEvent::new(
                         self.kind,
                         "watch_skipped",
-                        &[path.as_path().to_owned()],
+                        &[path.to_path_buf()],
                         "Native watch limit cooldown is active; registration will be retried"
                             .into(),
                         false,
@@ -980,12 +973,12 @@ impl OsWatcher {
                 return Ok(None);
             }
 
-            match self.watch(path.as_path()) {
+            match self.watch(&path) {
                 Ok(()) => {}
                 Err(error)
                     if self.kind == OsWatcherKind::Native && is_max_files_watch_error(&error) =>
                 {
-                    state.start_native_watch_limit_cooldown(path.as_path());
+                    state.start_native_watch_limit_cooldown(&path);
                     return Ok(None);
                 }
                 Err(error) => return Err(error),
@@ -1017,7 +1010,7 @@ impl OsWatcher {
     fn rewatch_if_stale(
         &self,
         state: &mut WatcherState,
-        path: &SanitizedPath,
+        path: &Path,
         key: &WatchKey,
     ) -> anyhow::Result<()> {
         let Some(path_state) = state.paths.get_mut(key) else {
@@ -1030,8 +1023,8 @@ impl OsWatcher {
         log::trace!("rewatching stale path: {path:?}");
         // A renamed directory's watch survives under the old path; unwatch it
         // so the backend won't skip installation as a duplicate.
-        self.unwatch(path.as_path()).log_err();
-        self.watch(path.as_path())?;
+        self.unwatch(path).log_err();
+        self.watch(path)?;
         path_state.stale = false;
         Ok(())
     }
@@ -1061,7 +1054,7 @@ impl OsWatcher {
         let Some(path) = state.remove_registration(id) else {
             return;
         };
-        self.unwatch(path.as_path()).log_err();
+        self.unwatch(&path).log_err();
     }
 
     fn watch(&self, path: &Path) -> anyhow::Result<()> {
@@ -1212,7 +1205,7 @@ fn dispatch(
             )
         {
             for path in &event.paths {
-                let path = SanitizedPath::new(path);
+                let path = Path::new(path);
                 for event_key in [WatchKey::exact(path), WatchKey::folded(path)] {
                     let Some(path_state) = state.paths.get_mut(&event_key) else {
                         continue;
@@ -1248,7 +1241,7 @@ fn dispatch(
         } else {
             let mut ids = Vec::new();
             for path in &event.paths {
-                let sanitized = SanitizedPath::new(path);
+                let sanitized = Path::new(path);
                 state.paths.watcher_ids_covering(sanitized, &mut ids);
             }
             ids.sort_unstable_by_key(|id| id.0);
@@ -1518,7 +1511,7 @@ mod tests {
                 .contains_key(path.as_path())
         );
         let case_insensitive = case_insensitive_path(&path);
-        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
+        let key = WatchKey::for_registration(Path::new(&path), case_insensitive);
         assert!(watcher.registrations.lock().contains_key(&key));
 
         // poll_path_until_created also enqueues a Rescan for the same path, but
@@ -1588,7 +1581,7 @@ mod tests {
             }
 
             watcher.dispatch(Ok(event));
-            let rewatched = SanitizedPath::new(rewatched);
+            let rewatched = Path::new(rewatched);
             let key = WatchKey::for_registration(rewatched, case_insensitive);
             watcher
                 .rewatch_if_stale(&mut watcher.state.lock(), rewatched, &key)
@@ -1597,13 +1590,9 @@ mod tests {
             let backend = backend.lock();
             assert_eq!(
                 backend.watch_calls,
-                &[
-                    dir.clone(),
-                    subdir.clone(),
-                    rewatched.as_path().to_path_buf()
-                ]
+                &[dir.clone(), subdir.clone(), rewatched.to_path_buf()]
             );
-            assert_eq!(backend.unwatch_calls, &[rewatched.as_path().to_path_buf()]);
+            assert_eq!(backend.unwatch_calls, &[rewatched.to_path_buf()]);
         }
     }
 
@@ -1669,8 +1658,8 @@ mod tests {
 
     #[test]
     fn watch_key_folds_case_but_keeps_exact_distinct() {
-        let mixed = SanitizedPath::new(Path::new("/Repo/Proj"));
-        let lower = SanitizedPath::new(Path::new("/repo/proj"));
+        let mixed = Path::new(Path::new("/Repo/Proj"));
+        let lower = Path::new(Path::new("/repo/proj"));
 
         // Folded keys collide regardless of casing; exact keys do not.
         assert_eq!(WatchKey::folded(mixed), WatchKey::folded(lower));

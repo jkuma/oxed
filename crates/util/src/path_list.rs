@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use crate::paths::SanitizedPath;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +48,7 @@ impl PathList {
         let mut indexed_paths: Vec<(usize, PathBuf)> = paths
             .iter()
             .enumerate()
-            .map(|(ix, path)| (ix, SanitizedPath::new(path).into()))
+            .map(|(ix, path)| (ix, path.as_ref().to_path_buf()))
             .collect();
         indexed_paths.sort_by(|(_, a), (_, b)| a.cmp(b));
         let order = indexed_paths.iter().map(|e| e.0).collect::<Vec<_>>().into();

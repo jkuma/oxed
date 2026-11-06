@@ -71,12 +71,7 @@ use std::{
 };
 use sum_tree::{Edit, SumTree, TreeMap};
 use text::{Bias, BufferId, OffsetRangeExt, Rope, ToOffset};
-use util::{
-    ResultExt, debug_panic,
-    paths::{PathStyle, SanitizedPath},
-    post_inc,
-    rel_path::RelPath,
-};
+use util::{ResultExt, debug_panic, paths::PathStyle, post_inc, rel_path::RelPath};
 use worktree::{
     File, PathChange, PathKey, PathProgress, PathSummary, PathTarget, ProjectEntryId,
     UpdatedGitRepositoriesSet, UpdatedGitRepository, Worktree, WorktreeSettings,
@@ -4406,7 +4401,7 @@ impl Repository {
         let git_store = self.git_store.upgrade()?;
         let worktree_store = git_store.read(cx).worktree_store.read(cx);
         let abs_path = self.snapshot.repo_path_to_abs_path(path);
-        let abs_path = SanitizedPath::new(&abs_path);
+        let abs_path = Path::new(&abs_path);
         let (worktree, relative_path) = worktree_store.find_worktree(abs_path, cx)?;
         Some(ProjectPath {
             worktree_id: worktree.read(cx).id(),

@@ -273,15 +273,11 @@ fn create_empty_stub(temp_dir: &mut TempDir, rel: &Path) -> anyhow::Result<PathB
 mod tests {
     use super::*;
     use serde_json::json;
-    use util::paths::SanitizedPath;
     use util::test::TempTree;
 
     macro_rules! assert_path_eq {
         ($left:expr, $right:expr) => {
-            assert_eq!(
-                SanitizedPath::new(Path::new(&$left)),
-                SanitizedPath::new(Path::new(&$right))
-            )
+            assert_eq!(Path::new(&$left), Path::new(&$right))
         };
     }
 

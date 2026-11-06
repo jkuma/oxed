@@ -116,12 +116,7 @@ pub use toolbar::{
 pub use ui;
 use ui::{Window, prelude::*};
 use url::Url;
-use util::{
-    ResultExt, TryFutureExt,
-    paths::{PathStyle, SanitizedPath},
-    rel_path::RelPath,
-    serde::default_true,
-};
+use util::{ResultExt, TryFutureExt, paths::PathStyle, rel_path::RelPath, serde::default_true};
 use uuid::Uuid;
 pub use workspace_settings::{
     AccessibleMode, AutosaveSetting, BottomDockLayout, EncodingDisplayOptions, FocusFollowsMouse,
@@ -3462,7 +3457,7 @@ impl Workspace {
                 };
 
                 let this = this.clone();
-                let abs_path: Arc<Path> = SanitizedPath::new(&abs_path).as_path().into();
+                let abs_path: Arc<Path> = Path::new(&abs_path).into();
                 let fs = fs.clone();
                 let pane = pane.clone();
                 let task = cx.spawn(async move |cx| {
@@ -3527,8 +3522,7 @@ impl Workspace {
             // deterministic.
             if let Some((winner_abs_path, winner_is_dir)) = winner {
                 'emit_winner: {
-                    let winner_abs_path: Arc<Path> =
-                        SanitizedPath::new(&winner_abs_path).as_path().into();
+                    let winner_abs_path: Arc<Path> = Path::new(&winner_abs_path).into();
 
                     let visible = match options.visible.as_ref().unwrap_or(&OpenVisible::None) {
                         OpenVisible::All => true,
@@ -8360,12 +8354,11 @@ pub async fn find_existing_workspace(
                     let project = workspace.project.read(cx);
                     let path_style = workspace.path_style(cx);
                     Some(!abs_paths.iter().any(|path| {
-                        let path = util::paths::SanitizedPath::new(path);
                         project.worktrees(cx).any(|worktree| {
                             let worktree = worktree.read(cx);
                             let abs_path = worktree.abs_path();
                             path_style
-                                .strip_prefix(path.as_ref(), abs_path.as_ref())
+                                .strip_prefix(path, abs_path.as_ref())
                                 .ok()
                                 .and_then(|path| RelPath::new(path, path_style).ok())
                                 .and_then(|rel| worktree.entry_for_path(&rel))

@@ -125,7 +125,7 @@ use text::{Anchor, BufferId, LineEnding, OffsetRangeExt, ToPoint as _};
 
 use util::{
     ConnectionResult, ResultExt as _, debug_panic, defer, maybe, merge_json_value_into,
-    paths::{PathStyle, SanitizedPath, UrlExt},
+    paths::{PathStyle, UrlExt},
     post_inc,
     redact::redact_command,
     rel_path::{RelPath, RelPathBuf},
@@ -4080,10 +4080,9 @@ impl LocalLspStore {
 
         let (path, pattern) = match &watcher.glob_pattern {
             lsp::GlobPattern::String(s) => {
-                let watcher_path = SanitizedPath::new(s);
-                let path = glob_literal_prefix(watcher_path.as_path());
+                let watcher_path = Path::new(s);
+                let path = glob_literal_prefix(watcher_path);
                 let pattern = watcher_path
-                    .as_path()
                     .strip_prefix(&path)
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|e| {
@@ -4093,7 +4092,7 @@ impl LocalLspStore {
                             path.display(),
                             e
                         );
-                        watcher_path.as_path().to_string_lossy().into_owned()
+                        watcher_path.to_string_lossy().into_owned()
                     });
                 (path, pattern)
             }
@@ -4169,11 +4168,8 @@ impl LocalLspStore {
             let path_style = tree.path_style();
             match &watcher.glob_pattern {
                 lsp::GlobPattern::String(s) => {
-                    let watcher_path = SanitizedPath::new(s);
-                    let relative = watcher_path
-                        .as_path()
-                        .strip_prefix(&worktree_root_path)
-                        .ok()?;
+                    let watcher_path = Path::new(s);
+                    let relative = watcher_path.strip_prefix(&worktree_root_path).ok()?;
                     let literal_prefix = glob_literal_prefix(relative);
                     Some((
                         worktree.clone(),

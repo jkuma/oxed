@@ -15,11 +15,7 @@ use gpui::{
     App, AppContext as _, Context, Entity, EntityId, EventEmitter, Global, Task, WeakEntity,
 };
 use postage::{prelude::Stream as _, watch};
-use util::{
-    path_list::PathList,
-    paths::{PathStyle, SanitizedPath},
-    rel_path::RelPath,
-};
+use util::{path_list::PathList, paths::PathStyle, rel_path::RelPath};
 use worktree::{
     CreatedEntry, Entry, ProjectEntryId, UpdatedEntriesSet, UpdatedGitRepositoriesSet, Worktree,
     WorktreeId,
@@ -193,7 +189,7 @@ pub struct WorktreeStore {
     scanning_enabled: bool,
     #[allow(clippy::type_complexity)]
     loading_worktrees:
-        HashMap<Arc<SanitizedPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
+        HashMap<Arc<Path>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
     initial_scan_complete: (watch::Sender<bool>, watch::Receiver<bool>),
     fs: Arc<dyn Fs>,
 }
@@ -385,11 +381,11 @@ impl WorktreeStore {
         abs_path: impl AsRef<Path>,
         cx: &App,
     ) -> Option<(Entity<Worktree>, Arc<RelPath>)> {
-        let abs_path = SanitizedPath::new(abs_path.as_ref());
+        let abs_path = abs_path.as_ref();
         for tree in self.worktrees() {
             let path_style = tree.read(cx).path_style();
             if let Some(relative_path) = path_style
-                .strip_prefix(abs_path.as_ref(), tree.read(cx).abs_path().as_ref())
+                .strip_prefix(abs_path, tree.read(cx).abs_path().as_ref())
                 .ok()
                 .and_then(|path| RelPath::new(path, path_style).ok())
             {
@@ -589,8 +585,10 @@ impl WorktreeStore {
                         // We eagerly update `abs_path` and refresh this worktree.
                         // Otherwise, the FS watcher would do it on the `RootUpdated` event,
                         // but with a noticeable delay, so we handle it proactively.
-                        local
-                            .update_abs_path_and_refresh(SanitizedPath::new_arc(&abs_new_path), cx);
+                        local.update_abs_path_and_refresh(
+                            Arc::<Path>::from(abs_new_path.as_path()),
+                            cx,
+                        );
                         Task::ready(Ok(this.root_entry().cloned()))
                     } else {
                         // First refresh the parent directory (in case it was newly created)
@@ -614,7 +612,7 @@ impl WorktreeStore {
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>>> {
-        let abs_path: Arc<SanitizedPath> = SanitizedPath::new_arc(&abs_path);
+        let abs_path: Arc<Path> = Arc::from(abs_path.as_ref());
         if !self.loading_worktrees.contains_key(&abs_path) {
             let task = self.create_local_worktree(self.fs.clone(), abs_path.clone(), visible, cx);
 
@@ -673,7 +671,7 @@ impl WorktreeStore {
     fn create_local_worktree(
         &mut self,
         fs: Arc<dyn Fs>,
-        abs_path: Arc<SanitizedPath>,
+        abs_path: Arc<Path>,
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>, Arc<anyhow::Error>>> {
@@ -685,7 +683,7 @@ impl WorktreeStore {
         cx.spawn(async move |this, cx| {
             let worktree_id = next_worktree_id.await?;
             let worktree = Worktree::local(
-                SanitizedPath::cast_arc(abs_path.clone()),
+                abs_path.clone(),
                 visible,
                 fs,
                 next_entry_id,

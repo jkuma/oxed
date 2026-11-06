@@ -33,7 +33,6 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::Duration,
 };
-use util::paths::SanitizedPath;
 use wasmtime::{
     CacheStore, Engine, Store,
     component::{Component, ResourceTable},
@@ -517,7 +516,7 @@ impl WasmHost {
             .context("failed to create extension work dir")?;
 
         let permissions = wasmtime_wasi::FsPerms::ReadWrite;
-        let path = SanitizedPath::new(&extension_work_dir).to_string();
+        let path = extension_work_dir.display().to_string();
 
         let mut ctx = WasiCtxBuilder::new();
         ctx.inherit_stdio()

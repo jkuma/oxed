@@ -91,12 +91,7 @@ use std::{
 };
 
 use text::{Anchor, BufferId, Rope};
-use util::{
-    ResultExt as _, maybe,
-    path_list::PathList,
-    paths::{PathStyle, SanitizedPath},
-    rel_path::RelPath,
-};
+use util::{ResultExt as _, maybe, path_list::PathList, paths::PathStyle, rel_path::RelPath};
 use worktree::{CreatedEntry, Snapshot, Traversal};
 pub use worktree::{
     Entry, EntryKind, FS_WATCH_LATENCY, File, LocalWorktree, PathChange, ProjectEntryId,
@@ -1369,7 +1364,7 @@ impl Project {
         exclude_sub_dirs: bool,
         cx: &App,
     ) -> Option<bool> {
-        let path = SanitizedPath::new(path).as_path();
+        let path = Path::new(path);
         let path_style = self.path_style(cx);
         self.worktrees(cx)
             .filter_map(|worktree| {
@@ -1406,7 +1401,7 @@ impl Project {
     }
 
     fn visibility_for_subpath(&self, path: &Path, cx: &App) -> Option<bool> {
-        let path = SanitizedPath::new(path).as_path();
+        let path = Path::new(path);
         let path_style = self.path_style(cx);
         self.worktrees(cx)
             .filter_map(|worktree| {
