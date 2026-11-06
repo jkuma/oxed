@@ -30,7 +30,7 @@ use parking_lot::Mutex;
 use rope::Rope;
 use std::{path::PathBuf, sync::Arc, sync::atomic::AtomicBool, time::SystemTime};
 use text::LineEnding;
-use util::{paths::PathStyle, rel_path::RelPath};
+use util::rel_path::RelPath;
 
 #[derive(Clone)]
 pub struct FakeGitRepository {
@@ -332,7 +332,7 @@ impl GitRepository for FakeGitRepository {
                     .iter()
                     .filter_map(|path| {
                         let path_in_repo = path.strip_prefix(workdir_path).ok()?;
-                        let path_in_repo = RelPath::new(path_in_repo, PathStyle::local()).ok()?;
+                        let path_in_repo = RelPath::new(path_in_repo).ok()?;
                         let content = self.fs.read_file_sync(path).ok()?;
                         Some((RepoPath::from_rel_path(&path_in_repo), content))
                     })
@@ -571,7 +571,7 @@ impl GitRepository for FakeGitRepository {
                     }
                 }
                 let content = self.fs.read_file_sync(path).ok()?;
-                let repo_path = RelPath::new(repo_path, PathStyle::local()).ok()?;
+                let repo_path = RelPath::new(repo_path).ok()?;
                 Some((RepoPath::from_rel_path(&repo_path), (content, is_ignored)))
             })
             .collect();
@@ -1389,7 +1389,7 @@ impl GitRepository for FakeGitRepository {
                     return None;
                 }
                 let content = self.fs.read_file_sync(path).ok()?;
-                let repo_path = RelPath::new(repo_path, PathStyle::local()).ok()?;
+                let repo_path = RelPath::new(repo_path).ok()?;
                 Some((RepoPath::from_rel_path(&repo_path), content))
             })
             .collect();

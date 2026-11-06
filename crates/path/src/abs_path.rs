@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::Context;
 
-use crate::{PathStyle, rel_path::RelPath};
+use crate::rel_path::RelPath;
 
 // An absolute path on the user's local filesystem.
 // Requires paths to be valid utf-8
@@ -89,7 +89,7 @@ impl AbsPath {
 
     pub fn strip_prefix<'a>(&'a self, prefix: &AbsPath) -> Option<Cow<'a, RelPath>> {
         let prefix = self.0.strip_prefix(&prefix.0).ok()?;
-        RelPath::new(prefix, PathStyle::local()).ok()
+        RelPath::new(prefix).ok()
     }
 }
 

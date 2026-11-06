@@ -15,7 +15,7 @@ use gpui::{
     App, AppContext as _, Context, Entity, EntityId, EventEmitter, Global, Task, WeakEntity,
 };
 use postage::{prelude::Stream as _, watch};
-use util::{path_list::PathList, paths::PathStyle, rel_path::RelPath};
+use util::{path_list::PathList, rel_path::RelPath};
 use worktree::{
     CreatedEntry, Entry, ProjectEntryId, UpdatedEntriesSet, UpdatedGitRepositoriesSet, Worktree,
     WorktreeId,
@@ -383,11 +383,10 @@ impl WorktreeStore {
     ) -> Option<(Entity<Worktree>, Arc<RelPath>)> {
         let abs_path = abs_path.as_ref();
         for tree in self.worktrees() {
-            let path_style = tree.read(cx).path_style();
-            if let Some(relative_path) = path_style
-                .strip_prefix(abs_path, tree.read(cx).abs_path().as_ref())
+            if let Some(relative_path) = abs_path
+                .strip_prefix(tree.read(cx).abs_path().as_ref())
                 .ok()
-                .and_then(|path| RelPath::new(path, path_style).ok())
+                .and_then(|path| RelPath::new(path).ok())
             {
                 return Some((tree.clone(), relative_path.into_arc()));
             }
@@ -406,10 +405,6 @@ impl WorktreeStore {
     pub fn absolutize(&self, project_path: &ProjectPath, cx: &App) -> Option<PathBuf> {
         let worktree = self.worktree_for_id(project_path.worktree_id, cx)?;
         Some(worktree.read(cx).absolutize(&project_path.path))
-    }
-
-    pub fn path_style(&self) -> PathStyle {
-        PathStyle::local()
     }
 
     pub fn find_or_create_worktree(
@@ -840,7 +835,7 @@ impl WorktreeStore {
                 let main_path = snapshot
                     .root_repo_common_dir()
                     .filter(|dir| !crate::git_store::is_submodule_git_dir(dir))
-                    .map(|dir| crate::git_store::repo_identity_path(dir, snapshot.path_style()))
+                    .map(|dir| crate::git_store::repo_identity_path(dir))
                     .filter(|repo_path| {
                         snapshot.root_repo_is_linked_worktree()
                             || *repo_path == folder_path.as_path()

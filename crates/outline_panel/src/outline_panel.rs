@@ -2314,7 +2314,6 @@ impl OutlinePanel {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let path_style = self.project.read(cx).path_style(cx);
         if let Some(clipboard_text) = self
             .selected_entry()
             .and_then(|entry| match entry {
@@ -2324,7 +2323,7 @@ impl OutlinePanel {
                 }
                 PanelEntry::Search(_) | PanelEntry::Outline(..) => None,
             })
-            .map(|p| p.display(path_style).to_string())
+            .map(|p| p.display().to_string())
         {
             cx.write_to_clipboard(ClipboardItem::new_string(clipboard_text));
         }

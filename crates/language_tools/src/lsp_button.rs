@@ -13,7 +13,6 @@ use editor::{Editor, EditorEvent};
 use gpui::{Action as _, Anchor, App, Entity, Subscription, Task, TaskExt, WeakEntity, actions};
 use language::{BinaryStatus, BufferId, ServerHealth};
 use lsp::{LanguageServerId, LanguageServerName, LanguageServerSelector};
-use path::PathStyle;
 use project::{
     LanguageServerUpdate, LspStore, LspStoreEvent, Worktree, lsp_store::log_store::GlobalLogStore,
     project_settings::ProjectSettings, trusted_worktrees::TrustedWorktrees,
@@ -265,32 +264,27 @@ impl LanguageServerState {
             );
         }
 
-        let path_style = self
-            .workspace
-            .upgrade()
-            .map(|workspace| workspace.read(cx).path_style(cx))
-            .unwrap_or(PathStyle::local());
-
-        let server_metadata =
-            self.lsp_store
-                .update(cx, |lsp_store, _| {
-                    lsp_store
-                        .language_server_statuses()
-                        .map(|(server_id, status)| {
-                            (
-                                server_id,
-                                ServerMetadata {
-                                    server_version: status.server_readable_version.clone(),
-                                    binary_display_path: status.binary.as_ref().map(|binary| {
-                                        tooltip_for_server_binary(binary, path_style)
-                                    }),
-                                    process_id: status.process_id,
-                                },
-                            )
-                        })
-                        .collect::<HashMap<_, _>>()
-                })
-                .unwrap_or_default();
+        let server_metadata = self
+            .lsp_store
+            .update(cx, |lsp_store, _| {
+                lsp_store
+                    .language_server_statuses()
+                    .map(|(server_id, status)| {
+                        (
+                            server_id,
+                            ServerMetadata {
+                                server_version: status.server_readable_version.clone(),
+                                binary_display_path: status
+                                    .binary
+                                    .as_ref()
+                                    .map(|binary| tooltip_for_server_binary(binary)),
+                                process_id: status.process_id,
+                            },
+                        )
+                    })
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
 
         let process_memory_cache = self.process_memory_cache.clone();
 
@@ -490,7 +484,6 @@ impl LanguageServerState {
                             };
 
                             let project = workspace.read(cx).project().clone();
-                            let path_style = project.read(cx).path_style(cx);
                             let buffer_store = project.read(cx).buffer_store().clone();
 
                             let buffers = state_for_restart
@@ -515,8 +508,7 @@ impl LanguageServerState {
                                                 .strip_prefix(&worktree_ref.abs_path())
                                                 .ok()?;
                                             let relative_path =
-                                                RelPath::new(relative_path, path_style)
-                                                    .log_err()?;
+                                                RelPath::new(relative_path).log_err()?;
                                             let entry =
                                                 worktree_ref.entry_for_path(&relative_path)?;
                                             let project_path =
@@ -538,8 +530,7 @@ impl LanguageServerState {
                                                     .strip_prefix(&worktree.abs_path())
                                                     .ok()?;
                                                 let relative_path =
-                                                    RelPath::new(relative_path, path_style)
-                                                        .log_err()?;
+                                                    RelPath::new(relative_path).log_err()?;
                                                 let entry =
                                                     worktree.entry_for_path(&relative_path)?;
                                                 let project_path = project
@@ -685,11 +676,8 @@ impl LanguageServerState {
     }
 }
 
-fn tooltip_for_server_binary(
-    server_binary: &lsp::LanguageServerBinary,
-    path_style: PathStyle,
-) -> SharedString {
-    let runtime = path_style.file_name(&server_binary.path).and_then(|name| {
+fn tooltip_for_server_binary(server_binary: &lsp::LanguageServerBinary) -> SharedString {
+    let runtime = server_binary.path.file_name().and_then(|name| {
         ["node", "python"]
             .into_iter()
             .find(|runtime| name.to_string_lossy().starts_with(runtime))
@@ -705,8 +693,7 @@ fn tooltip_for_server_binary(
         .map(Path::new)
         .unwrap_or(&server_binary.path);
 
-    let display_path = path_style
-        .normalize_lexically(&target_path.compact())
+    let display_path = util::paths::collapse_dot_segments(&target_path.compact())
         .to_string_lossy()
         .into_owned();
 
@@ -1600,7 +1587,7 @@ mod tests {
             env: None,
         };
         assert_eq!(
-            tooltip_for_server_binary(&node_server, PathStyle::Unix),
+            tooltip_for_server_binary(&node_server),
             "/zed/languages/basedpyright/langserver.index.js (node)"
         );
 
@@ -1610,7 +1597,7 @@ mod tests {
             env: None,
         };
         assert_eq!(
-            tooltip_for_server_binary(&python_server, PathStyle::Unix),
+            tooltip_for_server_binary(&python_server),
             "/zed/languages/pylsp/pylsp (python)"
         );
 
@@ -1619,10 +1606,7 @@ mod tests {
             arguments: vec!["server".into()],
             env: None,
         };
-        assert_eq!(
-            tooltip_for_server_binary(&standalone_server, PathStyle::Unix),
-            "/usr/bin/ty"
-        );
+        assert_eq!(tooltip_for_server_binary(&standalone_server), "/usr/bin/ty");
 
         let flagged_node_server = lsp::LanguageServerBinary {
             path: "/usr/bin/node".into(),
@@ -1634,7 +1618,7 @@ mod tests {
             env: None,
         };
         assert_eq!(
-            tooltip_for_server_binary(&flagged_node_server, PathStyle::Unix),
+            tooltip_for_server_binary(&flagged_node_server),
             "/zed/languages/eslint/server.js (node)"
         );
     }

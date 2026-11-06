@@ -5,7 +5,7 @@ use crate::application_menu::{ApplicationMenu, show_menus};
 use arrayvec::ArrayVec;
 use git_ui_core::worktree_picker::WorktreePicker;
 pub use platform_title_bar::{self, PlatformTitleBar};
-use project::{linked_worktree_short_name, repo_identity_path, repo_identity_path_if_local};
+use project::{linked_worktree_short_name, repo_identity_path};
 
 use crate::application_menu::{
     ActivateDirection, ActivateMenuLeft, ActivateMenuRight, OpenApplicationMenu,
@@ -131,9 +131,8 @@ impl Render for TitleBar {
                 .map(|name| SharedString::from(name.to_string()));
             if let Some(repo) = &repository {
                 let repo = repo.read(cx);
-                let identity = repo_identity_path(&repo.common_dir_abs_path, repo.path_style);
-                let identity_fallback =
-                    repo_identity_path_if_local(&repo.common_dir_abs_path, repo.path_style);
+                let identity = repo_identity_path(&repo.common_dir_abs_path);
+                let identity_fallback = Some(identity);
                 linked_worktree_name = linked_worktree_name_anchor(
                     repo.main_worktree_abs_path(),
                     identity_fallback,
@@ -143,7 +142,6 @@ impl Render for TitleBar {
                     linked_worktree_short_name(
                         name_anchor_path,
                         repo.work_directory_abs_path.as_ref(),
-                        repo.path_style,
                     )
                 })
                 .or_else(|| {
@@ -155,7 +153,7 @@ impl Render for TitleBar {
                 let display_name = if identity.extension() == Some(std::ffi::OsStr::new("git")) {
                     identity.file_stem()
                 } else {
-                    repo.path_style.file_name(identity)
+                    identity.file_name()
                 };
 
                 if let Some(repo_name) = display_name.and_then(|n| n.to_str()) {
@@ -703,28 +701,18 @@ impl TitleBar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use util::paths::PathStyle;
 
     #[test]
-    fn test_local_path_style_uses_bare_repository_worktree_name() {
-        let (repository_identity_path, work_directory_path) = match PathStyle::local() {
-            PathStyle::Unix => (
-                Path::new("/repos/zed"),
-                Path::new("/worktrees/zed/plum-warbler/zed"),
-            ),
-        };
+    fn test_bare_repository_worktree_name_anchor() {
+        let repository_identity_path = Path::new("/repos/zed");
+        let work_directory_path = Path::new("/worktrees/zed/plum-warbler/zed");
 
-        let repository_identity_path =
-            repo_identity_path_if_local(repository_identity_path, PathStyle::local());
+        let repository_identity_path = Some(repo_identity_path(repository_identity_path));
         let name_anchor_path = linked_worktree_name_anchor(None, repository_identity_path, true);
 
         assert_eq!(
             name_anchor_path.and_then(|name_anchor_path| {
-                linked_worktree_short_name(
-                    name_anchor_path,
-                    work_directory_path,
-                    PathStyle::local(),
-                )
+                linked_worktree_short_name(name_anchor_path, work_directory_path)
             }),
             Some("plum-warbler".into())
         );

@@ -143,7 +143,7 @@ use project::{ProjectPath, WorktreeId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{collections::VecDeque, sync::Arc};
 use ui::{App, TextSize};
-use util::{paths::PathStyle, rel_path::RelPath};
+use util::rel_path::RelPath;
 use workspace::{
     Pane, SaveIntent, Workspace,
     notifications::{
@@ -420,15 +420,10 @@ impl UndoMessage {
     }
 }
 
-fn project_path_display(
-    project: &Project,
-    project_path: &ProjectPath,
-    path_style: PathStyle,
-    cx: &App,
-) -> String {
+fn project_path_display(project: &Project, project_path: &ProjectPath, cx: &App) -> String {
     project
         .short_full_path_for_project_path(project_path, cx)
-        .unwrap_or_else(|| project_path.path.display(path_style).to_string())
+        .unwrap_or_else(|| project_path.path.display().to_string())
 }
 
 impl Inner {
@@ -617,11 +612,10 @@ impl Inner {
 
         let (from_name, to_name) = workspace.update(cx, |workspace, cx| {
             let project = workspace.project().read(cx);
-            let path_style = project.path_style(cx);
 
             (
-                project_path_display(project, from, path_style, cx),
-                project_path_display(project, to, path_style, cx),
+                project_path_display(project, from, cx),
+                project_path_display(project, to, cx),
             )
         });
 
@@ -740,9 +734,8 @@ impl Inner {
 
         let name = workspace.update(cx, |workspace, cx| {
             let project = workspace.project().read(cx);
-            let path_style = project.path_style(cx);
 
-            project_path_display(project, project_path, path_style, cx)
+            project_path_display(project, project_path, cx)
         });
 
         if !self.confirm_trash(project_path, &name, cx).await? {
@@ -767,9 +760,8 @@ impl Inner {
 
         let name = workspace.update(cx, |workspace, cx| {
             let project = workspace.project().read(cx);
-            let path_style = project.path_style(cx);
 
-            project_path_display(project, project_path, path_style, cx)
+            project_path_display(project, project_path, cx)
         });
 
         let task = workspace.update(cx, |workspace, cx| {
@@ -804,7 +796,6 @@ impl Inner {
         let name = workspace
             .update(cx, |workspace, cx| {
                 let project = workspace.project().read(cx);
-                let path_style = project.path_style(cx);
                 let original_path = project.fs().original_path_for_trash_id(trash_id)?;
                 let original_name = original_path
                     .file_name()
@@ -817,7 +808,7 @@ impl Inner {
                     let relative_path = original_path
                         .strip_prefix(worktree_abs_path.as_ref())
                         .ok()?;
-                    let relative_path = RelPath::new(relative_path, path_style).ok()?;
+                    let relative_path = RelPath::new(relative_path).ok()?;
                     Some(ProjectPath {
                         worktree_id,
                         path: relative_path.into_arc(),
@@ -825,7 +816,7 @@ impl Inner {
                 })();
 
                 Some(project_path.map_or(original_name, |project_path| {
-                    project_path_display(project, &project_path, path_style, cx)
+                    project_path_display(project, &project_path, cx)
                 }))
             })
             .unwrap_or_else(|| "item".to_string());
@@ -936,14 +927,13 @@ impl Inner {
     ) -> Result<bool> {
         let (names, dirty_buffers) = self.workspace.update(cx, |workspace, cx| {
             let project = workspace.project().read(cx);
-            let path_style = project.path_style(cx);
             let dirty_buffers = project
                 .dirty_buffers(cx)
                 .filter(|dirty_path| trash_paths.contains(&dirty_path))
                 .count();
             let names = trash_paths
                 .iter()
-                .map(|project_path| project_path_display(project, project_path, path_style, cx))
+                .map(|project_path| project_path_display(project, project_path, cx))
                 .collect::<Vec<_>>();
 
             (names, dirty_buffers)

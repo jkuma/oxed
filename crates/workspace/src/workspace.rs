@@ -116,7 +116,7 @@ pub use toolbar::{
 pub use ui;
 use ui::{Window, prelude::*};
 use url::Url;
-use util::{ResultExt, TryFutureExt, paths::PathStyle, rel_path::RelPath, serde::default_true};
+use util::{ResultExt, TryFutureExt, rel_path::RelPath, serde::default_true};
 use uuid::Uuid;
 pub use workspace_settings::{
     AccessibleMode, AutosaveSetting, BottomDockLayout, EncodingDisplayOptions, FocusFollowsMouse,
@@ -2486,10 +2486,6 @@ impl Workspace {
         &self.project
     }
 
-    pub fn path_style(&self, cx: &App) -> PathStyle {
-        self.project.read(cx).path_style(cx)
-    }
-
     pub fn recently_activated_items(&self, cx: &App) -> HashMap<EntityId, usize> {
         let mut history: HashMap<EntityId, usize> = HashMap::default();
 
@@ -3555,9 +3551,7 @@ impl Workspace {
                                 .strip_prefix(worktree_abs_path.as_ref())
                                 .ok()
                                 .and_then(|relative_path| {
-                                    let relative_path =
-                                        RelPath::new(relative_path, PathStyle::local())
-                                            .log_err()?;
+                                    let relative_path = RelPath::new(relative_path).log_err()?;
                                     worktree.entry_for_path(&relative_path)
                                 })
                         }?;
@@ -4556,10 +4550,9 @@ impl Workspace {
 
         // Not a valid URL - treat as a file path
         let project = self.project();
-        let path_style = project.read(cx).path_style(cx);
 
         // If it's an absolute path, open it directly
-        if path_style.has_root(Path::new(url_or_path)) {
+        if Path::new(url_or_path).has_root() {
             open_abs_path(self, PathBuf::from(url_or_path), cx);
             return;
         }
@@ -4567,7 +4560,7 @@ impl Workspace {
         let path = Path::new(url_or_path);
         // Try to resolve relative path against base_path first
         if let Some(base) = base_path
-            && let Some(resolved_path) = path_style.join(base, path).map(PathBuf::from)
+            && let Some(resolved_path) = util::paths::join_relative(base, path).map(PathBuf::from)
             && resolved_path.exists()
         {
             open_abs_path(self, resolved_path, cx);
@@ -5644,7 +5637,6 @@ impl Workspace {
         cx: &App,
     ) -> WindowTitleContext {
         let project_name = project_window_title(project, cx);
-        let path_style = project.path_style(cx);
 
         let (file_name, file_path, relative_path, file_stem) = project_path
             .map(|project_path| {
@@ -5670,7 +5662,7 @@ impl Workspace {
                 };
                 let relative_path = if needs.relative_path {
                     (!project_path.path.as_unix_str().is_empty())
-                        .then(|| project_path.path.display(path_style).to_string())
+                        .then(|| project_path.path.display().to_string())
                 } else {
                     None
                 };
@@ -8347,15 +8339,13 @@ pub async fn find_existing_workspace(
                 cx.update(|cx| {
                     let workspace = target_workspace.read(cx);
                     let project = workspace.project.read(cx);
-                    let path_style = workspace.path_style(cx);
                     Some(!abs_paths.iter().any(|path| {
                         project.worktrees(cx).any(|worktree| {
                             let worktree = worktree.read(cx);
                             let abs_path = worktree.abs_path();
-                            path_style
-                                .strip_prefix(path, abs_path.as_ref())
+                            path.strip_prefix(abs_path.as_ref())
                                 .ok()
-                                .and_then(|path| RelPath::new(path, path_style).ok())
+                                .and_then(|path| RelPath::new(path).ok())
                                 .and_then(|rel| worktree.entry_for_path(&rel))
                                 .is_some_and(|e| e.is_dir())
                         })
@@ -9674,12 +9664,8 @@ mod tests {
             });
         });
         cx.executor().run_until_parked();
-        // `${relativePath}` renders with the project's path style, which uses
-        // `\` separators on Windows.
-        let expected_relative_path = cx.update(|_, cx| {
-            let path_style = project.read(cx).path_style(cx);
-            rel_path("src/one.txt").display(path_style).to_string()
-        });
+        let expected_relative_path =
+            cx.update(|_, _| rel_path("src/one.txt").display().to_string());
         assert_eq!(
             cx.window_title().as_deref(),
             Some(format!("root1 — {expected_relative_path}").as_str())
@@ -15585,7 +15571,7 @@ mod tests {
             .flat_map(|item| {
                 item.project_paths(cx)
                     .into_iter()
-                    .map(|path| path.path.display(PathStyle::local()).into_owned())
+                    .map(|path| path.path.display().into_owned())
             })
             .collect()
     }

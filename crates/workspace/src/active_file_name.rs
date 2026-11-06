@@ -3,7 +3,6 @@ use gpui::{
 };
 use settings::Settings;
 use ui::{Button, Tooltip, prelude::*};
-use util::paths::PathStyle;
 
 use crate::{
     HideStatusItem, StatusItemView, item::ItemHandle, workspace_settings::StatusBarSettings,
@@ -60,7 +59,7 @@ impl StatusItemView for ActiveFileName {
         if let Some(item) = active_pane_item {
             self.project_path = item
                 .project_path(cx)
-                .map(|path| path.path.display(PathStyle::local()).into_owned().into());
+                .map(|path| path.path.display().into_owned().into());
             self.full_path = item.tab_tooltip_text(cx);
         } else {
             self.project_path = None;

@@ -28,7 +28,7 @@ use std::{
     sync::Arc,
 };
 use ui::{DiffStat, Divider, Tooltip, prelude::*};
-use util::paths::{PathExt as _, PathStyle};
+use util::paths::PathExt as _;
 use workspace::{
     Item, ItemHandle, ItemNavHistory, ToolbarItemEvent, ToolbarItemLocation, ToolbarItemView,
     Workspace,
@@ -389,12 +389,7 @@ impl Item for SoloDiffView {
                         .to_string(),
                 )
             })
-            .unwrap_or_else(|| {
-                self.repo_path
-                    .as_ref()
-                    .display(PathStyle::local())
-                    .into_owned()
-            })
+            .unwrap_or_else(|| self.repo_path.as_ref().display().into_owned())
             .into()
     }
 
@@ -404,12 +399,7 @@ impl Item for SoloDiffView {
                 .read(cx)
                 .file()
                 .map(|file| file.full_path(cx).compact().to_string_lossy().into_owned())
-                .unwrap_or_else(|| {
-                    self.repo_path
-                        .as_ref()
-                        .display(PathStyle::local())
-                        .into_owned()
-                })
+                .unwrap_or_else(|| self.repo_path.as_ref().display().into_owned())
                 .into(),
         )
     }
@@ -484,12 +474,7 @@ impl Item for SoloDiffView {
     }
 
     fn breadcrumbs(&self, cx: &App) -> Option<(Vec<HighlightedText>, Option<gpui::Font>)> {
-        let text: SharedString = self
-            .repo_path
-            .as_ref()
-            .display(PathStyle::local())
-            .into_owned()
-            .into();
+        let text: SharedString = self.repo_path.as_ref().display().into_owned().into();
 
         // When the git panel is set to convey status via label color rather
         // than an icon, tint the whole path like multibuffer headers do.

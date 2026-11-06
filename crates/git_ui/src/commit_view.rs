@@ -37,7 +37,7 @@ use std::{
 };
 use theme::ActiveTheme;
 use ui::{ContextMenu, DiffStat, Disclosure, Divider, Tooltip, WithScrollbar, prelude::*};
-use util::{ResultExt, paths::PathStyle, rel_path::RelPath, truncate_and_trailoff};
+use util::{ResultExt, rel_path::RelPath, truncate_and_trailoff};
 use workspace::item::TabTooltipContent;
 use workspace::{
     Item, ItemHandle, ItemNavHistory, ToolbarItemEvent, ToolbarItemLocation, ToolbarItemView,
@@ -374,7 +374,7 @@ impl CommitView {
                     .path
                     .file_name()
                     .map(|name| name.to_string())
-                    .unwrap_or_else(|| file.path.display(PathStyle::local()).to_string());
+                    .unwrap_or_else(|| file.path.display().to_string());
                 let display_name = format!("{short_sha} - {file_name}");
 
                 let file = Arc::new(GitBlob {
@@ -1073,10 +1073,6 @@ impl language::File for GitBlob {
         DiskState::Historic {
             was_deleted: self.is_deleted,
         }
-    }
-
-    fn path_style(&self, _: &App) -> PathStyle {
-        PathStyle::local()
     }
 
     fn path(&self) -> &Arc<RelPath> {

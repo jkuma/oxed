@@ -37,7 +37,7 @@ use ui::{
 use util::{
     ResultExt,
     markdown::{source_position_from_fragment, split_local_url_fragment},
-    paths::{PathStyle, PathWithPosition},
+    paths::PathWithPosition,
     rel_path::RelPath,
 };
 use workspace::item::{
@@ -1125,7 +1125,6 @@ impl MarkdownPreviewView {
                         workspace_directory.as_deref(),
                         project.as_ref(),
                         source_project_path.as_ref(),
-                        PathStyle::local(),
                         cx,
                     )
                 }
@@ -1520,7 +1519,6 @@ fn resolve_preview_image(
     workspace_directory: Option<&Path>,
     project: Option<&Entity<Project>>,
     source_project_path: Option<&ProjectPath>,
-    client_path_style: PathStyle,
     cx: &App,
 ) -> Option<ImageSource> {
     if dest_url.starts_with("data:") {
@@ -1558,11 +1556,11 @@ fn resolve_preview_image(
 
     let path = if let (Some(stripped), Some(root)) = (workspace_relative_path, workspace_directory)
     {
-        client_path_style.join_path(root, stripped).ok()?
-    } else if client_path_style.has_root(Path::new(&decoded)) {
+        util::paths::join_path(root, stripped).ok()?
+    } else if Path::new(&decoded).has_root() {
         PathBuf::from(decoded)
     } else {
-        client_path_style.join_path(base_directory?, decoded).ok()?
+        util::paths::join_path(base_directory?, decoded).ok()?
     };
 
     path.exists()
@@ -1576,12 +1574,11 @@ fn resolve_project_path_for_preview_image(
     project: &Entity<Project>,
     cx: &App,
 ) -> Option<ProjectPath> {
-    let worktree = project
+    project
         .read(cx)
         .worktree_for_id(source_project_path.worktree_id, cx)?;
-    let path_style = worktree.read(cx).path_style();
 
-    if workspace_relative_path.is_none() && path_style.is_absolute(Path::new(decoded_path)) {
+    if workspace_relative_path.is_none() && Path::new(decoded_path).is_absolute() {
         return project
             .read(cx)
             .project_path_for_absolute_path(Path::new(decoded_path), cx);
@@ -1589,14 +1586,13 @@ fn resolve_project_path_for_preview_image(
 
     let source_directory = source_project_path.path.parent()?;
     let path = if let Some(workspace_relative_path) = workspace_relative_path {
-        RelPath::new(Path::new(workspace_relative_path), path_style)
+        RelPath::new(Path::new(workspace_relative_path))
             .ok()?
             .into_owned()
     } else {
-        let joined_path = path_style
-            .join_path(source_directory.as_std_path(), decoded_path)
-            .ok()?;
-        RelPath::new(&joined_path, path_style).ok()?.into_owned()
+        let joined_path =
+            util::paths::join_path(source_directory.as_std_path(), decoded_path).ok()?;
+        RelPath::new(&joined_path).ok()?.into_owned()
     };
 
     Some(ProjectPath {
@@ -2347,7 +2343,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
-    use util::paths::{PathStyle, PathWithPosition};
+    use util::paths::PathWithPosition;
     use util::rel_path::{RelPath, rel_path};
     use util::test::TempTree;
     use workspace::item::{Item, ItemHandle, SerializableItem};
@@ -2546,7 +2542,6 @@ mod tests {
                 Some(workspace_directory),
                 None,
                 None,
-                PathStyle::local(),
                 cx,
             );
             assert_resolved_preview_image_path(resolved, image_file.as_path());
@@ -2558,7 +2553,6 @@ mod tests {
             Some(workspace_directory),
             None,
             None,
-            PathStyle::local(),
             cx,
         );
         assert!(missing.is_none());

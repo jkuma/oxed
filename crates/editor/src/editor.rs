@@ -7800,9 +7800,9 @@ impl Editor {
         cx: &mut Context<Self>,
     ) {
         if let Some(path) = self.active_buffer(cx).and_then(|buffer| {
-            let project = self.project()?.read(cx);
+            self.project()?;
             let path = buffer.read(cx).file()?.path();
-            let path = path.display(project.path_style(cx));
+            let path = path.display();
             Some(path)
         }) {
             cx.write_to_clipboard(ClipboardItem::new_string(path.to_string()));
@@ -7863,9 +7863,9 @@ impl Editor {
                 end_line
             };
 
-            let project = self.project()?.read(cx);
+            self.project()?;
             let file = buffer.file()?;
-            let path = file.path().display(project.path_style(cx));
+            let path = file.path().display();
 
             let location = if start_line == end_line {
                 format!("{path}:{start_line}")

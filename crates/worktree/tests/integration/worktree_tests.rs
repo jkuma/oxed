@@ -26,7 +26,6 @@ use std::{
 };
 use util::{
     ResultExt,
-    paths::PathStyle,
     rel_path::{RelPath, rel_path},
     test::TempTree,
 };
@@ -5773,11 +5772,7 @@ async fn test_load_file_encoding(cx: &mut TestAppContext) {
 
     cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
 
-    let rel_path = |name: &str| {
-        RelPath::new(&Path::new(name), PathStyle::local())
-            .unwrap()
-            .into_arc()
-    };
+    let rel_path = |name: &str| RelPath::new(&Path::new(name)).unwrap().into_arc();
 
     // Run Success Tests
     for case in success_cases {
@@ -5908,7 +5903,7 @@ async fn test_write_file_encoding(cx: &mut gpui::TestAppContext) {
 
         fs.insert_file(&file_path, "".into()).await;
 
-        let rel_path = RelPath::new(&path, PathStyle::local()).unwrap().into_arc();
+        let rel_path = RelPath::new(&path).unwrap().into_arc();
         let text = text::Rope::from(case.text);
 
         let task = worktree.update(cx, |wt, cx| {

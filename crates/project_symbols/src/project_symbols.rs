@@ -259,7 +259,6 @@ impl PickerDelegate for ProjectSymbolsDelegate {
         _window: &mut Window,
         cx: &mut Context<Picker<Self>>,
     ) -> Option<Self::ListItem> {
-        let path_style = self.project.read(cx).path_style(cx);
         let string_match = &self.matches.get(ix)?;
         let symbol = &self.symbols.get(string_match.candidate_id)?;
         let theme = cx.theme();
@@ -275,7 +274,7 @@ impl PickerDelegate for ProjectSymbolsDelegate {
                 {
                     path = worktree.read(cx).root_name().join(&path);
                 }
-                path.display(path_style).into_owned().into()
+                path.display().into_owned().into()
             }
             SymbolLocation::OutsideProject {
                 abs_path,

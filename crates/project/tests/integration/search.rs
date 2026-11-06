@@ -10,10 +10,7 @@ use project::{
 };
 use serde_json::json;
 use text::Rope;
-use util::{
-    paths::{PathMatcher, PathStyle},
-    rel_path::RelPath,
-};
+use util::{paths::PathMatcher, rel_path::RelPath};
 
 use crate::init_test;
 
@@ -27,10 +24,10 @@ fn path_matcher_creation_for_valid_paths() {
         "./dir/file",
         "dir/[a-z].txt",
     ] {
-        let path_matcher = PathMatcher::new(&[valid_path.to_owned()], PathStyle::local())
+        let path_matcher = PathMatcher::new(&[valid_path.to_owned()])
             .unwrap_or_else(|e| panic!("Valid path {valid_path} should be accepted, but got: {e}"));
         assert!(
-            path_matcher.is_match(&RelPath::new(valid_path.as_ref(), PathStyle::local()).unwrap()),
+            path_matcher.is_match(&RelPath::new(valid_path.as_ref()).unwrap()),
             "Path matcher for valid path {valid_path} should match itself"
         )
     }
@@ -39,7 +36,7 @@ fn path_matcher_creation_for_valid_paths() {
 #[test]
 fn path_matcher_creation_for_globs() {
     for invalid_glob in ["dir/[].txt", "dir/[a-z.txt", "dir/{file"] {
-        match PathMatcher::new(&[invalid_glob.to_owned()], PathStyle::local()) {
+        match PathMatcher::new(&[invalid_glob.to_owned()]) {
             Ok(_) => panic!("Invalid glob {invalid_glob} should not be accepted"),
             Err(_expected) => {}
         }
@@ -52,7 +49,7 @@ fn path_matcher_creation_for_globs() {
         "dir/[a-z].txt",
         "{dir,file}",
     ] {
-        match PathMatcher::new(&[valid_glob.to_owned()], PathStyle::local()) {
+        match PathMatcher::new(&[valid_glob.to_owned()]) {
             Ok(_expected) => {}
             Err(e) => panic!("Valid glob should be accepted, but got: {e}"),
         }

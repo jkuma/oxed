@@ -50,8 +50,8 @@ use ui::{
     Tooltip, prelude::*, right_click_menu,
 };
 use util::{
-    ResultExt, debug_panic, markdown::MarkdownInlineCode, maybe, paths::PathStyle,
-    serde::default_true, truncate_and_remove_front,
+    ResultExt, debug_panic, markdown::MarkdownInlineCode, maybe, serde::default_true,
+    truncate_and_remove_front,
 };
 
 /// A selected entry in e.g. project panel.
@@ -2245,7 +2245,6 @@ impl Pane {
 
         const DELETED_MESSAGE: &str = "This file has been deleted on disk since you started editing it. Do you want to recreate it?";
 
-        let path_style = project.read_with(cx, |project, cx| project.path_style(cx));
         if save_intent == SaveIntent::Skip {
             let is_saveable_singleton = cx.update(|_window, cx| {
                 item.can_save(cx) && item.buffer_kind(cx) == ItemBufferKind::Singleton
@@ -2389,7 +2388,7 @@ impl Pane {
                     let answer_task = pane.update_in(cx, |pane, window, cx| {
                         if pane.save_modals_spawned.insert(item_id) {
                             pane.activate_item(item_ix, true, true, window, cx);
-                            let prompt = dirty_message_for(item.project_path(cx), path_style);
+                            let prompt = dirty_message_for(item.project_path(cx));
                             Some(window.prompt(
                                 PromptLevel::Warning,
                                 &prompt,
@@ -3312,14 +3311,9 @@ impl Pane {
                                     menu.entry(
                                         "Copy Relative Path",
                                         Some(Box::new(zed_actions::workspace::CopyRelativePath)),
-                                        window.handler_for(&pane, move |this, _, cx| {
-                                            let Some(project) = this.project.upgrade() else {
-                                                return;
-                                            };
-                                            let path_style = project
-                                                .update(cx, |project, cx| project.path_style(cx));
+                                        window.handler_for(&pane, move |_, _, cx| {
                                             cx.write_to_clipboard(ClipboardItem::new_string(
-                                                relative_path.display(path_style).to_string(),
+                                                relative_path.display().to_string(),
                                             ));
                                         }),
                                     )
@@ -4907,9 +4901,9 @@ impl NavHistoryState {
     }
 }
 
-fn dirty_message_for(buffer_path: Option<ProjectPath>, path_style: PathStyle) -> String {
+fn dirty_message_for(buffer_path: Option<ProjectPath>) -> String {
     let path = buffer_path.as_ref().and_then(|p| {
-        let path = p.path.display(path_style);
+        let path = p.path.display();
         if path.is_empty() { None } else { Some(path) }
     });
     match path {
@@ -9212,11 +9206,11 @@ mod tests {
             path: util::rel_path::rel_path("dir/__init__.py").into(),
         };
         assert_eq!(
-            dirty_message_for(Some(project_path), PathStyle::Unix),
+            dirty_message_for(Some(project_path)),
             "`dir/__init__.py` contains unsaved edits. Do you want to save it?"
         );
         assert_eq!(
-            dirty_message_for(None, PathStyle::Unix),
+            dirty_message_for(None),
             "This buffer contains unsaved edits. Do you want to save it?"
         );
     }

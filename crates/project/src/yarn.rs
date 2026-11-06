@@ -15,7 +15,7 @@ use anyhow::Result;
 use collections::HashMap;
 use fs::Fs;
 use gpui::{App, AppContext as _, Context, Entity, Task};
-use util::{ResultExt, archive::extract_zip, paths::PathStyle, rel_path::RelPath};
+use util::{ResultExt, archive::extract_zip, rel_path::RelPath};
 
 pub(crate) struct YarnPathStore {
     temp_dirs: HashMap<Arc<Path>, tempfile::TempDir>,
@@ -113,8 +113,7 @@ impl YarnPathStore {
                     new_path
                 };
                 // Rebase zip-path onto new temp path.
-                let as_relative =
-                    RelPath::new(path.strip_prefix(zip_file).ok()?, PathStyle::local()).ok()?;
+                let as_relative = RelPath::new(path.strip_prefix(zip_file).ok()?).ok()?;
                 Some((zip_root.into(), as_relative.into_arc()))
             })
         } else {

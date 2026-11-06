@@ -432,8 +432,8 @@ impl LspLocationsPicker {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let preview = picker_preview::editor_preview(project.clone(), window, cx);
-        let delegate = LspLocationsDelegate::new(kind, matches, project, editor, origin);
+        let preview = picker_preview::editor_preview(project, window, cx);
+        let delegate = LspLocationsDelegate::new(kind, matches, editor, origin);
         let picker = cx.new(|cx| Picker::list_with_preview(delegate, preview, window, cx));
         let subscription = cx.subscribe(&picker, |_, _, _: &DismissEvent, cx| {
             cx.emit(DismissEvent);
@@ -482,7 +482,6 @@ enum Entry {
 
 struct LspLocationsDelegate {
     kind: LspPickerKind,
-    project: Entity<Project>,
     editor: WeakEntity<Editor>,
     origin: Option<NavigationEntry>,
     all_matches: Vec<LocationMatch>,
@@ -497,7 +496,6 @@ impl LspLocationsDelegate {
     fn new(
         kind: LspPickerKind,
         all_matches: Vec<LocationMatch>,
-        project: Entity<Project>,
         editor: WeakEntity<Editor>,
         origin: Option<NavigationEntry>,
     ) -> Self {
@@ -520,7 +518,6 @@ impl LspLocationsDelegate {
         let matches = (0..all_matches.len()).collect();
         let mut this = Self {
             kind,
-            project,
             editor,
             origin,
             all_matches,
@@ -791,7 +788,6 @@ impl PickerDelegate for LspLocationsDelegate {
                     .into_any_element(),
             ),
             Entry::Header(path) => {
-                let path_style = self.project.read(cx).path_style(cx);
                 let file_name = path
                     .path
                     .file_name()
@@ -800,7 +796,7 @@ impl PickerDelegate for LspLocationsDelegate {
                 let directory = path
                     .path
                     .parent()
-                    .map(|parent| parent.display(path_style))
+                    .map(|parent| parent.display())
                     .map(SharedString::new)
                     .unwrap_or_default();
                 let file_icon = ItemSettings::get_global(cx)

@@ -71,7 +71,7 @@ pub use text::{
 use theme::{ActiveTheme as _, SyntaxTheme};
 #[cfg(any(test, feature = "test-support"))]
 use util::RandomCharIter;
-use util::{RangeExt, debug_panic, maybe, paths::PathStyle, rel_path::RelPath};
+use util::{RangeExt, debug_panic, maybe, rel_path::RelPath};
 
 #[cfg(any(test, feature = "test-support"))]
 pub use {tree_sitter_python, tree_sitter_rust, tree_sitter_typescript};
@@ -380,9 +380,6 @@ pub trait File: Send + Sync + Any {
     fn file_system_abs_path(&self, cx: &App) -> Option<PathBuf> {
         self.as_local().map(|file| file.abs_path(cx))
     }
-
-    /// Returns the path style of this file.
-    fn path_style(&self, cx: &App) -> PathStyle;
 
     /// Returns the last component of this handle's absolute path. If this handle refers to the root
     /// of its worktree, then this method will return the name of the worktree itself.
@@ -5337,7 +5334,7 @@ impl BufferSnapshot {
             if file.path().file_name().is_none() || include_root {
                 Some(file.full_path(cx).to_string_lossy().into_owned())
             } else {
-                Some(file.path().display(file.path_style(cx)).to_string())
+                Some(file.path().display().to_string())
             }
         } else {
             None
@@ -5965,10 +5962,6 @@ impl File for TestFile {
 
     fn is_private(&self) -> bool {
         false
-    }
-
-    fn path_style(&self, _cx: &App) -> PathStyle {
-        PathStyle::local()
     }
 }
 

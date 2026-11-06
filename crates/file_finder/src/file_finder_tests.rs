@@ -1475,7 +1475,7 @@ async fn test_single_file_worktrees(cx: &mut TestAppContext) {
         assert_eq!(matches.len(), 1);
 
         let (file_name, file_name_positions, full_path, full_path_positions) =
-            delegate.labels_for_path_match(&matches[0], PathStyle::local());
+            delegate.labels_for_path_match(&matches[0]);
         assert_eq!(file_name, "the-file");
         assert_eq!(file_name_positions, &[0, 1, 4]);
         assert_eq!(full_path, "");
@@ -2119,7 +2119,7 @@ async fn test_history_match_positions(cx: &mut gpui::TestAppContext) {
         assert_eq!(file_label.highlight_indices(), &[0, 1, 2]);
         assert_eq!(
             path_label.text(),
-            format!("test{}", PathStyle::local().primary_separator())
+            format!("test{}", std::path::MAIN_SEPARATOR_STR)
         );
         assert_eq!(path_label.highlight_indices(), &[] as &[usize]);
     });
@@ -2173,7 +2173,7 @@ async fn test_history_labels_do_not_include_worktree_root_name(cx: &mut gpui::Te
             }
         }
 
-        let separator = PathStyle::local().primary_separator();
+        let separator = std::path::MAIN_SEPARATOR_STR;
 
         let (file_label, path_label) = finder.delegate.labels_for_match(&matches[0], window, cx);
         assert_eq!(file_label.text(), "second.rs");
@@ -2211,7 +2211,7 @@ async fn test_history_labels_do_not_include_worktree_root_name(cx: &mut gpui::Te
 
         let (file_label, path_label) = finder.delegate.labels_for_match(history_match, window, cx);
         assert_eq!(file_label.text(), "first.rs");
-        let separator = PathStyle::local().primary_separator();
+        let separator = std::path::MAIN_SEPARATOR_STR;
         assert_eq!(
             path_label.text(),
             format!("src{separator}"),
@@ -2259,7 +2259,7 @@ async fn test_history_labels_include_worktree_root_name_when_hide_root_false(
     let picker = open_file_picker(&workspace, cx);
     picker.update_in(cx, |finder, window, cx| {
         let matches = &finder.delegate.matches.matches;
-        let separator = PathStyle::local().primary_separator();
+        let separator = std::path::MAIN_SEPARATOR_STR;
 
         let (_file_label, path_label) = finder.delegate.labels_for_match(&matches[0], window, cx);
         assert_eq!(
@@ -2330,7 +2330,7 @@ async fn test_history_labels_include_worktree_root_name_when_hide_root_true_and_
         let matches = &finder.delegate.matches.matches;
         assert!(matches.len() >= 2, "Should have at least 2 history matches");
 
-        let separator = PathStyle::local().primary_separator();
+        let separator = std::path::MAIN_SEPARATOR_STR;
 
         let first_match = matches
             .iter()

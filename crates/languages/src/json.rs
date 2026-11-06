@@ -29,7 +29,7 @@ use std::{
 };
 use util::{
     ResultExt, archive::extract_zip, fs::remove_matching, maybe, merge_json_value_into,
-    paths::PathStyle, rel_path::RelPath, union_json_value_into,
+    rel_path::RelPath, union_json_value_into,
 };
 
 const SERVER_PATH: &str =
@@ -181,7 +181,7 @@ impl LspAdapter for JsonLspAdapter {
             .as_ref()
             .and_then(|abs_path| {
                 let rel_path = abs_path.strip_prefix(delegate.worktree_root_path()).ok()?;
-                RelPath::new(rel_path, PathStyle::local()).ok()
+                RelPath::new(rel_path).ok()
             })
             .unwrap_or_else(|| Cow::Borrowed(RelPath::empty()));
         let mut config = cx.update(|cx| {

@@ -1074,7 +1074,6 @@ impl Delegate {
                     .into_any_element(),
             ),
             Entry::Header(path) => {
-                let path_style = self.project(cx).read(cx).path_style(cx);
                 let file_name = path
                     .path
                     .file_name()
@@ -1083,7 +1082,7 @@ impl Delegate {
                 let directory = path
                     .path
                     .parent()
-                    .map(|parent| parent.display(path_style))
+                    .map(|parent| parent.display())
                     .map(SharedString::new)
                     .unwrap_or_default();
                 let file_icon = ItemSettings::get_global(cx)

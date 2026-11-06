@@ -19,7 +19,6 @@ use std::{
     sync::Arc,
 };
 use ui::{Color, Icon, IconName};
-use util::paths::PathStyle;
 use util::rel_path::RelPath;
 use workspace::{
     Item, ItemHandle as _, ItemNavHistory, ToolbarItemLocation, Workspace,
@@ -94,10 +93,10 @@ fn register_entry(
         .as_ref()
         .and_then(|root| entry.new_path.strip_prefix(root).ok())
         .map(|rel| {
-            RelPath::new(rel, PathStyle::local())
+            RelPath::new(rel)
                 .map(|r| r.into_owned().into())
                 .unwrap_or_else(|_| {
-                    RelPath::new(Path::new(MultiBuffer::DEFAULT_TITLE), PathStyle::Unix)
+                    RelPath::new(Path::new(MultiBuffer::DEFAULT_TITLE))
                         .unwrap()
                         .into_owned()
                         .into()
@@ -108,10 +107,10 @@ fn register_entry(
                 .new_path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .and_then(|s| RelPath::new(Path::new(s), PathStyle::Unix).ok())
+                .and_then(|s| RelPath::new(Path::new(s)).ok())
                 .map(|r| r.into_owned().into())
                 .unwrap_or_else(|| {
-                    RelPath::new(Path::new(MultiBuffer::DEFAULT_TITLE), PathStyle::Unix)
+                    RelPath::new(Path::new(MultiBuffer::DEFAULT_TITLE))
                         .unwrap()
                         .into_owned()
                         .into()

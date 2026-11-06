@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
@@ -14,7 +14,10 @@ use std::{
 use path::rel_path::RelPath;
 use path::rel_path::RelPathBuf;
 
-pub use path::PathStyle;
+pub use path::{
+    collapse_dot_segments, join_path, join_path_preserving_components, join_relative,
+    normalize_separators,
+};
 
 /// Returns the path to the user's home directory.
 ///
@@ -184,36 +187,6 @@ pub fn normalize_path(path: &Path) -> PathBuf {
         }
     }
     ret
-}
-
-#[derive(Debug, Clone)]
-pub struct RemotePathBuf {
-    style: PathStyle,
-    string: String,
-}
-
-impl RemotePathBuf {
-    pub fn new(string: String, style: PathStyle) -> Self {
-        Self { style, string }
-    }
-
-    pub fn from_str(path: &str, style: PathStyle) -> Self {
-        Self::new(path.to_string(), style)
-    }
-
-    pub fn path_style(&self) -> PathStyle {
-        self.style
-    }
-
-    pub fn to_proto(self) -> String {
-        self.string
-    }
-}
-
-impl Display for RemotePathBuf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.string)
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -577,14 +550,12 @@ impl PathWithPosition {
 pub struct PathMatcher {
     sources: Vec<(String, RelPathBuf, /*trailing separator*/ bool)>,
     glob: GlobSet,
-    path_style: PathStyle,
 }
 
 impl std::fmt::Debug for PathMatcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PathMatcher")
             .field("sources", &self.sources)
-            .field("path_style", &self.path_style)
             .finish()
     }
 }
@@ -598,10 +569,7 @@ impl PartialEq for PathMatcher {
 impl Eq for PathMatcher {}
 
 impl PathMatcher {
-    pub fn new(
-        globs: impl IntoIterator<Item = impl AsRef<str>>,
-        path_style: PathStyle,
-    ) -> Result<Self, globset::Error> {
+    pub fn new(globs: impl IntoIterator<Item = impl AsRef<str>>) -> Result<Self, globset::Error> {
         let globs = globs
             .into_iter()
             .map(|as_str| {
@@ -610,14 +578,13 @@ impl PathMatcher {
                     .build()
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Self::from_globs(globs, path_style)
+        Self::from_globs(globs)
     }
 
     /// Skips invalid globs, reporting each error to `on_error`.
     /// If the combined set cannot be built, reports the error and matches nothing.
     pub fn new_lenient(
         globs: impl IntoIterator<Item = impl AsRef<str>>,
-        path_style: PathStyle,
         mut on_error: impl FnMut(globset::Error),
     ) -> Self {
         let globs = globs
@@ -635,29 +602,26 @@ impl PathMatcher {
                 }
             })
             .collect();
-        match Self::from_globs(globs, path_style) {
+        match Self::from_globs(globs) {
             Ok(matcher) => matcher,
             Err(error) => {
                 on_error(error);
-                Self {
-                    path_style,
-                    ..Self::default()
-                }
+                Self { ..Self::default() }
             }
         }
     }
 
-    fn from_globs(globs: Vec<Glob>, path_style: PathStyle) -> Result<Self, globset::Error> {
+    fn from_globs(globs: Vec<Glob>) -> Result<Self, globset::Error> {
         let sources = globs
             .iter()
             .filter_map(|glob| {
                 let glob = glob.glob();
                 Some((
                     glob.to_string(),
-                    RelPath::new(&glob.as_ref(), path_style)
+                    RelPath::new(&glob.as_ref())
                         .ok()
                         .map(std::borrow::Cow::into_owned)?,
-                    glob.ends_with(path_style.separators_ch()),
+                    glob.ends_with('/'),
                 ))
             })
             .collect();
@@ -666,11 +630,7 @@ impl PathMatcher {
             glob_builder.add(single_glob);
         }
         let glob = glob_builder.build()?;
-        Ok(PathMatcher {
-            glob,
-            sources,
-            path_style,
-        })
+        Ok(PathMatcher { glob, sources })
     }
 
     pub fn sources(&self) -> impl Iterator<Item = &str> + Clone {
@@ -686,14 +646,14 @@ impl PathMatcher {
         {
             return true;
         }
-        let other_path = other.display(self.path_style);
+        let other_path = other.display();
 
         if self.glob.is_match(&*other_path) {
             return true;
         }
 
         self.glob
-            .is_match(other_path.into_owned() + self.path_style.primary_separator())
+            .is_match(other_path.into_owned() + std::path::MAIN_SEPARATOR_STR)
     }
 
     pub fn is_match_std_path<P: AsRef<Path>>(&self, other: P) -> bool {
@@ -710,7 +670,6 @@ impl PathMatcher {
 impl Default for PathMatcher {
     fn default() -> Self {
         Self {
-            path_style: PathStyle::local(),
             glob: GlobSet::empty(),
             sources: vec![],
         }
@@ -1154,15 +1113,13 @@ pub fn compare_paths(
 }
 
 pub trait UrlExt {
-    /// A version of `url::Url::to_file_path` that does platform handling based on the provided `PathStyle` instead of the host platform.
-    ///
-    /// Prefer using this over `url::Url::to_file_path` when you need to handle paths in a cross-platform way as is the case for remoting interactions.
-    fn to_file_path_ext(&self, path_style: PathStyle) -> Result<PathBuf, ()>;
+    /// Converts a `file://` URL to a path; other hosts than `localhost` are rejected.
+    fn to_file_path_ext(&self) -> Result<PathBuf, ()>;
 }
 
 impl UrlExt for url::Url {
-    // Copied from `url::Url::to_file_path`, but the `cfg` handling is replaced with runtime branching on `PathStyle`
-    fn to_file_path_ext(&self, source_path_style: PathStyle) -> Result<PathBuf, ()> {
+    // Copied from `url::Url::to_file_path`.
+    fn to_file_path_ext(&self) -> Result<PathBuf, ()> {
         if let Some(segments) = self.path_segments() {
             let host = match self.host() {
                 None | Some(url::Host::Domain("localhost")) => None,
@@ -1172,11 +1129,7 @@ impl UrlExt for url::Url {
             let str_len = self.as_str().len();
             // remove scheme://
             let estimated_capacity = str_len.saturating_sub(self.scheme().len() + 3);
-            return match source_path_style {
-                PathStyle::Unix => {
-                    file_url_segments_to_pathbuf_posix(estimated_capacity, host, segments)
-                }
-            };
+            return file_url_segments_to_pathbuf_posix(estimated_capacity, host, segments);
         }
 
         fn file_url_segments_to_pathbuf_posix(
@@ -1208,7 +1161,7 @@ impl UrlExt for url::Url {
 
             let path = String::from_utf8(bytes).map_err(|_| ())?;
             debug_assert!(
-                PathStyle::Unix.is_absolute(Path::new(&path)),
+                Path::new(&path).is_absolute(),
                 "to_file_path() failed to produce an absolute Path"
             );
 
@@ -1226,11 +1179,10 @@ mod tests {
 
     #[test]
     fn test_lenient_path_matcher() {
-        let path_style = PathStyle::Unix;
         let patterns = ["**/.git", "[", "target/**", "{"];
         let mut errors = Vec::new();
-        let matcher = PathMatcher::new_lenient(patterns, path_style, |error| errors.push(error));
-        let expected = PathMatcher::new(["**/.git", "target/**"], path_style).unwrap();
+        let matcher = PathMatcher::new_lenient(patterns, |error| errors.push(error));
+        let expected = PathMatcher::new(["**/.git", "target/**"]).unwrap();
         assert_eq!(matcher, expected);
         assert_eq!(errors.len(), 2);
         assert_eq!(errors[0].glob(), Some("["));
@@ -1239,36 +1191,29 @@ mod tests {
             let path = RelPath::from_unix_str(path).unwrap();
             assert_eq!(matcher.is_match(path), expected.is_match(path));
         }
-        if path_style == PathStyle::local() {
-            assert!(matcher.is_match(RelPath::from_unix_str("nested/.git").unwrap()));
-            assert!(matcher.is_match(RelPath::from_unix_str("target/file.rs").unwrap()));
-        }
-        assert!(PathMatcher::new(patterns, path_style).is_err());
+        assert!(matcher.is_match(RelPath::from_unix_str("nested/.git").unwrap()));
+        assert!(matcher.is_match(RelPath::from_unix_str("target/file.rs").unwrap()));
+        assert!(PathMatcher::new(patterns).is_err());
 
         let mut errors = Vec::new();
-        let matcher = PathMatcher::new_lenient(["[", "{"], path_style, |error| errors.push(error));
+        let matcher = PathMatcher::new_lenient(["[", "{"], |error| errors.push(error));
         assert_eq!(errors.len(), 2);
-        assert_eq!(matcher.path_style, path_style);
         assert_eq!(matcher.sources().count(), 0);
         assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
         assert!(!matcher.is_match_std_path("file.rs"));
 
-        let matcher = PathMatcher::new_lenient([] as [&str; 0], path_style, |_| {
-            panic!("empty patterns are valid")
-        });
-        assert_eq!(matcher.path_style, path_style);
+        let matcher =
+            PathMatcher::new_lenient([] as [&str; 0], |_| panic!("empty patterns are valid"));
         assert_eq!(matcher.sources().count(), 0);
         assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
     }
 
     #[test]
     fn test_lenient_path_matcher_preserves_escaping() {
-        let path_style = PathStyle::Unix;
         let patterns = [r"directory\file.rs", r"literal\*", r"literal\[name]"];
-        let strict = PathMatcher::new(patterns, path_style).unwrap();
-        let lenient = PathMatcher::new_lenient(patterns, path_style, |_| {
-            panic!("valid patterns are preserved")
-        });
+        let strict = PathMatcher::new(patterns).unwrap();
+        let lenient =
+            PathMatcher::new_lenient(patterns, |_| panic!("valid patterns are preserved"));
         assert_eq!(lenient, strict);
         for path in [
             "directory/file.rs",
@@ -2449,7 +2394,7 @@ mod tests {
     // fn edge_of_glob() {
     //     let path = Path::new("/work/node_modules");
     //     let path_matcher =
-    //         PathMatcher::new(&["**/node_modules/**".to_owned()], PathStyle::Unix).unwrap();
+    //         PathMatcher::new(&["**/node_modules/**".to_owned()]).unwrap();
     //     assert!(
     //         path_matcher.is_match(path),
     //         "Path matcher should match {path:?}"
@@ -2459,7 +2404,7 @@ mod tests {
     // #[perf]
     // fn file_in_dirs() {
     //     let path = Path::new("/work/.env");
-    //     let path_matcher = PathMatcher::new(&["**/.env".to_owned()], PathStyle::Unix).unwrap();
+    //     let path_matcher = PathMatcher::new(&["**/.env".to_owned()]).unwrap();
     //     assert!(
     //         path_matcher.is_match(path),
     //         "Path matcher should match {path:?}"
@@ -2873,21 +2818,15 @@ mod tests {
 
         let url = url::Url::parse("file:///home/user/file.txt").unwrap();
         assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
+            url.to_file_path_ext(),
             Ok(PathBuf::from("/home/user/file.txt"))
         );
 
         let url = url::Url::parse("file:///").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
-            Ok(PathBuf::from("/"))
-        );
+        assert_eq!(url.to_file_path_ext(), Ok(PathBuf::from("/")));
 
         let url = url::Url::parse("file:///a/b/c/d/e").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
-            Ok(PathBuf::from("/a/b/c/d/e"))
-        );
+        assert_eq!(url.to_file_path_ext(), Ok(PathBuf::from("/a/b/c/d/e")));
     }
 
     #[test]
@@ -2896,19 +2835,19 @@ mod tests {
 
         let url = url::Url::parse("file:///home/user/file%20with%20spaces.txt").unwrap();
         assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
+            url.to_file_path_ext(),
             Ok(PathBuf::from("/home/user/file with spaces.txt"))
         );
 
         let url = url::Url::parse("file:///path%2Fwith%2Fencoded%2Fslashes").unwrap();
         assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
+            url.to_file_path_ext(),
             Ok(PathBuf::from("/path/with/encoded/slashes"))
         );
 
         let url = url::Url::parse("file:///special%23chars%3F.txt").unwrap();
         assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
+            url.to_file_path_ext(),
             Ok(PathBuf::from("/special#chars?.txt"))
         );
     }
@@ -2919,7 +2858,7 @@ mod tests {
 
         let url = url::Url::parse("file://localhost/home/user/file.txt").unwrap();
         assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
+            url.to_file_path_ext(),
             Ok(PathBuf::from("/home/user/file.txt"))
         );
     }
@@ -2929,7 +2868,7 @@ mod tests {
         use super::UrlExt;
 
         let url = url::Url::parse("file://somehost/home/user/file.txt").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Unix), Err(()));
+        assert_eq!(url.to_file_path_ext(), Err(()));
     }
 
     #[test]
@@ -2937,16 +2876,10 @@ mod tests {
         use super::UrlExt;
 
         let url = url::Url::parse("file:///C:").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
-            Ok(PathBuf::from("/C:/"))
-        );
+        assert_eq!(url.to_file_path_ext(), Ok(PathBuf::from("/C:/")));
 
         let url = url::Url::parse("file:///D|").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Unix),
-            Ok(PathBuf::from("/D|/"))
-        );
+        assert_eq!(url.to_file_path_ext(), Ok(PathBuf::from("/D|/")));
     }
 
     #[test]
@@ -2954,9 +2887,9 @@ mod tests {
         use super::UrlExt;
 
         let url = url::Url::parse("http://example.com/path").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Unix), Err(()));
+        assert_eq!(url.to_file_path_ext(), Err(()));
 
         let url = url::Url::parse("https://example.com/path").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Unix), Err(()));
+        assert_eq!(url.to_file_path_ext(), Err(()));
     }
 }

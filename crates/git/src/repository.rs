@@ -36,7 +36,6 @@ use std::{
 use sum_tree::MapSeekTarget;
 use thiserror::Error;
 use util::command::{Stdio, new_command};
-use util::paths::PathStyle;
 use util::rel_path::RelPath;
 use util::{ResultExt, paths};
 use uuid::Uuid;
@@ -4025,8 +4024,8 @@ impl RepoPath {
         Ok(Self::from_rel_path(rel_path))
     }
 
-    pub fn from_std_path(path: &Path, path_style: PathStyle) -> Result<Self> {
-        let rel_path = RelPath::new(path, path_style)?;
+    pub fn from_std_path(path: &Path) -> Result<Self> {
+        let rel_path = RelPath::new(path)?;
         Ok(Self::from_rel_path(&rel_path))
     }
 

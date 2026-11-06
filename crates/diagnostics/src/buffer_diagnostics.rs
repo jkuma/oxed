@@ -823,8 +823,7 @@ impl Item for BufferDiagnosticsEditor {
     }
 
     // Builds the content to be displayed in the tab.
-    fn tab_content(&self, params: TabContentParams, _window: &Window, cx: &App) -> AnyElement {
-        let path_style = self.project.read(cx).path_style(cx);
+    fn tab_content(&self, params: TabContentParams, _window: &Window, _: &App) -> AnyElement {
         let error_count = self.summary.error_count;
         let warning_count = self.summary.warning_count;
         let label = Label::new(
@@ -832,7 +831,7 @@ impl Item for BufferDiagnosticsEditor {
                 .path
                 .file_name()
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| self.project_path.path.display(path_style).to_string()),
+                .unwrap_or_else(|| self.project_path.path.display().to_string()),
         );
 
         h_flex()
@@ -868,15 +867,8 @@ impl Item for BufferDiagnosticsEditor {
         "Buffer Diagnostics".into()
     }
 
-    fn tab_tooltip_text(&self, cx: &App) -> Option<SharedString> {
-        let path_style = self.project.read(cx).path_style(cx);
-        Some(
-            format!(
-                "Buffer Diagnostics - {}",
-                self.project_path.path.display(path_style)
-            )
-            .into(),
-        )
+    fn tab_tooltip_text(&self, _: &App) -> Option<SharedString> {
+        Some(format!("Buffer Diagnostics - {}", self.project_path.path.display()).into())
     }
 
     fn to_item_events(event: &EditorEvent, f: &mut dyn FnMut(ItemEvent)) {
@@ -886,8 +878,7 @@ impl Item for BufferDiagnosticsEditor {
 
 impl Render for BufferDiagnosticsEditor {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let path_style = self.project.read(cx).path_style(cx);
-        let filename = self.project_path.path.display(path_style).to_string();
+        let filename = self.project_path.path.display().to_string();
         let error_count = self.summary.error_count;
         let warning_count = match self.include_warnings {
             true => self.summary.warning_count,

@@ -25,9 +25,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 use url::Url;
-use util::{
-    archive::extract_zip, fs::make_file_executable, maybe, paths::PathStyle, rel_path::RelPath,
-};
+use util::{archive::extract_zip, fs::make_file_executable, maybe, rel_path::RelPath};
 use wasmtime::component::{Linker, Resource};
 
 pub const MIN_VERSION: Version = Version::new(0, 8, 0);
@@ -303,9 +301,7 @@ impl HostWorktree for WasmState {
     ) -> wasmtime::Result<Result<String, String>> {
         let delegate = self.table.get(&delegate)?;
         Ok(delegate
-            .read_text_file(
-                &RelPath::new(Path::new(&path), PathStyle::Unix).into_wasmtime_result()?,
-            )
+            .read_text_file(&RelPath::new(Path::new(&path)).into_wasmtime_result()?)
             .await
             .map_err(|error| error.to_string()))
     }
@@ -664,9 +660,9 @@ impl ExtensionImports for WasmState {
     ) -> wasmtime::Result<Result<String, String>> {
         self.on_main_thread(|cx| {
             async move {
-                let path = location.as_ref().and_then(|location| {
-                    RelPath::new(Path::new(&location.path), PathStyle::Unix).ok()
-                });
+                let path = location
+                    .as_ref()
+                    .and_then(|location| RelPath::new(Path::new(&location.path)).ok());
                 let location = path
                     .as_ref()
                     .zip(location.as_ref())

@@ -68,7 +68,7 @@ use util::{
     ResultExt, TryFutureExt,
     markdown::MarkdownInlineCode,
     maybe,
-    paths::{PathExt, PathStyle, compare_paths},
+    paths::{PathExt, compare_paths},
     rel_path::{RelPath, RelPathBuf},
 };
 use workspace::{
@@ -2097,14 +2097,13 @@ impl ProjectPanel {
         let worktree_id = edit_state.worktree_id;
         let is_new_entry = edit_state.is_new_entry();
         let filename = self.filename_editor.read(cx).text(cx);
-        let path_style = self.project.read(cx).path_style(cx);
         if filename.trim().is_empty() {
             return None;
         }
 
         let filename_indicates_dir = filename.ends_with('/');
         let filename = filename.trim_start_matches('/');
-        let filename = RelPath::new(filename.as_ref(), path_style).ok()?.into_arc();
+        let filename = RelPath::new(filename.as_ref()).ok()?.into_arc();
 
         edit_state.is_dir =
             edit_state.is_dir || (edit_state.is_new_entry() && filename_indicates_dir);
@@ -3776,7 +3775,6 @@ impl ProjectPanel {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let path_style = self.project.read(cx).path_style(cx);
         let file_paths = {
             let project = self.project.read(cx);
             self.effective_entries()
@@ -3786,7 +3784,7 @@ impl ProjectPanel {
                         project
                             .path_for_entry(entry.entry_id, cx)?
                             .path
-                            .display(path_style)
+                            .display()
                             .into_owned(),
                     )
                 })
@@ -3957,9 +3955,7 @@ impl ProjectPanel {
                 dir_path.to_rel_path_buf()
             };
 
-            let directory = dir_path
-                .display(self.project.read(cx).path_style(cx))
-                .into_owned();
+            let directory = dir_path.display().into_owned();
             window.dispatch_action(
                 Box::new(zed_actions::search::NewSearchInDirectory { directory }),
                 cx,
@@ -5807,7 +5803,6 @@ impl ProjectPanel {
         let item_colors = get_item_color(is_sticky, cx);
 
         let canonical_path = details.canonical_path.clone();
-        let path_style = self.project.read(cx).path_style(cx);
         let path = details.path.clone();
 
         let depth = details.depth;
@@ -6455,7 +6450,6 @@ impl ProjectPanel {
                                         folded_ancestors,
                                         entry_id,
                                         file_name,
-                                        path_style,
                                         is_sticky,
                                         kind.is_file(),
                                         is_active || is_marked,
@@ -6529,7 +6523,6 @@ impl ProjectPanel {
         folded_ancestors: &FoldedAncestors,
         entry_id: ProjectEntryId,
         file_name: String,
-        path_style: PathStyle,
         is_sticky: bool,
         is_file: bool,
         is_active_or_marked: bool,
@@ -6546,7 +6539,7 @@ impl ProjectPanel {
             .collect::<Vec<_>>();
         let active_index = folded_ancestors.active_index();
         let components_len = components.len();
-        let delimiter = SharedString::new(path_style.primary_separator());
+        let delimiter = SharedString::new(std::path::MAIN_SEPARATOR_STR);
 
         let path_component_elements =
             components
@@ -6805,7 +6798,6 @@ impl ProjectPanel {
 
         let (chevron, icon) = Self::entry_icons(entry, is_expanded, cx);
 
-        let path_style = self.project.read(cx).path_style(cx);
         let (depth, difference) =
             ProjectPanel::calculate_depth_and_difference(entry, entries_paths);
 
@@ -6813,9 +6805,7 @@ impl ProjectPanel {
             entry
                 .path
                 .last_n_components(difference)
-                .map_or(String::new(), |suffix| {
-                    suffix.display(path_style).to_string()
-                })
+                .map_or(String::new(), |suffix| suffix.display().to_string())
         } else {
             entry_file_name(entry, root_name).to_string()
         };

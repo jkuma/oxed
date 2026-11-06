@@ -1,10 +1,7 @@
 use std::path::Path;
 
 use settings::{RegisterSetting, ScanSymlinksSetting, Settings};
-use util::{
-    paths::{PathMatcher, PathStyle},
-    rel_path::RelPath,
-};
+use util::{paths::PathMatcher, rel_path::RelPath};
 
 #[derive(Clone, PartialEq, Eq, RegisterSetting)]
 pub struct WorktreeSettings {
@@ -83,7 +80,7 @@ impl Settings for WorktreeSettings {
 
 fn valid_path_matchers(mut values: Vec<String>, context: &'static str) -> PathMatcher {
     values.sort();
-    PathMatcher::new_lenient(values, PathStyle::local(), |error| {
+    PathMatcher::new_lenient(values, |error| {
         log::error!("Failed to compile patterns in `{context}`: {error}");
     })
 }
@@ -91,7 +88,7 @@ fn valid_path_matchers(mut values: Vec<String>, context: &'static str) -> PathMa
 fn file_scan_inclusion_matchers(mut values: Vec<String>) -> (PathMatcher, PathMatcher) {
     values.sort();
     let mut errors = Vec::new();
-    let inclusions = PathMatcher::new_lenient(&values, PathStyle::local(), |error| {
+    let inclusions = PathMatcher::new_lenient(&values, |error| {
         errors.push(error);
     });
     let parent_inclusions = values
@@ -103,7 +100,7 @@ fn file_scan_inclusion_matchers(mut values: Vec<String>) -> (PathMatcher, PathMa
                     .is_none_or(|invalid| invalid == pattern.as_str())
             })
         })
-        .flat_map(|pattern| inclusion_parent_patterns(pattern, PathStyle::local()))
+        .flat_map(|pattern| inclusion_parent_patterns(pattern))
         .collect();
     for error in errors {
         log::error!("Failed to compile patterns in `file_scan_inclusions`: {error}");
@@ -114,13 +111,13 @@ fn file_scan_inclusion_matchers(mut values: Vec<String>) -> (PathMatcher, PathMa
     )
 }
 
-fn inclusion_parent_patterns(pattern: &str, path_style: PathStyle) -> Vec<String> {
+fn inclusion_parent_patterns(pattern: &str) -> Vec<String> {
     let mut parents = Vec::new();
     let mut open_braces = 0_usize;
     let mut class_start = None;
     let mut escaped = false;
     for (index, character) in pattern.char_indices() {
-        let is_separator = path_style.separators_ch().contains(&character);
+        let is_separator = character == '/';
         let mut split_index = index;
         if class_start.is_none() {
             if escaped {

@@ -84,7 +84,6 @@ use ui::{
     ProjectEmptyState, ScrollAxes, Scrollbars, SplitButton, Tab, Tooltip, WithScrollbar,
     prelude::*,
 };
-use util::paths::PathStyle;
 use util::{ResultExt, TryFutureExt, markdown::MarkdownInlineCode, maybe};
 use workspace::SERIALIZATION_THROTTLE_TIME;
 use workspace::{
@@ -1070,17 +1069,17 @@ pub struct GitStatusEntry {
 }
 
 impl GitStatusEntry {
-    fn display_name(&self, path_style: PathStyle) -> String {
+    fn display_name(&self) -> String {
         self.repo_path
             .file_name()
             .map(|name| name.to_owned())
-            .unwrap_or_else(|| self.repo_path.display(path_style).to_string())
+            .unwrap_or_else(|| self.repo_path.display().to_string())
     }
 
-    fn parent_dir(&self, path_style: PathStyle) -> Option<String> {
+    fn parent_dir(&self) -> Option<String> {
         self.repo_path
             .parent()
-            .map(|parent| parent.display(path_style).to_string())
+            .map(|parent| parent.display().to_string())
     }
 }
 
@@ -2686,11 +2685,10 @@ impl GitPanel {
             cx.propagate();
             return;
         }
-        let path_style = self.project.read(cx).path_style(cx);
         cx.write_to_clipboard(ClipboardItem::new_string(
             paths
                 .into_iter()
-                .map(|path| path.display(path_style).into_owned())
+                .map(|path| path.display().into_owned())
                 .join("\n"),
         ));
     }
@@ -2924,7 +2922,6 @@ impl GitPanel {
         maybe!({
             let active_repo = self.active_repository.clone()?;
             let workspace = self.workspace.clone();
-            let path_style = self.project.read(cx).path_style(cx);
 
             let staged = targets
                 .iter()
@@ -2982,7 +2979,7 @@ impl GitPanel {
                             entry
                                 .repo_path
                                 .file_name()
-                                .unwrap_or(entry.repo_path.display(path_style).as_ref())
+                                .unwrap_or(entry.repo_path.display().as_ref())
                         )
                     ),
                     None,
@@ -5064,7 +5061,6 @@ impl GitPanel {
     }
 
     fn update_visible_entries(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let path_style = self.project.read(cx).path_style(cx);
         let selected_change = self.selected_entry.and_then(|index| {
             let entry = self.entries.get(index)?.status_entry()?;
             Some((entry.repo_path.clone(), self.section_for_entry_index(index)))
@@ -5268,9 +5264,7 @@ impl GitPanel {
              section: Section,
              is_visible: bool,
              logical_indices: Option<&mut Vec<usize>>| {
-                if let Some(estimate) =
-                    this.width_estimate_for_list_entry(is_tree_view, &entry, path_style)
-                {
+                if let Some(estimate) = this.width_estimate_for_list_entry(is_tree_view, &entry) {
                     if estimate > max_width_estimate {
                         max_width_estimate = estimate;
                         max_width_item_index = Some(this.entries.len());
@@ -5824,18 +5818,13 @@ impl GitPanel {
             .collect()
     }
 
-    fn status_width_estimate(
-        tree_view: bool,
-        entry: &GitStatusEntry,
-        path_style: PathStyle,
-        depth: usize,
-    ) -> usize {
+    fn status_width_estimate(tree_view: bool, entry: &GitStatusEntry, depth: usize) -> usize {
         if tree_view {
-            Self::item_width_estimate(0, entry.display_name(path_style).len(), depth)
+            Self::item_width_estimate(0, entry.display_name().len(), depth)
         } else {
             Self::item_width_estimate(
-                entry.parent_dir(path_style).map(|s| s.len()).unwrap_or(0),
-                entry.display_name(path_style).len(),
+                entry.parent_dir().map(|s| s.len()).unwrap_or(0),
+                entry.display_name().len(),
                 0,
             )
         }
@@ -5845,16 +5834,12 @@ impl GitPanel {
         &self,
         tree_view: bool,
         entry: &GitListEntry,
-        path_style: PathStyle,
     ) -> Option<usize> {
         match entry {
-            GitListEntry::Status(status) => Some(Self::status_width_estimate(
-                tree_view, status, path_style, 0,
-            )),
+            GitListEntry::Status(status) => Some(Self::status_width_estimate(tree_view, status, 0)),
             GitListEntry::TreeStatus(status) => Some(Self::status_width_estimate(
                 tree_view,
                 &status.entry,
-                path_style,
                 status.depth,
             )),
             GitListEntry::Directory(dir) => {
@@ -8058,9 +8043,8 @@ impl GitPanel {
     ) -> AnyElement {
         let settings = GitPanelSettings::get_global(cx);
         let tree_view = settings.tree_view;
-        let path_style = self.project.read(cx).path_style(cx);
         let git_path_style = ProjectSettings::get_global(cx).git.path_style;
-        let display_name = entry.display_name(path_style);
+        let display_name = entry.display_name();
 
         let selected = self.selected_entry == Some(ix);
         let marked = self.row_is_marked(ix);
@@ -8190,11 +8174,10 @@ impl GitPanel {
                     )
                 } else {
                     this.child(self.path_formatted(
-                        entry.parent_dir(path_style),
+                        entry.parent_dir(),
                         path_color,
                         display_name,
                         label_color,
-                        path_style,
                         git_path_style,
                         status.is_deleted(),
                     ))
@@ -8516,7 +8499,6 @@ impl GitPanel {
         path_color: Color,
         file_name: String,
         label_color: Color,
-        path_style: PathStyle,
         git_path_style: GitPathStyle,
         strikethrough: bool,
     ) -> Div {
@@ -8539,7 +8521,7 @@ impl GitPanel {
                 let path_name = if file_name_first {
                     dir
                 } else {
-                    format!("{dir}{}", path_style.primary_separator())
+                    format!("{dir}{}", std::path::MAIN_SEPARATOR_STR)
                 };
 
                 this.child(

@@ -948,7 +948,7 @@ impl PathInclusionMatcher {
                     as_abs_path.starts_with(prefix),
                 )
             } else {
-                RelPath::new(prefix, snapshot.path_style()).map_or((false, false), |prefix| {
+                RelPath::new(prefix).map_or((false, false), |prefix| {
                     (
                         prefix.starts_with(entry_path),
                         entry_path.starts_with(&prefix),

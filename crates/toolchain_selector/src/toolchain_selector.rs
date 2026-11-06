@@ -25,7 +25,7 @@ use ui::{
     Divider, HighlightedLabel, KeyBinding, List, ListItem, ListItemSpacing, Navigable,
     NavigableEntry, prelude::*,
 };
-use util::{ResultExt, maybe, paths::PathStyle, rel_path::RelPath};
+use util::{ResultExt, maybe, rel_path::RelPath};
 use workspace::{ModalView, Workspace};
 
 actions!(
@@ -110,11 +110,10 @@ impl AddToolchainState {
             .context("Could not find worktree")?;
         Ok(cx.new(|cx| {
             let (lister, rx) = Self::create_path_browser_delegate(project.clone(), cx);
-            let path_style = project.read(cx).path_style(cx);
             let picker = cx.new(|cx| {
                 let picker = Picker::uniform_list(lister, window, cx);
                 let mut worktree_root = worktree_root_path.to_string_lossy().into_owned();
-                worktree_root.push_str(path_style.primary_separator());
+                worktree_root.push_str(std::path::MAIN_SEPARATOR_STR);
                 picker.set_query(&worktree_root, window, cx);
                 picker
             });
@@ -763,7 +762,6 @@ impl ToolchainSelectorDelegate {
         cx: &mut Context<Picker<Self>>,
     ) -> Self {
         let _project = project.clone();
-        let path_style = project.read(cx).path_style(cx);
 
         let _fetch_candidates_task = cx.spawn_in(window, {
             async move |this, cx| {
@@ -804,7 +802,7 @@ impl ToolchainSelectorDelegate {
                     if relative_path.is_empty() {
                         Cow::Borrowed("worktree root")
                     } else {
-                        Cow::Owned(format!("`{}`", relative_path.display(path_style)))
+                        Cow::Owned(format!("`{}`", relative_path.display()))
                     }
                 };
                 let placeholder_text =
@@ -863,16 +861,12 @@ impl ToolchainSelectorDelegate {
             add_toolchain_text: Arc::from("Add Toolchain"),
         }
     }
-    fn relativize_path(
-        path: SharedString,
-        worktree_root: &Path,
-        path_style: PathStyle,
-    ) -> SharedString {
+    fn relativize_path(path: SharedString, worktree_root: &Path) -> SharedString {
         Path::new(&path.as_ref())
             .strip_prefix(&worktree_root)
             .ok()
             .and_then(|suffix| suffix.to_str())
-            .map(|suffix| format!(".{}{suffix}", path_style.primary_separator()).into())
+            .map(|suffix| format!(".{}{suffix}", std::path::MAIN_SEPARATOR_STR).into())
             .unwrap_or(path)
     }
 }
@@ -964,18 +958,14 @@ impl PickerDelegate for ToolchainSelectorDelegate {
         let background = cx.background_executor().clone();
         let candidates = self.candidates.clone();
         let worktree_root_path = self.worktree_abs_path_root.clone();
-        let path_style = self.project.read(cx).path_style(cx);
         cx.spawn_in(window, async move |this, cx| {
             let matches = if query.is_empty() {
                 candidates
                     .into_iter()
                     .enumerate()
                     .map(|(index, (candidate, _))| {
-                        let path = Self::relativize_path(
-                            candidate.path.clone(),
-                            &worktree_root_path,
-                            path_style,
-                        );
+                        let path =
+                            Self::relativize_path(candidate.path.clone(), &worktree_root_path);
                         let string = format!("{}{}", candidate.name, path);
                         StringMatch {
                             candidate_id: index,
@@ -990,11 +980,8 @@ impl PickerDelegate for ToolchainSelectorDelegate {
                     .into_iter()
                     .enumerate()
                     .map(|(candidate_id, (toolchain, _))| {
-                        let path = Self::relativize_path(
-                            toolchain.path.clone(),
-                            &worktree_root_path,
-                            path_style,
-                        );
+                        let path =
+                            Self::relativize_path(toolchain.path.clone(), &worktree_root_path);
                         let string = format!("{}{}", toolchain.name, path);
                         StringMatchCandidate::new(candidate_id, &string)
                     })
@@ -1034,12 +1021,7 @@ impl PickerDelegate for ToolchainSelectorDelegate {
         let (toolchain, scope) = &self.candidates.get(mat.candidate_id)?;
 
         let label = toolchain.name.clone();
-        let path_style = self.project.read(cx).path_style(cx);
-        let path = Self::relativize_path(
-            toolchain.path.clone(),
-            &self.worktree_abs_path_root,
-            path_style,
-        );
+        let path = Self::relativize_path(toolchain.path.clone(), &self.worktree_abs_path_root);
         let (name_highlights, mut path_highlights) = mat
             .positions
             .iter()

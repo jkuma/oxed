@@ -1,5 +1,5 @@
 use gpui::BackgroundExecutor;
-use path::{PathStyle, rel_path::RelPath};
+use path::rel_path::RelPath;
 use std::{
     cmp::{self, Ordering},
     sync::{
@@ -44,7 +44,6 @@ pub trait PathMatchCandidateSet<'a>: Send + Sync {
     fn root_is_file(&self) -> bool;
     fn prefix(&self) -> Arc<RelPath>;
     fn candidates(&'a self, start: usize) -> Self::Candidates;
-    fn path_style(&self) -> PathStyle;
 }
 
 impl<'a> MatchCandidate for PathMatchCandidate<'a> {
@@ -93,7 +92,6 @@ pub fn match_fixed_path_set(
     query: &str,
     smart_case: bool,
     max_results: usize,
-    path_style: PathStyle,
 ) -> Vec<PathMatch> {
     let lowercase_query = query.chars().map(simple_lowercase).collect::<Vec<_>>();
     let query = query.chars().collect::<Vec<_>>();
@@ -104,11 +102,8 @@ pub fn match_fixed_path_set(
     let mut results = Vec::with_capacity(candidates.len());
     let (path_prefix, path_prefix_chars, lowercase_prefix) = match worktree_root_name {
         Some(worktree_root_name) => {
-            let mut path_prefix_chars = worktree_root_name
-                .display(path_style)
-                .chars()
-                .collect::<Vec<_>>();
-            path_prefix_chars.extend(path_style.primary_separator().chars());
+            let mut path_prefix_chars = worktree_root_name.display().chars().collect::<Vec<_>>();
+            path_prefix_chars.extend(std::path::MAIN_SEPARATOR_STR.chars());
             let lowercase_pfx = path_prefix_chars
                 .iter()
                 .map(|c| simple_lowercase(*c))

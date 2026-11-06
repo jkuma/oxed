@@ -19,7 +19,6 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
-use util::paths::PathStyle;
 use util::rel_path::RelPath;
 use util::{archive::extract_zip, fs::make_file_executable, maybe};
 use wasmtime::component::{Linker, Resource};
@@ -443,9 +442,9 @@ impl ExtensionImports for WasmState {
     ) -> wasmtime::Result<Result<String, String>> {
         self.on_main_thread(|cx| {
             async move {
-                let path = location.as_ref().and_then(|location| {
-                    RelPath::new(Path::new(&location.path), PathStyle::Unix).ok()
-                });
+                let path = location
+                    .as_ref()
+                    .and_then(|location| RelPath::new(Path::new(&location.path)).ok());
                 let location = path
                     .as_ref()
                     .zip(location.as_ref())

@@ -2640,7 +2640,7 @@ mod tests {
 
         let local_1_child = (
             WorktreeId::from_usize(0),
-            RelPath::new(std::path::Path::new("child1"), util::paths::PathStyle::Unix)
+            RelPath::new(std::path::Path::new("child1"))
                 .unwrap()
                 .into_arc(),
         );
@@ -2648,7 +2648,7 @@ mod tests {
         let local_2 = (WorktreeId::from_usize(1), RelPath::empty_arc());
         let local_2_child = (
             WorktreeId::from_usize(1),
-            RelPath::new(std::path::Path::new("child2"), util::paths::PathStyle::Unix)
+            RelPath::new(std::path::Path::new("child2"))
                 .unwrap()
                 .into_arc(),
         );

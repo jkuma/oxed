@@ -21,10 +21,7 @@ use std::{
 };
 use ui::{Context, LabelLike, ListItem, Window};
 use ui::{HighlightedLabel, ListItemSpacing, prelude::*};
-use util::{
-    ResultExt, maybe,
-    paths::{PathStyle, compare_paths},
-};
+use util::{ResultExt, maybe, paths::compare_paths};
 use workspace::Workspace;
 
 pub struct OpenPathPrompt;
@@ -38,7 +35,6 @@ pub struct OpenPathDelegate {
     cancel_flag: Arc<AtomicBool>,
     should_dismiss: bool,
     prompt_root: String,
-    path_style: PathStyle,
     replace_prompt: Task<()>,
     render_footer:
         Arc<dyn Fn(&mut Window, &mut Context<Picker<Self>>) -> Option<AnyElement> + 'static>,
@@ -53,7 +49,6 @@ impl OpenPathDelegate {
         creating_path: bool,
         cx: &App,
     ) -> Self {
-        let path_style = lister.path_style(cx);
         let sort_mode = cx
             .try_global::<SettingsStore>()
             .and_then(|store| store.merged_settings().project_panel.as_ref()?.sort_mode)
@@ -68,10 +63,7 @@ impl OpenPathDelegate {
             string_matches: Vec::new(),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             should_dismiss: true,
-            prompt_root: match path_style {
-                PathStyle::Unix => "/".to_string(),
-            },
-            path_style,
+            prompt_root: "/".to_string(),
             replace_prompt: Task::ready(()),
             render_footer: Arc::new(|_, _| None),
             hidden_entries: false,
@@ -157,9 +149,7 @@ impl OpenPathDelegate {
     }
 
     fn current_dir(&self) -> &'static str {
-        match self.path_style {
-            PathStyle::Unix => "./",
-        }
+        "./"
     }
 }
 
@@ -291,7 +281,7 @@ impl PickerDelegate for OpenPathDelegate {
     ) -> Task<()> {
         let lister = &self.lister;
         let input_is_empty = query.is_empty();
-        let (dir, suffix) = get_dir_and_suffix(query, self.path_style);
+        let (dir, suffix) = get_dir_and_suffix(query);
 
         let query = match &self.directory_state {
             DirectoryState::List { parent_path, .. } => {
@@ -585,14 +575,13 @@ impl PickerDelegate for OpenPathDelegate {
         if candidate.path.string.is_empty() || !candidate.is_dir {
             return None;
         }
-        let path_style = self.path_style;
         match &self.directory_state {
             DirectoryState::List { parent_path, .. }
             | DirectoryState::Create { parent_path, .. } => Some(format!(
                 "{}{}{}",
                 parent_path,
                 candidate.path.string,
-                path_style.primary_separator()
+                std::path::MAIN_SEPARATOR_STR
             )),
             DirectoryState::None { .. } => None,
         }
@@ -612,7 +601,7 @@ impl PickerDelegate for OpenPathDelegate {
             return None;
         }
         let trimmed = parent_path.trim_end_matches(['/', '\\']);
-        let (dir, _) = get_dir_and_suffix(trimmed.to_string(), self.path_style);
+        let (dir, _) = get_dir_and_suffix(trimmed.to_string());
         Some(dir)
     }
     fn confirm_completion(
@@ -626,7 +615,6 @@ impl PickerDelegate for OpenPathDelegate {
             return None;
         }
 
-        let path_style = self.path_style;
         Some(
             maybe!({
                 match &self.directory_state {
@@ -635,7 +623,7 @@ impl PickerDelegate for OpenPathDelegate {
                         parent_path,
                         candidate.path.string,
                         if candidate.is_dir {
-                            path_style.primary_separator()
+                            std::path::MAIN_SEPARATOR_STR
                         } else {
                             ""
                         }
@@ -645,7 +633,7 @@ impl PickerDelegate for OpenPathDelegate {
                         parent_path,
                         candidate.path.string,
                         if candidate.is_dir {
-                            path_style.primary_separator()
+                            std::path::MAIN_SEPARATOR_STR
                         } else {
                             ""
                         }
@@ -669,14 +657,11 @@ impl PickerDelegate for OpenPathDelegate {
                     if parent_path == &self.prompt_root && candidate.path.string.is_empty() {
                         PathBuf::from(&self.prompt_root)
                     } else {
-                        let Some(confirmed_path) = self
-                            .path_style
-                            .join_path_preserving_components(
-                                Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
-                                &candidate.path.string,
-                            )
-                            .log_err()
-                        else {
+                        let Some(confirmed_path) = util::paths::join_path_preserving_components(
+                            Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
+                            &candidate.path.string,
+                        )
+                        .log_err() else {
                             return;
                         };
                         confirmed_path
@@ -699,14 +684,11 @@ impl PickerDelegate for OpenPathDelegate {
                         if parent_path == &self.prompt_root && user_input.file.string.is_empty() {
                             PathBuf::from(&self.prompt_root)
                         } else {
-                            let Some(prompted_path) = self
-                                .path_style
-                                .join_path_preserving_components(
-                                    Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
-                                    &user_input.file.string,
-                                )
-                                .log_err()
-                            else {
+                            let Some(prompted_path) = util::paths::join_path_preserving_components(
+                                Path::new(self.lister.resolve_tilde(parent_path).as_ref()),
+                                &user_input.file.string,
+                            )
+                            .log_err() else {
                                 return;
                             };
                             prompted_path
@@ -931,13 +913,7 @@ impl PickerDelegate for OpenPathDelegate {
     }
 
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
-        Arc::from(
-            format!(
-                "[directory{}]filename.ext",
-                self.path_style.primary_separator()
-            )
-            .as_str(),
-        )
+        Arc::from(format!("[directory{}]filename.ext", std::path::MAIN_SEPARATOR_STR).as_str())
     }
 
     fn separators_after_indices(&self) -> Vec<usize> {
@@ -982,63 +958,58 @@ fn path_candidates(
         .collect()
 }
 
-fn get_dir_and_suffix(query: String, path_style: PathStyle) -> (String, String) {
-    match path_style {
-        PathStyle::Unix => {
-            let (mut dir, suffix) = if let Some(index) = query.rfind('/') {
-                (query[..index].to_string(), query[index + 1..].to_string())
-            } else {
-                (query, String::new())
-            };
-            if !dir.ends_with('/') {
-                dir.push('/');
-            }
-            (dir, suffix)
-        }
+fn get_dir_and_suffix(query: String) -> (String, String) {
+    let (mut dir, suffix) = if let Some(index) = query.rfind('/') {
+        (query[..index].to_string(), query[index + 1..].to_string())
+    } else {
+        (query, String::new())
+    };
+    if !dir.ends_with('/') {
+        dir.push('/');
     }
+    (dir, suffix)
 }
 
 #[cfg(test)]
 mod tests {
-    use util::paths::PathStyle;
 
     use super::get_dir_and_suffix;
 
     #[test]
     fn test_get_dir_and_suffix_with_posix_style() {
-        let (dir, suffix) = get_dir_and_suffix("".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("".into());
         assert_eq!(dir, "/");
         assert_eq!(suffix, "");
 
-        let (dir, suffix) = get_dir_and_suffix("/".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/".into());
         assert_eq!(dir, "/");
         assert_eq!(suffix, "");
 
-        let (dir, suffix) = get_dir_and_suffix("/Use".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/Use".into());
         assert_eq!(dir, "/");
         assert_eq!(suffix, "Use");
 
-        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Docum".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Docum".into());
         assert_eq!(dir, "/Users/Junkui/");
         assert_eq!(suffix, "Docum");
 
-        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Documents".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Documents".into());
         assert_eq!(dir, "/Users/Junkui/");
         assert_eq!(suffix, "Documents");
 
-        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Documents/".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/Users/Junkui/Documents/".into());
         assert_eq!(dir, "/Users/Junkui/Documents/");
         assert_eq!(suffix, "");
 
-        let (dir, suffix) = get_dir_and_suffix("/root/.".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/root/.".into());
         assert_eq!(dir, "/root/");
         assert_eq!(suffix, ".");
 
-        let (dir, suffix) = get_dir_and_suffix("/root/..".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/root/..".into());
         assert_eq!(dir, "/root/");
         assert_eq!(suffix, "..");
 
-        let (dir, suffix) = get_dir_and_suffix("/root/.hidden".into(), PathStyle::Unix);
+        let (dir, suffix) = get_dir_and_suffix("/root/.hidden".into());
         assert_eq!(dir, "/root/");
         assert_eq!(suffix, ".hidden");
     }

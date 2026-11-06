@@ -5,10 +5,7 @@ use fs::FakeFs;
 use project::{Project, ProjectEntryId, project_search::PathInclusionMatcher, search::SearchQuery};
 use serde_json::json;
 use settings::Settings;
-use util::{
-    paths::{PathMatcher, PathStyle},
-    rel_path::RelPath,
-};
+use util::{paths::PathMatcher, rel_path::RelPath};
 use worktree::{Entry, EntryKind, WorktreeSettings};
 
 #[gpui::test]
@@ -89,7 +86,7 @@ async fn test_path_inclusion_matcher(cx: &mut gpui::TestAppContext) {
     // 2. Test searching for `field`, including ignored files but updating
     // `files_to_include` to only include files under `src/lib`.
     let include_ignored = true;
-    let files_to_include = PathMatcher::new(vec!["src/lib"], PathStyle::Unix).unwrap();
+    let files_to_include = PathMatcher::new(vec!["src/lib"]).unwrap();
     let files_to_exclude = PathMatcher::default();
     let match_full_paths = false;
     let search_query = SearchQuery::text(

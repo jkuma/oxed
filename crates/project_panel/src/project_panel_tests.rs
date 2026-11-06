@@ -22,7 +22,7 @@ use serde_json::json;
 use settings::{FolderIndicator, ProjectPanelAutoOpenSettings, SettingsStore, SplicingVec};
 use smallvec::smallvec;
 use std::path::{Path, PathBuf};
-use util::{paths::PathStyle, rel_path::rel_path};
+use util::rel_path::rel_path;
 use workspace::{
     AppState, ItemHandle, MultiWorkspace, Pane, Workspace,
     item::{Item, ProjectItem, test::TestItem},
@@ -10560,8 +10560,8 @@ async fn test_compare_selected_files(cx: &mut gpui::TestAppContext) {
             diff_view.tab_tooltip_text(cx).unwrap(),
             format!(
                 "{} ↔ {}",
-                rel_path(file1_path).display(PathStyle::local()),
-                rel_path(file2_path).display(PathStyle::local())
+                rel_path(file1_path).display(),
+                rel_path(file2_path).display()
             )
         );
     });

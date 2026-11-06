@@ -7,10 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    PathStyle,
-    abs_path::{AbsPath, AbsPathBuf},
-};
+use crate::abs_path::{AbsPath, AbsPathBuf};
 
 /// A file system path that is guaranteed to be relative and normalized.
 ///
@@ -50,12 +47,10 @@ impl RelPath {
     /// processing `..` components, and removing trailing separators. It does
     /// not allocate unless it's necessary to reformat the path.
     #[track_caller]
-    pub fn new<'a>(path: &'a Path, path_style: PathStyle) -> Result<Cow<'a, Self>> {
+    pub fn new<'a>(path: &'a Path) -> Result<Cow<'a, Self>> {
         let mut path = path.to_str().context("non utf-8 path")?;
 
-        let (prefixes, suffixes): (&[_], &[_]) = match path_style {
-            PathStyle::Unix => (&["./"], &['/']),
-        };
+        let (prefixes, suffixes): (&[_], &[_]) = (&["./"], &['/']);
 
         while prefixes.iter().any(|prefix| path.starts_with(prefix)) {
             path = &path[prefixes[0].len()..];
@@ -66,7 +61,7 @@ impl RelPath {
             path = prefix;
         }
 
-        if path_style.has_root(Path::new(&path)) {
+        if Path::new(&path).has_root() {
             return Err(anyhow!("absolute path not allowed: {path:?}"));
         }
 
@@ -97,7 +92,7 @@ impl RelPath {
 
     #[track_caller]
     pub fn new_test<'a>(path: &'a str) -> Cow<'a, Self> {
-        Self::new(Path::new(path), PathStyle::Unix).unwrap()
+        Self::new(Path::new(path)).unwrap()
     }
 
     /// Converts a path that is already normalized and uses '/' separators
@@ -107,7 +102,7 @@ impl RelPath {
     #[track_caller]
     pub fn from_unix_str<S: AsRef<Path> + ?Sized>(path: &S) -> anyhow::Result<&Self> {
         let path = path.as_ref();
-        match Self::new(path, PathStyle::Unix)? {
+        match Self::new(path)? {
             Cow::Borrowed(path) => Ok(path),
             Cow::Owned(_) => Err(anyhow!("invalid relative path {path:?}")),
         }
@@ -236,14 +231,12 @@ impl RelPath {
         Arc::from(self)
     }
 
-    /// Convert the path into a string with the given path style.
+    /// Convert the path into a string.
     ///
     /// Whenever a path is presented to the user, it should be converted to
     /// a string via this method.
-    pub fn display(&self, style: PathStyle) -> Cow<'_, str> {
-        match style {
-            PathStyle::Unix => Cow::Borrowed(&self.0),
-        }
+    pub fn display(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.0)
     }
 
     /// Get the internal unix-style representation of the path.
@@ -446,7 +439,7 @@ impl TryFrom<&str> for RelPathBuf {
     type Error = anyhow::Error;
 
     fn try_from(s: &str) -> Result<Self> {
-        RelPath::new(Path::new(s), PathStyle::Unix).map(|cow| cow.into_owned())
+        RelPath::new(Path::new(s)).map(|cow| cow.into_owned())
     }
 }
 
@@ -587,8 +580,7 @@ impl<'de> serde::Deserialize<'de> for RelPathBuf {
         D: serde::Deserializer<'de>,
     {
         let path = String::deserialize(deserializer)?;
-        let rel_path =
-            RelPath::new(Path::new(&path), PathStyle::local()).map_err(serde::de::Error::custom)?;
+        let rel_path = RelPath::new(Path::new(&path)).map_err(serde::de::Error::custom)?;
         Ok(rel_path.into_owned())
     }
 }
@@ -599,26 +591,26 @@ mod tests {
 
     #[test]
     fn test_rel_path_new() {
-        assert!(RelPath::new(Path::new("/"), PathStyle::local()).is_err());
-        assert!(RelPath::new(Path::new("//"), PathStyle::local()).is_err());
-        assert!(RelPath::new(Path::new("/foo/"), PathStyle::local()).is_err());
+        assert!(RelPath::new(Path::new("/")).is_err());
+        assert!(RelPath::new(Path::new("//")).is_err());
+        assert!(RelPath::new(Path::new("/foo/")).is_err());
 
-        let path = RelPath::new("foo/".as_ref(), PathStyle::local()).unwrap();
+        let path = RelPath::new("foo/".as_ref()).unwrap();
         assert_eq!(path, rel_path("foo").into());
         assert!(matches!(path, Cow::Borrowed(_)));
 
         assert_eq!(
-            RelPath::new("foo/bar/../baz/./quux/".as_ref(), PathStyle::local())
+            RelPath::new("foo/bar/../baz/./quux/".as_ref())
                 .unwrap()
                 .as_ref(),
             rel_path("foo/baz/quux")
         );
 
-        let path = RelPath::new("./foo/bar".as_ref(), PathStyle::Unix).unwrap();
+        let path = RelPath::new("./foo/bar".as_ref()).unwrap();
         assert_eq!(path.as_ref(), rel_path("foo/bar"));
         assert!(matches!(path, Cow::Borrowed(_)));
 
-        let path = RelPath::new("foo/./bar".as_ref(), PathStyle::Unix).unwrap();
+        let path = RelPath::new("foo/./bar".as_ref()).unwrap();
         assert_eq!(path.as_ref(), rel_path("foo/bar"));
         assert!(matches!(path, Cow::Owned(_)));
     }
@@ -742,8 +734,8 @@ mod tests {
 
     #[test]
     fn test_rel_path_constructors_absolute_path() {
-        assert!(RelPath::new(Path::new("/a/b"), PathStyle::Unix).is_err());
-        assert!(RelPath::new(Path::new("C:/a/b"), PathStyle::Unix).is_ok());
+        assert!(RelPath::new(Path::new("/a/b")).is_err());
+        assert!(RelPath::new(Path::new("C:/a/b")).is_ok());
     }
 
     #[test]

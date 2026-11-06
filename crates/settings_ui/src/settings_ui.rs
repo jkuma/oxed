@@ -39,7 +39,7 @@ use ui::{
     prelude::*,
 };
 
-use util::{ResultExt as _, paths::PathStyle, rel_path::RelPath};
+use util::{ResultExt as _, rel_path::RelPath};
 use workspace::{
     AppState, MultiWorkspace, OpenOptions, OpenVisible, Workspace, WorkspaceSettings,
     client_side_decorations,
@@ -2736,44 +2736,20 @@ impl SettingsWindow {
                 .worktree_root_dirs
                 .get(&worktree_id)
                 .map(|directory_name| {
-                    let path_style = PathStyle::local();
                     if path.is_empty() {
                         directory_name.clone()
                     } else {
                         format!(
                             "{}{}{}",
                             directory_name,
-                            path_style.primary_separator(),
-                            path.display(path_style)
+                            std::path::MAIN_SEPARATOR_STR,
+                            path.display()
                         )
                     }
                 }),
             SettingsUiFile::Server(file) => Some(file.to_string()),
         }
     }
-
-    // TODO:
-    //  Reconsider this after preview launch
-    // fn file_location_str(&self) -> String {
-    //     match &self.current_file {
-    //         SettingsUiFile::User => "settings.json".to_string(),
-    //         SettingsUiFile::Project((worktree_id, path)) => self
-    //             .worktree_root_dirs
-    //             .get(&worktree_id)
-    //             .map(|directory_name| {
-    //                 let path_style = PathStyle::local();
-    //                 let file_path = path.join(paths::local_settings_file_relative_path());
-    //                 format!(
-    //                     "{}{}{}",
-    //                     directory_name,
-    //                     path_style.separator(),
-    //                     file_path.display(path_style)
-    //                 )
-    //             })
-    //             .expect("Current file should always be present in root dir map"),
-    //         SettingsUiFile::Server(file) => file.to_string(),
-    //     }
-    // }
 
     fn render_search(
         &self,

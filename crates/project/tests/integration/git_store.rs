@@ -1228,7 +1228,6 @@ mod git_worktrees {
     use serde_json::json;
     use settings::SettingsStore;
     use std::path::{Path, PathBuf};
-    use util::paths::PathStyle;
 
     fn init_test(cx: &mut gpui::TestAppContext) {
         zlog::init_test();
@@ -1244,54 +1243,49 @@ mod git_worktrees {
         let work_dir = Path::new("/code/my-project");
 
         // Valid: sibling
-        assert!(worktrees_directory_for_repo(work_dir, "../worktrees", PathStyle::Unix).is_ok());
+        assert!(worktrees_directory_for_repo(work_dir, "../worktrees").is_ok());
 
         // Valid: subdirectory
-        assert!(
-            worktrees_directory_for_repo(work_dir, ".git/zed-worktrees", PathStyle::Unix).is_ok()
-        );
-        assert!(worktrees_directory_for_repo(work_dir, "my-worktrees", PathStyle::Unix).is_ok());
+        assert!(worktrees_directory_for_repo(work_dir, ".git/zed-worktrees").is_ok());
+        assert!(worktrees_directory_for_repo(work_dir, "my-worktrees").is_ok());
 
         // Invalid: just ".." would resolve back to the working directory itself
-        let err = worktrees_directory_for_repo(work_dir, "..", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "..").unwrap_err();
         assert!(err.to_string().contains("must not be \"..\""));
 
         // Invalid: ".." with trailing separators
-        let err = worktrees_directory_for_repo(work_dir, "..\\", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "..\\").unwrap_err();
         assert!(err.to_string().contains("must not be \"..\""));
-        let err = worktrees_directory_for_repo(work_dir, "../", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "../").unwrap_err();
         assert!(err.to_string().contains("must not be \"..\""));
 
         // Invalid: empty string would resolve to the working directory itself
-        let err = worktrees_directory_for_repo(work_dir, "", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "").unwrap_err();
         assert!(err.to_string().contains("must not be empty"));
 
         // Invalid: absolute path
-        let err =
-            worktrees_directory_for_repo(work_dir, "/tmp/worktrees", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "/tmp/worktrees").unwrap_err();
         assert!(err.to_string().contains("relative path"));
 
         // Invalid: "/" is absolute on Unix
-        let err = worktrees_directory_for_repo(work_dir, "/", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "/").unwrap_err();
         assert!(err.to_string().contains("relative path"));
 
         // Invalid: "///" is absolute
-        let err = worktrees_directory_for_repo(work_dir, "///", PathStyle::Unix).unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "///").unwrap_err();
         assert!(err.to_string().contains("relative path"));
 
         // Invalid: escapes too far up
-        let err = worktrees_directory_for_repo(work_dir, "../../other-project/wt", PathStyle::Unix)
-            .unwrap_err();
+        let err = worktrees_directory_for_repo(work_dir, "../../other-project/wt").unwrap_err();
         assert!(err.to_string().contains("outside"));
     }
 
     #[test]
-    fn test_worktree_directory_uses_remote_path_style() {
-        // Unix remote
+    fn test_worktree_directory_for_repo() {
         let anchor = Path::new("/home/user/dev/lsp-tests");
 
         assert_eq!(
-            worktrees_directory_for_repo(anchor, "../worktrees", PathStyle::Unix).unwrap(),
+            worktrees_directory_for_repo(anchor, "../worktrees").unwrap(),
             PathBuf::from("/home/user/dev/worktrees/lsp-tests")
         );
     }
@@ -1799,7 +1793,6 @@ mod trust_tests {
 mod resolve_worktree_tests {
     use fs::FakeFs;
     use gpui::TestAppContext;
-    use path::PathStyle;
     use project::{
         git_store::resolve_git_worktree_to_main_repo, linked_worktree_short_name,
         repo_identity_path,
@@ -1924,7 +1917,7 @@ mod resolve_worktree_tests {
         ];
         for (common_dir, expected) in examples {
             assert_eq!(
-                repo_identity_path(Path::new(common_dir), PathStyle::local()),
+                repo_identity_path(Path::new(common_dir)),
                 Path::new(expected),
                 "identity path for common_dir {common_dir:?} should be {expected:?}"
             );
@@ -1937,28 +1930,20 @@ mod resolve_worktree_tests {
             (
                 "/home/bob/zed",
                 "/home/bob/worktrees/olivetti/zed",
-                PathStyle::Unix,
                 Some("olivetti".into()),
             ),
-            (
-                "/home/bob/zed",
-                "/home/bob/zed2",
-                PathStyle::Unix,
-                Some("zed2".into()),
-            ),
+            ("/home/bob/zed", "/home/bob/zed2", Some("zed2".into())),
             (
                 "/home/bob/zed",
                 "/home/bob/worktrees/zed/selectric",
-                PathStyle::Unix,
                 Some("selectric".into()),
             ),
-            ("/home/bob/zed", "/home/bob/zed", PathStyle::Unix, None),
+            ("/home/bob/zed", "/home/bob/zed", None),
         ];
-        for (main_worktree_path, linked_worktree_path, path_style, expected) in examples {
+        for (main_worktree_path, linked_worktree_path, expected) in examples {
             let short_name = linked_worktree_short_name(
                 Path::new(main_worktree_path),
                 Path::new(linked_worktree_path),
-                path_style,
             );
             assert_eq!(
                 short_name, expected,

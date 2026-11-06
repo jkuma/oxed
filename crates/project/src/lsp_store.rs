@@ -125,7 +125,7 @@ use text::{Anchor, BufferId, LineEnding, OffsetRangeExt, ToPoint as _};
 
 use util::{
     ConnectionResult, ResultExt as _, debug_panic, defer, maybe, merge_json_value_into,
-    paths::{PathStyle, UrlExt},
+    paths::UrlExt,
     post_inc,
     redact::redact_command,
     rel_path::{RelPath, RelPathBuf},
@@ -4142,7 +4142,6 @@ impl LocalLspStore {
         worktrees.iter().find_map(|worktree| {
             let tree = worktree.read(cx);
             let worktree_root_path = tree.abs_path();
-            let path_style = tree.path_style();
             match &watcher.glob_pattern {
                 lsp::GlobPattern::String(s) => {
                     let watcher_path = Path::new(s);
@@ -4150,7 +4149,7 @@ impl LocalLspStore {
                     let literal_prefix = glob_literal_prefix(relative);
                     Some((
                         worktree.clone(),
-                        RelPath::new(&literal_prefix, path_style).ok()?.into_arc(),
+                        RelPath::new(&literal_prefix).ok()?.into_arc(),
                         relative.to_string_lossy().into_owned(),
                     ))
                 }
@@ -4166,7 +4165,7 @@ impl LocalLspStore {
                     literal_prefix.push(glob_literal_prefix(Path::new(&rp.pattern)));
                     Some((
                         worktree.clone(),
-                        RelPath::new(&literal_prefix, path_style).ok()?.into_arc(),
+                        RelPath::new(&literal_prefix).ok()?.into_arc(),
                         rp.pattern.clone(),
                     ))
                 }
@@ -8542,14 +8541,13 @@ impl LspStore {
         language_server_id: LanguageServerId,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Buffer>>> {
-        let path_style = self.worktree_store.read(cx).path_style();
         cx.spawn(async move |lsp_store, cx| {
             // Escape percent-encoded string.
             let current_scheme = abs_path.scheme().to_owned();
             // Uri is immutable, so we can't modify the scheme
 
             let abs_path = abs_path
-                .to_file_path_ext(path_style)
+                .to_file_path_ext()
                 .map_err(|()| anyhow!("can't convert URI to path"))?;
             let p = abs_path.clone();
             let yarn_worktree = lsp_store
@@ -8614,8 +8612,7 @@ impl LspStore {
                 let relative_path = if let Some(known_path) = known_relative_path {
                     known_path
                 } else {
-                    RelPath::new(abs_path.strip_prefix(worktree_root)?, PathStyle::local())?
-                        .into_arc()
+                    RelPath::new(abs_path.strip_prefix(worktree_root)?)?.into_arc()
                 };
                 (worktree, relative_path, source_ws)
             };
@@ -11159,8 +11156,7 @@ async fn normalize_lsp_relative_path(
             if let Ok(canonical_path) = fs.canonicalize(abs_path).await
                 && let Ok(canonical_root) = fs.canonicalize(&worktree_root).await
                 && let Ok(canonical_relative_path) = canonical_path.strip_prefix(&canonical_root)
-                && let Ok(canonical_relative_path) =
-                    RelPath::new(canonical_relative_path, PathStyle::local())
+                && let Ok(canonical_relative_path) = RelPath::new(canonical_relative_path)
             {
                 return Ok(canonical_relative_path.into_arc());
             }

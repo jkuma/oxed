@@ -2060,8 +2060,8 @@ impl ProjectSearchView {
         let text = self.search_query_text(cx);
         let included_files = self
             .filters_enabled
-            .then(|| {
-                match self.parse_path_matches(self.included_files_editor.read(cx).text(cx), cx) {
+            .then(
+                || match self.parse_path_matches(self.included_files_editor.read(cx).text(cx)) {
                     Ok(included_files) => {
                         let should_unmark_error =
                             self.panels_with_errors.remove(&InputPanel::Include);
@@ -2079,13 +2079,13 @@ impl ProjectSearchView {
                         }
                         PathMatcher::default()
                     }
-                }
-            })
+                },
+            )
             .unwrap_or(PathMatcher::default());
         let excluded_files = self
             .filters_enabled
-            .then(|| {
-                match self.parse_path_matches(self.excluded_files_editor.read(cx).text(cx), cx) {
+            .then(
+                || match self.parse_path_matches(self.excluded_files_editor.read(cx).text(cx)) {
                     Ok(excluded_files) => {
                         let should_unmark_error =
                             self.panels_with_errors.remove(&InputPanel::Exclude);
@@ -2104,8 +2104,8 @@ impl ProjectSearchView {
                         }
                         PathMatcher::default()
                     }
-                }
-            })
+                },
+            )
             .unwrap_or(PathMatcher::default());
 
         // If the project contains multiple visible worktrees, we match the
@@ -2176,23 +2176,22 @@ impl ProjectSearchView {
             return (PathMatcher::default(), PathMatcher::default());
         }
         let included = self
-            .parse_path_matches(self.included_files_editor.read(cx).text(cx), cx)
+            .parse_path_matches(self.included_files_editor.read(cx).text(cx))
             .unwrap_or_default();
         let excluded = self
-            .parse_path_matches(self.excluded_files_editor.read(cx).text(cx), cx)
+            .parse_path_matches(self.excluded_files_editor.read(cx).text(cx))
             .unwrap_or_default();
         (included, excluded)
     }
 
-    fn parse_path_matches(&self, text: String, cx: &App) -> anyhow::Result<PathMatcher> {
-        let path_style = self.entity.read(cx).project.read(cx).path_style(cx);
+    fn parse_path_matches(&self, text: String) -> anyhow::Result<PathMatcher> {
         let queries = split_glob_patterns(&text)
             .into_iter()
             .map(str::trim)
             .filter(|maybe_glob_str| !maybe_glob_str.is_empty())
             .map(str::to_owned)
             .collect::<Vec<_>>();
-        Ok(PathMatcher::new(&queries, path_style)?)
+        Ok(PathMatcher::new(&queries)?)
     }
 
     fn select_match(&mut self, direction: Direction, window: &mut Window, cx: &mut Context<Self>) {
@@ -3508,7 +3507,7 @@ pub mod tests {
         InlayHintSettingsContent, SearchSettingsContent, SeedQuerySetting, SettingsStore,
         SplicingVec, ThemeColorsContent, ThemeStyleContent,
     };
-    use util::{paths::PathStyle, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use util_macros::perf;
     use workspace::{DeploySearch, MultiWorkspace, SaveIntent};
 
@@ -4928,12 +4927,7 @@ pub mod tests {
                 .clone()
         });
         assert!(a_dir_entry.is_dir());
-        let directory = cx.update(|_, cx| {
-            a_dir_entry
-                .path
-                .display(workspace.read(cx).path_style(cx))
-                .into_owned()
-        });
+        let directory = cx.update(|_, _| a_dir_entry.path.display().into_owned());
         window
             .update(cx, |_, window, cx| {
                 window.dispatch_action(
@@ -4970,7 +4964,7 @@ pub mod tests {
                     search_view.included_files_editor.update(cx, |editor, cx| {
                         assert_eq!(
                             editor.display_text(cx),
-                            a_dir_entry.path.display(PathStyle::local()),
+                            a_dir_entry.path.display(),
                             "New search in directory should have included dir entry path"
                         );
                     });

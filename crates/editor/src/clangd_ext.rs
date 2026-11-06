@@ -2,7 +2,7 @@ use anyhow::Context as _;
 use gpui::{App, Context, Entity, TaskExt, Window};
 use language::Language;
 use url::Url;
-use util::paths::{PathStyle, UrlExt as _};
+use util::paths::UrlExt as _;
 use workspace::{OpenOptions, OpenVisible};
 
 use crate::lsp_ext::find_specific_language_server_in_selection;
@@ -39,7 +39,7 @@ pub fn switch_source_header(
             buffer
                 .file()
                 .map(|file| file.path())
-                .map(|path| path.display(PathStyle::local()).to_string())
+                .map(|path| path.display().to_string())
                 .unwrap_or_else(|| "Unknown".to_string())
         });
 
@@ -62,14 +62,13 @@ pub fn switch_source_header(
         if switch_source_header.0.is_empty() {
             return Ok(());
         }
-        let path_style = workspace.update(cx, |ws, cx| ws.path_style(cx));
         let path = Url::parse(&switch_source_header.0).with_context(|| {
             format!(
                 "Parsing URL \"{}\" returned from switch source/header failed",
                 switch_source_header.0
             )
         })?;
-        let path = path.to_file_path_ext(path_style).map_err(|()| {
+        let path = path.to_file_path_ext().map_err(|()| {
             anyhow::anyhow!(
                 "URL conversion to file path failed for \"{}\"",
                 switch_source_header.0

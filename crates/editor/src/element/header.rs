@@ -682,23 +682,17 @@ pub(crate) fn render_buffer_header(
         .unwrap_or_default();
     let file = buffer.file();
     let can_open_excerpts = file.is_none_or(|file| file.can_open());
-    let path_style = file.map(|file| file.path_style(cx));
     let relative_path = buffer.resolve_file_path(include_root, cx);
-    let (parent_path, filename) = match (&relative_path, path_style) {
-        (Some(path), Some(path_style)) => {
-            match path_style
-                .file_name(Path::new(path))
-                .and_then(OsStr::to_str)
-            {
-                Some(file_name) => (
-                    path.strip_suffix(file_name)
-                        .filter(|parent| !parent.is_empty())
-                        .map(ToOwned::to_owned),
-                    Some(file_name.to_owned()),
-                ),
-                None => (None, Some(path.clone())),
-            }
-        }
+    let (parent_path, filename) = match (&relative_path, file) {
+        (Some(path), Some(_)) => match Path::new(path).file_name().and_then(OsStr::to_str) {
+            Some(file_name) => (
+                path.strip_suffix(file_name)
+                    .filter(|parent| !parent.is_empty())
+                    .map(ToOwned::to_owned),
+                Some(file_name.to_owned()),
+            ),
+            None => (None, Some(path.clone())),
+        },
         (Some(path), None) => (None, Some(path.clone())),
         (None, _) => (None, None),
     };
@@ -1011,7 +1005,6 @@ pub(crate) fn render_buffer_header(
                     && let Some(worktree) =
                         project.read(cx).worktree_for_id(file.worktree_id(cx), cx)
                 {
-                    let path_style = file.path_style(cx);
                     let worktree = worktree.read(cx);
                     let relative_path = file.path();
                     let entry_for_path = worktree.entry_for_path(relative_path);
@@ -1048,7 +1041,7 @@ pub(crate) fn render_buffer_header(
                                 Some(Box::new(zed_actions::workspace::CopyRelativePath)),
                                 window.handler_for(&editor, move |_, _, cx| {
                                     cx.write_to_clipboard(ClipboardItem::new_string(
-                                        relative_path.display(path_style).to_string(),
+                                        relative_path.display().to_string(),
                                     ));
                                 }),
                             )

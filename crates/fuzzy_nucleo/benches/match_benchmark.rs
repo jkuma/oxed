@@ -1,6 +1,6 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use fuzzy::CharBag;
-use path::{PathStyle, rel_path::RelPath};
+use path::rel_path::RelPath;
 use std::sync::atomic::AtomicBool;
 
 const DIRS: &[&str] = &[
@@ -299,15 +299,7 @@ fn bench_path_matching(criterion: &mut Criterion) {
                         (generate_nucleo_path_candidates(path_strings), query)
                     },
                     |(candidates, query)| {
-                        fuzzy_nucleo::match_fixed_path_set(
-                            candidates,
-                            0,
-                            None,
-                            query,
-                            case,
-                            size,
-                            PathStyle::Unix,
-                        )
+                        fuzzy_nucleo::match_fixed_path_set(candidates, 0, None, query, case, size)
                     },
                     BatchSize::SmallInput,
                 )
@@ -322,15 +314,7 @@ fn bench_path_matching(criterion: &mut Criterion) {
                         (generate_fuzzy_path_candidates(path_strings), query)
                     },
                     |(candidates, query)| {
-                        fuzzy::match_fixed_path_set(
-                            candidates,
-                            0,
-                            None,
-                            query,
-                            false,
-                            size,
-                            PathStyle::Unix,
-                        )
+                        fuzzy::match_fixed_path_set(candidates, 0, None, query, false, size)
                     },
                     BatchSize::SmallInput,
                 )

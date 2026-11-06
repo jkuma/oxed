@@ -1,5 +1,5 @@
 use gpui::BackgroundExecutor;
-use path::{PathStyle, rel_path::RelPath};
+use path::rel_path::RelPath;
 use std::{
     cmp::Ordering,
     sync::{
@@ -65,7 +65,6 @@ pub trait PathMatchCandidateSet<'a>: Send + Sync {
     fn root_is_file(&self) -> bool;
     fn prefix(&self) -> Arc<RelPath>;
     fn candidates(&'a self, start: usize) -> Self::Candidates;
-    fn path_style(&self) -> PathStyle;
 }
 
 impl PartialEq for PathMatch {
@@ -156,12 +155,11 @@ fn path_match_helper<'a>(
     path_prefix: &Arc<RelPath>,
     root_is_file: bool,
     relative_to: &Option<Arc<RelPath>>,
-    path_style: PathStyle,
     cancel_flag: &AtomicBool,
 ) -> Result<(), Cancelled> {
     let mut candidate_buf = if !path_prefix.is_empty() && !root_is_file {
-        let mut s = path_prefix.display(path_style).to_string();
-        s.push_str(path_style.primary_separator());
+        let mut s = path_prefix.display().to_string();
+        s.push_str(std::path::MAIN_SEPARATOR_STR);
         s
     } else {
         String::new()
@@ -242,7 +240,6 @@ pub fn match_fixed_path_set(
     query: &str,
     case: Case,
     max_results: usize,
-    path_style: PathStyle,
 ) -> Vec<PathMatch> {
     let Some(query) = Query::build(query, case) else {
         return Vec::new();
@@ -267,7 +264,6 @@ pub fn match_fixed_path_set(
         &path_prefix,
         root_is_file,
         &None,
-        path_style,
         &AtomicBool::new(false),
     )
     .ok();
@@ -289,8 +285,6 @@ pub async fn match_path_sets<'a, Set: PathMatchCandidateSet<'a>>(
     if path_count == 0 {
         return Vec::new();
     }
-
-    let path_style = candidate_sets[0].path_style();
 
     let query = query.to_owned();
 
@@ -337,7 +331,6 @@ pub async fn match_path_sets<'a, Set: PathMatchCandidateSet<'a>>(
                                 &candidate_set.prefix(),
                                 candidate_set.root_is_file(),
                                 &relative_to,
-                                path_style,
                                 cancel_flag,
                             )
                             .is_err()

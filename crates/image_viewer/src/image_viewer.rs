@@ -677,7 +677,7 @@ fn breadcrumbs_text_for_image(project: &Project, image: &ImageItem, cx: &App) ->
         path = worktree.read(cx).root_name().join(&path);
     }
 
-    path.display(project.path_style(cx)).to_string()
+    path.display().to_string()
 }
 
 impl SerializableItem for ImageView {
