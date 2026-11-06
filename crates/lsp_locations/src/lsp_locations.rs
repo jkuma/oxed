@@ -178,7 +178,8 @@ fn handle_definition_locations(
         cx.propagate();
         return;
     }
-    let matches = build_location_matches(&action.locations, cx);
+    let project = workspace.read(cx).project().read(cx);
+    let matches = build_location_matches(&action.locations, project, cx);
     if matches.len() < 2 {
         cx.propagate();
         return;
@@ -266,7 +267,9 @@ async fn run_picker_matches(
 ) -> Option<Vec<LocationMatch>> {
     let locations = run_picker_query(kind, editor, workspace, project, cx).await?;
     editor
-        .update(cx, |_, cx| build_location_matches(&locations, cx))
+        .update(cx, |_, cx| {
+            build_location_matches(&locations, project.read(cx), cx)
+        })
         .ok()
 }
 
@@ -465,7 +468,12 @@ impl LspLocationsPicker {
         cx: &mut Context<Self>,
     ) -> Self {
         let delegate = LspLocationsDelegate::new(kind, matches, symbol, editor, origin);
-        let picker = cx.new(|cx| Picker::uniform_list(delegate, window, cx).popover());
+        let picker = cx.new(|cx| {
+            Picker::uniform_list(delegate, window, cx)
+                .popover()
+                .initial_width(rems(48.))
+                .resizable(true)
+        });
         let subscription = cx.subscribe(&picker, |_, _, _: &DismissEvent, cx| {
             cx.emit(DismissEvent);
         });
@@ -493,12 +501,15 @@ impl Focusable for LspLocationsPicker {
 
 impl Render for LspLocationsPicker {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex().child(self.picker.clone())
+        v_flex()
+            .debug_selector(|| "LSP_LOCATIONS_POPUP".into())
+            .child(self.picker.clone())
     }
 }
 
 struct LocationMatch {
     path: ProjectPath,
+    display_path: String,
     buffer: Entity<Buffer>,
     anchor_range: Range<Anchor>,
     range: Range<usize>,
@@ -536,8 +547,7 @@ impl LspLocationsDelegate {
                     index,
                     &format!(
                         "{} {}",
-                        location_match.display_text,
-                        location_match.path.path.as_unix_str()
+                        location_match.display_text, location_match.display_path
                     ),
                 )
             })
@@ -593,8 +603,13 @@ impl LspLocationsDelegate {
     }
 }
 
-fn build_location_matches(locations: &[Location], cx: &App) -> Vec<LocationMatch> {
+fn build_location_matches(
+    locations: &[Location],
+    project: &Project,
+    cx: &App,
+) -> Vec<LocationMatch> {
     use gpui::EntityId;
+    let several_roots = project.visible_worktrees(cx).nth(1).is_some();
     let mut snapshots: HashMap<EntityId, language::BufferSnapshot> = HashMap::default();
     let mut matches = Vec::with_capacity(locations.len());
 
@@ -609,6 +624,15 @@ fn build_location_matches(locations: &[Location], cx: &App) -> Vec<LocationMatch
         let path = ProjectPath {
             worktree_id: file.worktree_id(cx),
             path: file.path().clone(),
+        };
+        let in_single_root = !several_roots
+            && project
+                .worktree_for_id(path.worktree_id, cx)
+                .is_some_and(|worktree| worktree.read(cx).is_visible());
+        let display_path = if in_single_root {
+            path.path.as_unix_str().to_string()
+        } else {
+            file.full_path(cx).to_string_lossy().into_owned()
         };
 
         let start_offset: usize = snapshot.summary_for_anchor(&location.range.start);
@@ -652,6 +676,7 @@ fn build_location_matches(locations: &[Location], cx: &App) -> Vec<LocationMatch
 
         matches.push(LocationMatch {
             path,
+            display_path,
             buffer: location.buffer.clone(),
             anchor_range: location.range.clone(),
             range: start_offset..end_offset,
@@ -757,7 +782,6 @@ impl PickerDelegate for LspLocationsDelegate {
         cx: &mut Context<Picker<Self>>,
     ) -> Option<Self::ListItem> {
         let location_match = self.all_matches.get(*self.matches.get(ix)?)?;
-        let file_name = location_match.path.path.file_name().unwrap_or_default();
         Some(
             ListItem::new(ix)
                 .spacing(ListItemSpacing::Sparse)
@@ -778,10 +802,13 @@ impl PickerDelegate for LspLocationsDelegate {
                         )
                         .child(
                             div().flex_none().max_w(relative(0.5)).child(
-                                Label::new(format!("{file_name}:{}", location_match.line_number))
-                                    .size(LabelSize::Small)
-                                    .color(Color::Muted)
-                                    .truncate_start(),
+                                Label::new(format!(
+                                    "{}:{}",
+                                    location_match.display_path, location_match.line_number
+                                ))
+                                .size(LabelSize::Small)
+                                .color(Color::Muted)
+                                .truncate_start(),
                             ),
                         ),
                 )
@@ -831,6 +858,8 @@ mod tests {
     use editor::test::editor_lsp_test_context::EditorLspTestContext;
     use gpui::{Modifiers, TestAppContext};
     use indoc::indoc;
+    use project::Fs as _;
+    use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::{sync::Mutex, time::Duration};
     use text::OffsetRangeExt as _;
@@ -1586,5 +1615,101 @@ mod tests {
                 "Usages of abc (2)"
             );
         });
+    }
+
+    /// Opens the references popup on results in two same-named files and in a
+    /// file outside the project, and returns the paths its rows show.
+    async fn displayed_paths(
+        cx: &mut TestAppContext,
+        extra_root: Option<&'static str>,
+    ) -> Vec<String> {
+        let mut cx = references_cx(cx).await;
+        let project = cx.update_workspace(|workspace, _, _| workspace.project().clone());
+        let fs = cx.update(|_, cx| project.read(cx).fs().as_fake());
+        for directory in ["/root/a", "/root/b", "/outside"]
+            .into_iter()
+            .chain(extra_root)
+        {
+            fs.create_dir(Path::new(directory))
+                .await
+                .expect("directory");
+        }
+        let content = "fn abc() {}\n";
+        fs.insert_file("/root/a/mod.rs", content.into()).await;
+        fs.insert_file("/root/b/mod.rs", content.into()).await;
+        fs.insert_file("/outside/lib.rs", content.into()).await;
+        if let Some(root) = extra_root {
+            fs.insert_file(format!("{root}/main.rs"), content.into())
+                .await;
+            project
+                .update(&mut cx.cx.cx, |project, cx| {
+                    project.find_or_create_worktree(root, true, cx)
+                })
+                .await
+                .expect("extra root");
+        }
+        cx.run_until_parked();
+        cx.lsp
+            .set_request_handler::<lsp::request::References, _, _>(async move |_, _| {
+                Ok(Some(
+                    ["/root/a/mod.rs", "/root/b/mod.rs", "/outside/lib.rs"]
+                        .into_iter()
+                        .flat_map(|path| {
+                            let uri = lsp::Uri::from_file_path(path).expect("absolute path");
+                            references(uri, &[(0, 3, 6)])
+                        })
+                        .collect(),
+                ))
+            });
+
+        open(&mut cx, LspPickerKind::References);
+
+        let picker = active_picker(&mut cx).expect("references popup");
+        cx.update(|_window, cx| {
+            let mut paths: Vec<String> = picker
+                .read(cx)
+                .picker
+                .read(cx)
+                .delegate
+                .all_matches
+                .iter()
+                .map(|location_match| location_match.display_path.clone())
+                .collect();
+            paths.sort();
+            paths
+        })
+    }
+
+    #[gpui::test]
+    async fn test_rows_show_the_path_from_the_project_root(cx: &mut TestAppContext) {
+        assert_eq!(
+            displayed_paths(cx, None).await,
+            ["/outside/lib.rs", "a/mod.rs", "b/mod.rs"]
+        );
+    }
+
+    #[gpui::test]
+    async fn test_rows_name_the_root_when_the_project_has_several(cx: &mut TestAppContext) {
+        assert_eq!(
+            displayed_paths(cx, Some("/other")).await,
+            ["/outside/lib.rs", "root/a/mod.rs", "root/b/mod.rs"]
+        );
+    }
+
+    #[gpui::test]
+    async fn test_popup_opens_wide(cx: &mut TestAppContext) {
+        let mut cx = references_cx(cx).await;
+
+        open(&mut cx, LspPickerKind::References);
+
+        let bounds = cx
+            .debug_bounds("LSP_LOCATIONS_POPUP")
+            .expect("rendered popup");
+        let minimum = cx.update(|window, _| rems(48.).to_pixels(window.rem_size()));
+        assert!(
+            bounds.size.width >= minimum,
+            "popup is {:?} wide, expected at least {minimum:?}",
+            bounds.size.width
+        );
     }
 }
