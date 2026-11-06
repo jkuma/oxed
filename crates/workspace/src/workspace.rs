@@ -5869,11 +5869,6 @@ impl Workspace {
         let has_paths = !self.root_paths(cx).is_empty();
         let db = WorkspaceDb::global(cx);
         let kvp = db::kvp::KeyValueStore::global(cx);
-        let native_window_state = if database_id.is_some() {
-            window.native_window_state()
-        } else {
-            None
-        };
 
         cx.background_executor().spawn(async move {
             if !has_paths {
@@ -5886,7 +5881,6 @@ impl Workspace {
                     database_id,
                     SerializedWindowBounds(window_bounds),
                     display_uuid,
-                    native_window_state,
                 )
                 .await
                 .log_err();
@@ -8204,7 +8198,6 @@ pub async fn restore_multiworkspace(
     }
     .context("restoring the active workspace")?;
 
-    restore_native_window_state(window_handle, active_workspace.workspace_id, cx);
     window_handle
         .update(cx, |_, window, _cx| {
             window.activate_window();
@@ -8212,37 +8205,6 @@ pub async fn restore_multiworkspace(
         .ok();
 
     Ok(window_handle)
-}
-
-fn restore_native_window_state(
-    window_handle: WindowHandle<MultiWorkspace>,
-    workspace_id: WorkspaceId,
-    cx: &mut AsyncApp,
-) {
-    if window_bounds_env_override().is_some() {
-        return;
-    }
-    let Some((Some(display), Some(native_window_state))) = cx
-        .update(|cx| WorkspaceDb::global(cx))
-        .native_window_state(workspace_id)
-        .log_err()
-        .flatten()
-    else {
-        return;
-    };
-    let display_connected = cx.update(|cx| {
-        cx.displays()
-            .into_iter()
-            .any(|connected_display| connected_display.uuid().ok() == Some(display))
-    });
-    if !display_connected {
-        return;
-    }
-    window_handle
-        .update(cx, |_, window, _cx| {
-            window.restore_native_window_state(&native_window_state);
-        })
-        .log_err();
 }
 
 actions!(

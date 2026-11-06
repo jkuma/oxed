@@ -340,42 +340,6 @@ mod friction_spline {
     }
 }
 
-/// The set of gesture kinds that participate in recognition.
-///
-/// Used by [`PlatformGestures::native_recognizers`] to declare which gestures
-/// the platform recognizes natively rather than leaving to gpui core's
-/// portable recognizers.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct GestureKinds {
-    /// Tap (and multi-tap), synthesized as mouse presses by the portable recognizer.
-    pub tap: bool,
-    /// Long press, surfaced as [`LongPressEvent`].
-    pub long_press: bool,
-    /// Pan/scroll (including fling momentum), surfaced as
-    /// [`ScrollEvent`](crate::ScrollEvent)s.
-    pub pan: bool,
-    /// Pinch to zoom, surfaced as [`PinchEvent`](crate::PinchEvent)s.
-    pub pinch: bool,
-}
-
-impl GestureKinds {
-    /// No gestures; gpui core's portable recognizers handle everything.
-    pub const NONE: Self = Self {
-        tap: false,
-        long_press: false,
-        pan: false,
-        pinch: false,
-    };
-
-    /// All gesture kinds.
-    pub const ALL: Self = Self {
-        tap: true,
-        long_press: true,
-        pan: true,
-        pinch: true,
-    };
-}
-
 /// A direct touch drag claimed by an element before touch input becomes a tap,
 /// long press, or scrolling gesture.
 #[derive(Clone, Debug)]
@@ -469,28 +433,6 @@ impl InputEvent for LongPressEvent {
 }
 impl GestureEvent for LongPressEvent {}
 impl MouseEvent for LongPressEvent {}
-
-/// Platform gesture recognition services.
-///
-/// If your mobile platform supports native gesture recognition, use this
-/// to share it with GPUI.
-pub trait PlatformGestures {
-    /// Feel constants for the portable recognizers on this platform.
-    fn tuning(&self) -> GestureTuning {
-        GestureTuning::default()
-    }
-
-    /// The gesture kinds this platform recognizes natively.
-    fn native_recognizers(&self) -> GestureKinds {
-        GestureKinds::NONE
-    }
-}
-
-/// A no-op [`PlatformGestures`] implementation: no native recognizers and
-/// default tuning. Suitable for desktop platforms and tests.
-pub struct NullPlatformGestures;
-
-impl PlatformGestures for NullPlatformGestures {}
 
 /// Ceiling on recognized fling velocity, in pixels per second (matches
 /// Flutter's `kMaxFlingVelocity`).

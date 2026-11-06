@@ -1879,24 +1879,15 @@ impl WorkspaceDb {
     }
 
     query! {
-        pub(crate) async fn set_window_open_status(workspace_id: WorkspaceId, bounds: SerializedWindowBounds, display: Uuid, native_window_state: Option<Vec<u8>>) -> Result<()> {
+        pub(crate) async fn set_window_open_status(workspace_id: WorkspaceId, bounds: SerializedWindowBounds, display: Uuid) -> Result<()> {
             UPDATE workspaces
             SET window_state = ?2,
                 window_x = ?3,
                 window_y = ?4,
                 window_width = ?5,
                 window_height = ?6,
-                display = ?7,
-                native_window_state = ?8
+                display = ?7
             WHERE workspace_id = ?1
-        }
-    }
-
-    query! {
-        pub(crate) fn native_window_state(workspace_id: WorkspaceId) -> Result<Option<(Option<Uuid>, Option<Vec<u8>>)>> {
-            SELECT display, native_window_state
-            FROM workspaces
-            WHERE workspace_id = ?
         }
     }
 
@@ -2202,76 +2193,6 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(test_text_1, "test-text-1");
-    }
-
-    #[gpui::test]
-    async fn test_native_window_state_round_trip() {
-        zlog::init_test();
-
-        let db = WorkspaceDb::open_test_db("test_native_window_state_round_trip").await;
-        let id = db.next_id().await.unwrap();
-        let paths = &["/tmp/native-window-state"];
-        let display_uuid = Uuid::new_v4();
-        let window_bounds = SerializedWindowBounds(WindowBounds::Windowed(Bounds {
-            origin: point(px(100.0), px(200.0)),
-            size: size(px(800.0), px(600.0)),
-        }));
-
-        db.save_workspace(SerializedWorkspace {
-            id,
-            paths: PathList::new(paths),
-            identity_paths: None,
-            center_group: Default::default(),
-            window_bounds: None,
-            display: None,
-            docks: Default::default(),
-            bookmarks: Default::default(),
-            centered_layout: false,
-            session_id: None,
-            window_id: None,
-            user_toolchains: Default::default(),
-            recent_navigation_history: Default::default(),
-        })
-        .await;
-        assert_eq!(db.native_window_state(id).unwrap(), Some((None, None)));
-        assert_eq!(
-            db.native_window_state(WorkspaceId::from_i64(i64::MAX))
-                .unwrap(),
-            None
-        );
-
-        let state = vec![0u8, 1, 2, 3, 250, 251, 252];
-        db.set_window_open_status(id, window_bounds, display_uuid, Some(state.clone()))
-            .await
-            .unwrap();
-        assert_eq!(
-            db.native_window_state(id).unwrap(),
-            Some((Some(display_uuid), Some(state)))
-        );
-        let restored = db.workspace_for_roots(paths).unwrap();
-        assert_eq!(restored.window_bounds, Some(window_bounds));
-        assert_eq!(restored.display, Some(display_uuid));
-
-        let new_state = vec![9u8, 8, 7];
-        db.set_window_open_status(id, window_bounds, display_uuid, Some(new_state.clone()))
-            .await
-            .unwrap();
-        assert_eq!(
-            db.native_window_state(id).unwrap(),
-            Some((Some(display_uuid), Some(new_state)))
-        );
-
-        db.set_window_open_status(id, window_bounds, display_uuid, None)
-            .await
-            .unwrap();
-        assert_eq!(
-            db.native_window_state(id).unwrap(),
-            Some((Some(display_uuid), None))
-        );
-        assert_eq!(
-            db.workspace_for_roots(paths).unwrap().window_bounds,
-            Some(window_bounds)
-        );
     }
 
     #[gpui::test]
@@ -3196,7 +3117,7 @@ mod tests {
         db.save_workspace(workspace.clone()).await;
 
         // Save window bounds separately (as the actual code does via set_window_open_status)
-        db.set_window_open_status(id, window_bounds, display_uuid, None)
+        db.set_window_open_status(id, window_bounds, display_uuid)
             .await
             .unwrap();
 

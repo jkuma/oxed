@@ -18,11 +18,10 @@ use crate::{
     RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
     SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size,
     StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, TabStopMap,
-    TaffyLayoutEngine, Task, TextInputConfiguration, TextInputStateChange, TextRenderingMode,
-    TextStyle, TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
-    WindowInsets, WindowOptions, WindowParams, WindowTextSystem, WindowVisibility, point,
-    prelude::*, px, rems, size, transparent_black,
+    TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState,
+    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
+    WindowVisibility, point, prelude::*, px, rems, size, transparent_black,
 };
 
 use crate::gestures::{GestureTuning, RecognizedTouchGesture, TouchGestureRecognizer};
@@ -1244,11 +1243,6 @@ pub struct Window {
     pub(crate) element_opacity: f32,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
-    /// The [`TextInputConfiguration`] most recently forwarded to the platform
-    /// window, so that only actual changes are forwarded (reconfiguring a live
-    /// input session can restart the IME connection).
-    last_text_input_configuration: Option<TextInputConfiguration>,
-    focused_text_input: Option<FocusId>,
     pub(crate) image_cache_stack: Vec<AnyImageCache>,
     pub(crate) rendered_frame: Frame,
     pub(crate) next_frame: Frame,
@@ -1918,22 +1912,6 @@ impl Window {
             }
         }));
         invalidator.set_platform_waker(platform_window.frame_waker());
-        platform_window.on_visual_viewport_changed(Box::new({
-            let mut cx = cx.to_async();
-            move || {
-                handle
-                    .update(&mut cx, |_, window, _| window.refresh())
-                    .log_err();
-            }
-        }));
-        platform_window.on_insets_changed(Box::new({
-            let mut cx = cx.to_async();
-            move |_| {
-                handle
-                    .update(&mut cx, |_, window, _| window.refresh())
-                    .log_err();
-            }
-        }));
         platform_window.on_resize(Box::new({
             let mut cx = cx.to_async();
             move |_, _| {
@@ -2073,8 +2051,6 @@ impl Window {
             content_mask_stack: Vec::new(),
             element_opacity: 1.0,
             requested_autoscroll: None,
-            last_text_input_configuration: None,
-            focused_text_input: None,
             rendered_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
             next_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
             next_frame_callbacks,
@@ -2104,11 +2080,7 @@ impl Window {
             #[cfg(feature = "profiler")]
             window_profiler: profiler::WindowProfiler::new(handle.window_id())?,
             last_input_modality: InputModality::Mouse,
-            touch_gestures: TouchGestureRecognizer::new(
-                cx.platform
-                    .gestures()
-                    .map_or_else(GestureTuning::default, |gestures| gestures.tuning()),
-            ),
+            touch_gestures: TouchGestureRecognizer::new(GestureTuning::default()),
             touch_prediction_enabled: true,
             long_press_timer: None,
             long_press_capture: None,
@@ -2458,18 +2430,6 @@ impl Window {
         self.platform_window.inner_window_bounds()
     }
 
-    /// Encode the window's native restorable state into an opaque blob.
-    /// Returns `None` on platforms without native state restoration or if encoding fails.
-    pub fn native_window_state(&self) -> Option<Vec<u8>> {
-        self.platform_window.native_window_state()
-    }
-
-    /// Restore the window's native state from a blob previously produced
-    /// by [`Window::native_window_state`]. A no-op on platforms without native state restoration.
-    pub fn restore_native_window_state(&self, state: &[u8]) {
-        self.platform_window.restore_native_window_state(state);
-    }
-
     /// Dispatch the given action on the currently focused element.
     pub fn dispatch_action(&mut self, action: Box<dyn Action>, cx: &mut App) {
         let focus_id = self.focused(cx).map(|handle| handle.id);
@@ -2792,11 +2752,6 @@ impl Window {
         self.platform_window.bounds()
     }
 
-    /// Returns the regions of this window obscured by system UI and the keyboard.
-    pub fn insets(&self) -> WindowInsets {
-        self.platform_window.insets()
-    }
-
     /// Renders the current frame's scene to a texture and returns the pixel data as an RGBA image.
     /// This does not present the frame to screen - useful for visual testing where we want
     /// to capture what would be rendered without displaying it or requiring the window to be visible.
@@ -2853,46 +2808,6 @@ impl Window {
     /// Returns the size of the drawable area within the window.
     pub fn viewport_size(&self) -> Size<Pixels> {
         self.viewport_size
-    }
-
-    /// Returns the platform's visible viewport in window-local logical pixels.
-    ///
-    /// Unlike `viewport_size`, this can shrink or move when the keyboard opens.
-    /// During drawing this is a consistent frame snapshot. Outside drawing it
-    /// reflects the latest platform sample, not a synchronous geometry query.
-    pub fn visual_viewport_bounds(&self) -> Bounds<Pixels> {
-        self.platform_window.visual_viewport_bounds()
-    }
-
-    /// Returns a conservative rectangle avoiding platform-known obscured content.
-    ///
-    /// Intersects the visual viewport with the full layout area inset by system
-    /// safe areas and keyboard occlusion. Unknown overlays cannot be excluded.
-    pub fn fully_visible_bounds(&self) -> Bounds<Pixels> {
-        let insets = self.platform_window.insets().effective();
-        let viewport = self.viewport_size();
-        let left = insets.left.max(Pixels::ZERO).min(viewport.width);
-        let top = insets.top.max(Pixels::ZERO).min(viewport.height);
-        let right = (viewport.width - insets.right.max(Pixels::ZERO)).max(left);
-        let bottom = (viewport.height - insets.bottom.max(Pixels::ZERO)).max(top);
-        let safe_bounds = Bounds::from_corners(point(left, top), point(right, bottom));
-        let mut visible = safe_bounds.intersect(&self.visual_viewport_bounds());
-        visible.size.width = visible.size.width.max(Pixels::ZERO);
-        visible.size.height = visible.size.height.max(Pixels::ZERO);
-        visible
-    }
-
-    /// Requests the virtual keyboard for the currently focused text input.
-    ///
-    /// Call from a user gesture on platforms that require one. The platform may
-    /// decline the request; this does not change focus or the layout viewport.
-    pub fn request_virtual_keyboard(&self) {
-        self.platform_window.show_soft_keyboard();
-    }
-
-    /// Requests dismissal of the virtual keyboard without changing GPUI focus.
-    pub fn dismiss_virtual_keyboard(&self) {
-        self.platform_window.hide_soft_keyboard();
     }
 
     /// Returns whether this window is focused by the operating system (receiving key events).
@@ -3329,9 +3244,6 @@ impl Window {
         // This ensures that multiple test Apps have isolated arenas.
         let arena_scope = ElementArenaScope::enter(&cx.element_arena);
 
-        if self.platform_window.prepare_frame() {
-            self.refresh();
-        }
         self.invalidate_entities();
         cx.entities.clear_accessed();
         debug_assert!(self.rendered_entity_stack.is_empty());
@@ -3376,28 +3288,14 @@ impl Window {
         // paint_range indices remain valid for reuse_paint on the next frame.
         // Search backwards to find the last Some entry, since reuse_paint may
         // have copied None slots from the previous frame. (Fixes #50456)
-        let focused_text_input = if let Some(mut input_handler) = self
+        if let Some(input_handler) = self
             .next_frame
             .input_handlers
             .iter_mut()
             .rev()
             .find_map(|h| h.take())
         {
-            let accepts_text_input = input_handler.accepts_text_input(self, cx);
             self.platform_window.set_input_handler(input_handler);
-            self.focus.filter(|_| accepts_text_input)
-        } else {
-            None
-        };
-        self.apply_text_input_configuration(cx);
-        let previous = mem::replace(&mut self.focused_text_input, focused_text_input);
-        if previous.is_some() != focused_text_input.is_some() {
-            self.platform_window
-                .text_input_state_changed(if focused_text_input.is_some() {
-                    TextInputStateChange::FocusGained
-                } else {
-                    TextInputStateChange::FocusLost
-                });
         }
 
         self.layout_engine.as_mut().unwrap().clear();
@@ -5272,51 +5170,9 @@ impl Window {
 
         if focus_handle.is_focused(self) {
             let cx = self.to_async(cx);
-            self.next_frame.input_handlers.push(Some(
-                PlatformInputHandler::new(cx, Box::new(input_handler)).with_focus(focus_handle.id),
-            ));
-        }
-    }
-
-    /// Notifies native text services that the focused component's text changed.
-    ///
-    /// Text components should call this after application-driven edits, in addition
-    /// to notifying GPUI to redraw. Unfocused or unregistered components are ignored.
-    pub fn notify_text_input_changed(&self, focus_handle: &FocusHandle) {
-        if self.focused_text_input == Some(focus_handle.id) && focus_handle.is_focused(self) {
-            self.platform_window
-                .text_input_state_changed(TextInputStateChange::ContentChanged);
-        }
-    }
-
-    /// Notifies native text services that the focused component's selection changed.
-    ///
-    /// Text components should call this after application-driven selection changes,
-    /// in addition to notifying GPUI to redraw.
-    pub fn notify_text_selection_changed(&self, focus_handle: &FocusHandle) {
-        if self.focused_text_input == Some(focus_handle.id) && focus_handle.is_focused(self) {
-            self.platform_window
-                .text_input_state_changed(TextInputStateChange::SelectionChanged);
-        }
-    }
-
-    /// Forwards the focused input handler's [`TextInputConfiguration`] to the
-    /// platform window when it differs from the last forwarded value. With no
-    /// input handler the default configuration applies, so a field's
-    /// preferences don't outlive its focus.
-    fn apply_text_input_configuration(&mut self, cx: &mut App) {
-        let configuration = match self.platform_window.take_input_handler() {
-            Some(mut input_handler) => {
-                let configuration = input_handler.text_input_configuration(self, cx);
-                self.platform_window.set_input_handler(input_handler);
-                configuration
-            }
-            None => TextInputConfiguration::default(),
-        };
-        if self.last_text_input_configuration.as_ref() != Some(&configuration) {
-            self.platform_window
-                .set_text_input_configuration(configuration.clone());
-            self.last_text_input_configuration = Some(configuration);
+            self.next_frame
+                .input_handlers
+                .push(Some(PlatformInputHandler::new(cx, Box::new(input_handler))));
         }
     }
 
@@ -8132,94 +7988,6 @@ mod tests {
                 Empty
             }
         }
-    }
-
-    #[gpui::test]
-    fn test_fully_visible_bounds_preserve_layout_viewport(cx: &mut TestAppContext) {
-        let window = cx.add_window(|_, _| EmptyView);
-        let mut platform_window = cx.test_window(window.into());
-        platform_window.simulate_resize(size(px(400.), px(800.)));
-        window
-            .update(cx, |_, window, _| {
-                assert_eq!(
-                    window.visual_viewport_bounds(),
-                    Bounds::new(Point::default(), size(px(400.), px(800.)))
-                );
-                assert_eq!(
-                    window.fully_visible_bounds(),
-                    window.visual_viewport_bounds()
-                );
-            })
-            .unwrap();
-
-        platform_window.simulate_frame_request(RequestFrameOptions::default());
-        let wakes = platform_window.frame_wake_count();
-        let visual_bounds = Bounds::new(point(px(10.), px(40.)), size(px(380.), px(460.)));
-        platform_window.simulate_visual_viewport_change(visual_bounds);
-        assert!(platform_window.frame_wake_count() > wakes);
-        platform_window.simulate_frame_request(RequestFrameOptions::default());
-        let wakes = platform_window.frame_wake_count();
-        let insets = crate::WindowInsets {
-            safe_area: crate::Edges {
-                top: px(60.),
-                right: px(20.),
-                bottom: px(30.),
-                left: px(-10.),
-            },
-            ime: crate::Edges {
-                bottom: px(350.),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        platform_window.simulate_insets_change(insets.clone());
-        assert!(platform_window.frame_wake_count() > wakes);
-        window
-            .update(cx, |_, window, cx| {
-                let focus = cx.focus_handle();
-                window.focus(&focus, cx);
-                assert_eq!(window.insets(), insets);
-                assert_eq!(window.viewport_size(), size(px(400.), px(800.)));
-                assert_eq!(window.visual_viewport_bounds(), visual_bounds);
-                assert_eq!(
-                    window.fully_visible_bounds(),
-                    Bounds::new(point(px(10.), px(60.)), size(px(370.), px(390.)))
-                );
-                window.request_virtual_keyboard();
-                window.dismiss_virtual_keyboard();
-                assert!(focus.is_focused(window));
-                assert_eq!(window.viewport_size(), size(px(400.), px(800.)));
-            })
-            .unwrap();
-        assert_eq!(platform_window.virtual_keyboard_requests(), 1);
-        assert_eq!(platform_window.virtual_keyboard_dismissals(), 1);
-
-        platform_window.simulate_insets_change(crate::WindowInsets {
-            safe_area: crate::Edges {
-                top: px(900.),
-                left: px(500.),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        window
-            .update(cx, |_, window, _| {
-                assert_eq!(
-                    window.fully_visible_bounds().size,
-                    size(Pixels::ZERO, Pixels::ZERO)
-                );
-            })
-            .unwrap();
-
-        // Some backends update geometry snapshots without delivering inset callbacks.
-        use crate::PlatformWindow as _;
-        platform_window.on_insets_changed(Box::new(|_| {}));
-        platform_window.simulate_insets_change(crate::WindowInsets::default());
-        window
-            .update(cx, |_, window, _| {
-                assert_eq!(window.insets(), crate::WindowInsets::default());
-            })
-            .unwrap();
     }
 
     struct EmptyView;

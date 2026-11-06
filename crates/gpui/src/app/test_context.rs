@@ -502,16 +502,6 @@ impl TestAppContext {
             .simulate_display_refresh_interval_change(display_id, refresh_interval);
     }
 
-    /// Simulates visible viewport changes without resizing the window's layout area.
-    pub fn simulate_window_visual_viewport_change(
-        &self,
-        window_handle: AnyWindowHandle,
-        bounds: Bounds<Pixels>,
-    ) {
-        self.test_window(window_handle)
-            .simulate_visual_viewport_change(bounds);
-    }
-
     /// Simulates the window moving to a display with a different scale factor.
     pub fn simulate_window_scale_factor_change(
         &self,
