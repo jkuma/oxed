@@ -6876,7 +6876,7 @@ async fn test_definition(cx: &mut gpui::TestAppContext) {
             .map(|worktree| {
                 let worktree = worktree.read(cx);
                 (
-                    worktree.as_local().unwrap().abs_path().as_ref(),
+                    worktree.as_local().abs_path().as_ref(),
                     worktree.is_visible(),
                 )
             })
@@ -17332,8 +17332,7 @@ async fn test_git_events_after_project_excludes_dot_git(cx: &mut gpui::TestAppCo
             )
             .unwrap();
     });
-    cx.read(|cx| tree.read(cx).as_local().unwrap().scan_complete())
-        .await;
+    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
     cx.executor().run_until_parked();
 
     cx.update(|cx| {
@@ -19019,7 +19018,6 @@ async fn test_rescan_with_gitignore(cx: &mut gpui::TestAppContext) {
 
     tree.read_with(cx, |tree, _| {
         tree.as_local()
-            .unwrap()
             .manually_refresh_entries_for_paths(vec![rel_path("ignored-dir").into()])
     })
     .recv()

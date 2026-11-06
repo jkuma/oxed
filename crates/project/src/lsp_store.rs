@@ -3785,7 +3785,7 @@ impl LocalLspStore {
                             return None;
                         }
                         target_worktree.update(cx, |worktree, cx| {
-                            Some(worktree.as_local()?.refresh_entry(
+                            Some(worktree.as_local().refresh_entry(
                                 target_rel_path,
                                 Some(source_rel_path),
                                 cx,
@@ -4038,20 +4038,18 @@ impl LocalLspStore {
         if let Some((worktree, literal_prefix, pattern)) =
             Self::worktree_and_path_for_file_watcher(worktrees, watcher, cx)
         {
-            if worktree.read(cx).as_local().is_some() {
-                if let Some(glob) = Glob::new(&pattern).log_err() {
-                    let worktree_id = worktree.read(cx).id();
-                    watched
-                        .worktree_paths
-                        .entry(worktree_id)
-                        .or_default()
-                        .add(registration_id, glob);
-                    worktree.update(cx, |worktree, _| {
-                        if let Some(tree) = worktree.as_local_mut() {
-                            tree.add_path_prefix_to_scan(literal_prefix);
-                        }
-                    });
-                }
+            if let Some(glob) = Glob::new(&pattern).log_err() {
+                let worktree_id = worktree.read(cx).id();
+                watched
+                    .worktree_paths
+                    .entry(worktree_id)
+                    .or_default()
+                    .add(registration_id, glob);
+                worktree.update(cx, |worktree, _| {
+                    worktree
+                        .as_local_mut()
+                        .add_path_prefix_to_scan(literal_prefix);
+                });
             }
 
             return;
@@ -11084,12 +11082,12 @@ async fn find_worktree_for_lsp_path(
                 }
                 let scans = worktree_store
                     .worktrees()
-                    .filter_map(|worktree| {
-                        let scan_complete = worktree.read(cx).as_local()?.scan_complete();
-                        Some(async move {
+                    .map(|worktree| {
+                        let scan_complete = worktree.read(cx).as_local().scan_complete();
+                        async move {
                             scan_complete.await;
                             worktree
-                        })
+                        }
                     })
                     .collect::<FuturesUnordered<_>>();
                 (None, scans)
@@ -11104,7 +11102,7 @@ async fn find_worktree_for_lsp_path(
             while let Some(worktree) = scans.next().await {
                 let relative_path = worktree.read_with(cx, |worktree, _| {
                     worktree
-                        .as_local()?
+                        .as_local()
                         .relative_path_for_external_abs_path(&canonical_path)
                 });
                 if let Some(relative_path) = relative_path {
@@ -11123,7 +11121,7 @@ async fn normalize_lsp_relative_path(
     cx: &mut AsyncApp,
 ) -> Result<Arc<RelPath>> {
     let Some((fs, snapshot, worktree_root)) = worktree.read_with(cx, |worktree, _| {
-        let local_worktree = worktree.as_local()?;
+        let local_worktree = worktree.as_local();
         if local_worktree.fs_is_case_sensitive() {
             return None;
         }

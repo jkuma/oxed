@@ -198,9 +198,7 @@ fn worktree_exclusions(app_state: &AppState, cx: &App) -> Vec<WorktreeExclusions
             if !seen.insert(worktree.entity_id()) {
                 continue;
             }
-            let Some(local) = worktree.read(cx).as_local() else {
-                continue;
-            };
+            let local = worktree.read(cx).as_local();
             exclusions.push(WorktreeExclusions {
                 root: local.abs_path().to_string_lossy().into_owned(),
                 file_scan_exclusions: local

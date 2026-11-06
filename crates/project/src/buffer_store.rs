@@ -172,7 +172,7 @@ impl LocalBufferStore {
         {
             let mut refresh = worktree
                 .read(cx)
-                .as_local()?
+                .as_local()
                 .refresh_entries_for_paths(vec![path.clone()]);
             cx.spawn({
                 let path = path.clone();

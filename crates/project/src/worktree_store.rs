@@ -486,7 +486,6 @@ impl WorktreeStore {
             new_worktree
                 .update(cx, |this, cx| {
                     this.as_local_mut()
-                        .unwrap()
                         .refresh_entry(new_project_path.path, None, cx)
                 })
                 .await
@@ -526,11 +525,7 @@ impl WorktreeStore {
         };
 
         let fs = fs.clone();
-        let case_sensitive = new_worktree
-            .read(cx)
-            .as_local()
-            .unwrap()
-            .fs_is_case_sensitive();
+        let case_sensitive = new_worktree.read(cx).as_local().fs_is_case_sensitive();
 
         let do_rename = async move |fs: &dyn Fs, old_path: &Path, new_path: &Path, overwrite| {
             fs.rename(
@@ -580,7 +575,7 @@ impl WorktreeStore {
             rename.await?;
             Ok(new_worktree
                 .update(cx, |this, cx| {
-                    let local = this.as_local_mut().unwrap();
+                    let local = this.as_local_mut();
                     if is_root_entry {
                         // We eagerly update `abs_path` and refresh this worktree.
                         // Otherwise, the FS watcher would do it on the `RootUpdated` event,

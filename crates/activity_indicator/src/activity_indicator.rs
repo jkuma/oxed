@@ -307,9 +307,7 @@ impl ActivityIndicator {
         let has_deferred_scan_dirs = self.project.read(cx).visible_worktrees(cx).any(|worktree| {
             let worktree = worktree.read(cx);
             worktree.deferred_scan_dir_count() > 0
-                && worktree.as_local().is_none_or(|local_worktree| {
-                    local_worktree.settings().file_scan_depth.is_some()
-                })
+                && worktree.as_local().settings().file_scan_depth.is_some()
         });
         match &self.deferred_scan_message {
             DeferredScanMessage::Undetected if has_deferred_scan_dirs => {

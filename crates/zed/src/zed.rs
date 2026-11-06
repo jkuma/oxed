@@ -2857,7 +2857,7 @@ mod tests {
             assert_project_panel_selection(workspace, Path::new("/dir2/b.txt"), rel_path(""), cx);
             let worktree_roots = workspace
                 .worktrees(cx)
-                .map(|w| w.read(cx).as_local().unwrap().abs_path().as_ref())
+                .map(|w| w.read(cx).as_local().abs_path().as_ref())
                 .collect::<HashSet<_>>();
             assert_eq!(
                 worktree_roots,
@@ -2904,7 +2904,7 @@ mod tests {
             assert_project_panel_selection(workspace, Path::new("/dir3"), rel_path("c.txt"), cx);
             let worktree_roots = workspace
                 .worktrees(cx)
-                .map(|w| w.read(cx).as_local().unwrap().abs_path().as_ref())
+                .map(|w| w.read(cx).as_local().abs_path().as_ref())
                 .collect::<HashSet<_>>();
             assert_eq!(
                 worktree_roots,
@@ -2951,7 +2951,7 @@ mod tests {
             assert_project_panel_selection(workspace, Path::new("/d.txt"), rel_path(""), cx);
             let worktree_roots = workspace
                 .worktrees(cx)
-                .map(|w| w.read(cx).as_local().unwrap().abs_path().as_ref())
+                .map(|w| w.read(cx).as_local().abs_path().as_ref())
                 .collect::<HashSet<_>>();
             assert_eq!(
                 worktree_roots,
@@ -2963,7 +2963,7 @@ mod tests {
 
             let visible_worktree_roots = workspace
                 .visible_worktrees(cx)
-                .map(|w| w.read(cx).as_local().unwrap().abs_path().as_ref())
+                .map(|w| w.read(cx).as_local().abs_path().as_ref())
                 .collect::<HashSet<_>>();
             assert_eq!(
                 visible_worktree_roots,

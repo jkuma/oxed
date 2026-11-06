@@ -571,14 +571,14 @@ impl Worktree {
         }))
     }
 
-    pub fn as_local(&self) -> Option<&LocalWorktree> {
+    pub fn as_local(&self) -> &LocalWorktree {
         let Worktree::Local(worktree) = self;
-        Some(worktree)
+        worktree
     }
 
-    pub fn as_local_mut(&mut self) -> Option<&mut LocalWorktree> {
+    pub fn as_local_mut(&mut self) -> &mut LocalWorktree {
         let Worktree::Local(worktree) = self;
-        Some(worktree)
+        worktree
     }
 
     pub fn settings_location(&self, _: &Context<Self>) -> SettingsLocation<'static> {
@@ -911,7 +911,7 @@ impl LocalWorktree {
         let scan_state_updater = cx.spawn(async move |this, cx| {
             while let Some((state, this)) = scan_states_rx.next().await.zip(this.upgrade()) {
                 this.update(cx, |this, cx| {
-                    let this = this.as_local_mut().unwrap();
+                    let this = this.as_local_mut();
                     match state {
                         ScanState::Started => {
                             *this.is_scanning.0.borrow_mut() = true;
@@ -1315,16 +1315,13 @@ impl LocalWorktree {
                     }
                     let refresh_full_path = lowest_ancestor.join(refresh_path);
 
-                    refreshes.push(this.as_local_mut().unwrap().refresh_entry(
+                    refreshes.push(this.as_local_mut().refresh_entry(
                         refresh_full_path.into(),
                         None,
                         cx,
                     ));
                 }
-                (
-                    this.as_local_mut().unwrap().refresh_entry(path, None, cx),
-                    refreshes,
-                )
+                (this.as_local_mut().refresh_entry(path, None, cx), refreshes)
             })?;
             for refresh in refreshes {
                 refresh.await.log_err();
@@ -1381,9 +1378,7 @@ impl LocalWorktree {
             write.await?;
             let entry = this
                 .update(cx, |this, cx| {
-                    this.as_local_mut()
-                        .unwrap()
-                        .refresh_entry(path.clone(), None, cx)
+                    this.as_local_mut().refresh_entry(path.clone(), None, cx)
                 })?
                 .await?;
             let worktree = this.upgrade().context("worktree dropped")?;
@@ -1434,7 +1429,6 @@ impl LocalWorktree {
 
             this.update(cx, |this, _| {
                 this.as_local_mut()
-                    .unwrap()
                     .refresh_entries_for_paths(vec![entry.path])
             })?
             .recv()
@@ -1464,7 +1458,6 @@ impl LocalWorktree {
 
             this.update(cx, |this, _| {
                 this.as_local_mut()
-                    .unwrap()
                     .refresh_entries_for_paths(vec![entry.path])
             })?
             .recv()
@@ -1492,7 +1485,7 @@ impl LocalWorktree {
 
             let entry = this
                 .update(cx, |this, cx| {
-                    this.as_local_mut().unwrap().refresh_entry(path, None, cx)
+                    this.as_local_mut().refresh_entry(path, None, cx)
                 })?
                 .await?
                 .context("Entry not found after restore")?;
@@ -1564,7 +1557,6 @@ impl LocalWorktree {
                 |this, _| {
                     anyhow::Ok::<postage::barrier::Receiver>(
                         this.as_local()
-                            .with_context(|| "Worktree is not local")?
                             .refresh_entries_for_paths(paths_to_refresh.clone()),
                     )
                 },
@@ -2854,14 +2846,14 @@ impl language::LocalFile for File {
     }
 
     fn load(&self, cx: &App) -> Task<Result<String>> {
-        let worktree = self.worktree.read(cx).as_local().unwrap();
+        let worktree = self.worktree.read(cx).as_local();
         let abs_path = worktree.absolutize(&self.path);
         let fs = worktree.fs.clone();
         cx.background_spawn(async move { fs.load(&abs_path).await })
     }
 
     fn load_bytes(&self, cx: &App) -> Task<Result<Vec<u8>>> {
-        let worktree = self.worktree.read(cx).as_local().unwrap();
+        let worktree = self.worktree.read(cx).as_local();
         let abs_path = worktree.absolutize(&self.path);
         let fs = worktree.fs.clone();
         cx.background_spawn(async move { fs.load_bytes(&abs_path).await })
@@ -5519,7 +5511,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
 
         let tree = self.clone();
         let (fs, root_path) = self.read_with(cx, |tree, _| {
-            let tree = tree.as_local().unwrap();
+            let tree = tree.as_local();
             (tree.fs.clone(), tree.abs_path.clone())
         });
 
@@ -5580,7 +5572,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
                 }
             }
 
-            cx.update(|cx| tree.read(cx).as_local().unwrap().scan_complete())
+            cx.update(|cx| tree.read(cx).as_local().scan_complete())
                 .await;
         }
         .boxed_local()
@@ -5601,7 +5593,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
 
         let tree = self.clone();
         let (fs, root_path, mut git_dir_scan_id) = self.read_with(cx, |tree, _| {
-            let tree = tree.as_local().unwrap();
+            let tree = tree.as_local();
             let local_repo_entry = tree
                 .git_repositories
                 .values()
@@ -5615,7 +5607,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
         });
 
         let scan_id_increased = |tree: &mut Worktree, git_dir_scan_id: &mut usize| {
-            let tree = tree.as_local().unwrap();
+            let tree = tree.as_local();
             // let repository = tree.repositories.first().unwrap();
             let local_repo_entry = tree
                 .git_repositories
@@ -5672,7 +5664,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
                 }
             }
 
-            cx.update(|cx| tree.read(cx).as_local().unwrap().scan_complete())
+            cx.update(|cx| tree.read(cx).as_local().scan_complete())
                 .await;
         }
         .boxed_local()
@@ -6380,11 +6372,11 @@ mod tests {
             )
             .await
             .unwrap();
-            tree.read_with(cx, |tree, _| tree.as_local().unwrap().scan_complete())
+            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
                 .await;
             let (status_updates_tx, _status_updates_rx) = mpsc::unbounded();
             let scanner = tree.update(cx, |tree, cx| {
-                let tree = tree.as_local_mut().unwrap();
+                let tree = tree.as_local_mut();
                 tree._background_scanner_tasks.clear();
                 BackgroundScanner {
                     state: async_lock::Mutex::new(BackgroundScannerState {

@@ -9445,7 +9445,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -9603,7 +9602,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -9662,7 +9660,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -9955,7 +9952,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -10200,7 +10196,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -10313,7 +10308,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -10431,7 +10425,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -10670,7 +10663,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -10825,7 +10817,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11050,7 +11041,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11211,7 +11201,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11374,7 +11363,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11430,7 +11418,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11479,7 +11466,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11574,7 +11560,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11650,7 +11635,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -11709,7 +11693,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -12537,7 +12520,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -12649,7 +12631,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -12778,7 +12759,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -12984,7 +12964,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13021,7 +13000,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13058,7 +13036,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13094,7 +13071,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13747,7 +13723,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13830,7 +13805,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -13982,7 +13956,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14025,7 +13998,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14065,7 +14037,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14107,7 +14078,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14148,7 +14118,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14712,7 +14681,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -14737,7 +14705,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;
@@ -15340,7 +15307,6 @@ mod tests {
                 .unwrap()
                 .read(cx)
                 .as_local()
-                .unwrap()
                 .scan_complete()
         })
         .await;

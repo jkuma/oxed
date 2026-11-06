@@ -5162,11 +5162,9 @@ impl ProjectPanel {
 
                     let refresh_tasks: Vec<_> = paths_to_refresh
                         .into_iter()
-                        .filter_map(|(worktree, leaf_path)| {
+                        .map(|(worktree, leaf_path)| {
                             worktree.update(cx, |worktree, cx| {
-                                worktree
-                                    .as_local_mut()
-                                    .map(|local| local.refresh_entry(leaf_path, None, cx))
+                                worktree.as_local_mut().refresh_entry(leaf_path, None, cx)
                             })
                         })
                         .collect();

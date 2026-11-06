@@ -2312,9 +2312,7 @@ mod repository_activation_tests {
             .await
             .unwrap();
         worktree
-            .read_with(cx, |worktree, _| {
-                worktree.as_local().unwrap().scan_complete()
-            })
+            .read_with(cx, |worktree, _| worktree.as_local().scan_complete())
             .await;
         cx.executor().run_until_parked();
 

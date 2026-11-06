@@ -344,10 +344,9 @@ impl Search {
                 let gitignored_tracker = PathInclusionMatcher::new(query.clone());
                 let include_ignored = query.include_ignored();
                 for worktree in worktrees {
-                    let scan_complete = worktree.read_with(cx, |worktree, _| {
-                        worktree.as_local().map(|local| local.scan_complete())
-                    });
-                    if let Some(scan_complete) = scan_complete {
+                    let scan_complete =
+                        worktree.read_with(cx, |worktree, _| worktree.as_local().scan_complete());
+                    {
                         let mut scan_complete = pin!(scan_complete);
                         if scan_complete.as_mut().now_or_never().is_none() {
                             _ = results_tx.send(SearchResult::WaitingForScan).await;
@@ -357,10 +356,7 @@ impl Search {
                     }
 
                     let (mut snapshot, worktree_settings) = worktree
-                        .read_with(cx, |this, _| {
-                            Some((this.snapshot(), this.as_local()?.settings()))
-                        })
-                        .context("The worktree is not local")?;
+                        .read_with(cx, |this, _| (this.snapshot(), this.as_local().settings()));
                     if query.include_ignored() {
                         // Pre-fetch all of the ignored directories as they're going to be searched.
                         let mut entries_to_refresh = vec![];
@@ -375,7 +371,7 @@ impl Search {
                             }
                         }
                         let barrier = worktree.update(cx, |this, _| {
-                            let local = this.as_local_mut()?;
+                            let local = this.as_local_mut();
                             let barrier = entries_to_refresh
                                 .into_iter()
                                 .map(|path| local.add_path_prefix_to_scan(path).into_future())

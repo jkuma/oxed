@@ -3496,8 +3496,8 @@ async fn test_select_git_entry(cx: &mut gpui::TestAppContext) {
         let worktree1 = worktrees.next().unwrap();
         let worktree2 = worktrees.next().unwrap();
         (
-            worktree1.read(cx).as_local().unwrap().scan_complete(),
-            worktree2.read(cx).as_local().unwrap().scan_complete(),
+            worktree1.read(cx).as_local().scan_complete(),
+            worktree2.read(cx).as_local().scan_complete(),
         )
     });
     scan1_complete.await;

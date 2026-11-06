@@ -1065,7 +1065,7 @@ impl Project {
                 })
                 .await
                 .unwrap();
-            tree.read_with(cx, |tree, _| tree.as_local().unwrap().scan_complete())
+            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
                 .await;
         }
         project
@@ -1119,7 +1119,7 @@ impl Project {
                 .await
                 .unwrap();
 
-            tree.read_with(cx, |tree, _| tree.as_local().unwrap().scan_complete())
+            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
                 .await;
         }
         project
@@ -3420,7 +3420,7 @@ impl Project {
             let scans_complete = this
                 .read_with(cx, |this, cx| {
                     this.worktrees(cx)
-                        .filter_map(|worktree| Some(worktree.read(cx).as_local()?.scan_complete()))
+                        .map(|worktree| worktree.read(cx).as_local().scan_complete())
                         .collect::<Vec<_>>()
                 })
                 .unwrap();
