@@ -18,7 +18,6 @@ use crate::rel_path::{RelPath, StripPrefixError};
 pub mod abs_path;
 mod path_component;
 pub mod rel_path;
-mod windows_prefix;
 
 pub fn try_from_bytes<'a, T>(bytes: &'a [u8]) -> anyhow::Result<T>
 where
@@ -40,7 +39,6 @@ impl<T: AsRef<Path> + ?Sized> PathExt for T {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PathStyle {
     Unix,
-    Windows,
 }
 
 impl PathStyle {
@@ -52,41 +50,29 @@ impl PathStyle {
     pub fn primary_separator(&self) -> &'static str {
         match self {
             PathStyle::Unix => "/",
-            PathStyle::Windows => "\\",
         }
     }
 
     pub fn separators(&self) -> &'static [&'static str] {
         match self {
             PathStyle::Unix => &["/"],
-            PathStyle::Windows => &["\\", "/"],
         }
     }
 
     pub fn separators_ch(&self) -> &'static [char] {
         match self {
             PathStyle::Unix => &['/'],
-            PathStyle::Windows => &['\\', '/'],
         }
     }
 
     pub fn is_absolute(&self, path: &Path) -> bool {
         match self {
             PathStyle::Unix => self.has_root(path),
-            PathStyle::Windows => self.has_root(path) && self.components(path).prefix().is_some(),
         }
     }
 
     pub fn has_root(&self, path: &Path) -> bool {
         self.components(path).has_root()
-    }
-
-    pub fn is_windows(&self) -> bool {
-        *self == PathStyle::Windows
-    }
-
-    pub fn is_posix(&self) -> bool {
-        *self == PathStyle::Unix
     }
 
     pub fn join(self, left: impl AsRef<Path>, right: impl AsRef<Path>) -> Option<String> {
@@ -227,31 +213,27 @@ impl PathStyle {
         Components::new(*self, path)
     }
 
-    fn parse_prefix<'a>(&self, path: &'a OsStr) -> Option<Prefix<'a>> {
+    fn parse_prefix<'a>(&self, _path: &'a OsStr) -> Option<Prefix<'a>> {
         match self {
             PathStyle::Unix => None,
-            PathStyle::Windows => windows_prefix::parse_prefix(path),
         }
     }
 
     fn has_prefixes(&self) -> bool {
         match self {
             PathStyle::Unix => false,
-            PathStyle::Windows => true,
         }
     }
 
     fn is_sep_byte(&self, b: u8) -> bool {
         match self {
             Self::Unix => b == b'/',
-            Self::Windows => b == b'\\' || b == b'/',
         }
     }
 
     fn is_verbatim_sep(&self, b: u8) -> bool {
         match self {
             Self::Unix => self.is_sep_byte(b),
-            Self::Windows => b == b'\\',
         }
     }
 
@@ -308,15 +290,8 @@ mod tests {
         let posix_path = PathStyle::Unix
             .join_path(Path::new("/home/user/dev"), "worktrees")
             .unwrap();
-        let windows_path = PathStyle::Windows
-            .join_path(Path::new("C:\\Users\\user\\dev"), "worktrees")
-            .unwrap();
 
         assert_eq!(posix_path, PathBuf::from("/home/user/dev/worktrees"));
-        assert_eq!(
-            windows_path.to_string_lossy(),
-            "C:\\Users\\user\\dev\\worktrees"
-        );
     }
 
     #[test]
@@ -324,15 +299,8 @@ mod tests {
         let posix_path = PathStyle::Unix
             .join_path_preserving_components(Path::new("/home/user/symlink"), "../worktrees")
             .unwrap();
-        let windows_path = PathStyle::Windows
-            .join_path_preserving_components(Path::new(r"C:\Users\user\symlink"), r"..\worktrees")
-            .unwrap();
 
         assert_eq!(posix_path, PathBuf::from("/home/user/symlink/../worktrees"));
-        assert_eq!(
-            windows_path.to_string_lossy(),
-            r"C:\Users\user\symlink\..\worktrees"
-        );
     }
 
     #[test]
@@ -348,23 +316,6 @@ mod tests {
         for (path, normalized) in paths_and_normalized_unix {
             assert_eq!(
                 PathStyle::Unix.normalize_separators(path).as_os_str(),
-                OsStr::new(normalized),
-                "normalize_separators({path:?})"
-            );
-        }
-
-        let paths_and_normalized_windows = [
-            ("C:/Users/user", r"C:\Users\user"),
-            (r"C:/Users//.\user/", r"C:\Users\user"),
-            ("./Users", r".\Users"),
-            ("Users/../worktrees", r"Users\..\worktrees"),
-            // no normalization inside Path prefixes
-            (r"//server/share/dev", r"//server/share\dev"),
-            (r"\\?\C:\Users/user", r"\\?\C:\Users/user"),
-        ];
-        for (path, normalized) in paths_and_normalized_windows {
-            assert_eq!(
-                PathStyle::Windows.normalize_separators(path).as_os_str(),
                 OsStr::new(normalized),
                 "normalize_separators({path:?})"
             );
@@ -391,52 +342,6 @@ mod tests {
         for (path, normalized) in paths_and_normalized_unix {
             assert_eq!(
                 PathStyle::Unix.normalize_lexically(path).as_os_str(),
-                OsStr::new(normalized),
-                "normalize_lexically({path:?})"
-            );
-        }
-
-        let paths_and_normalized_windows = [
-            (
-                r"C:\Users\user\dev\..\worktrees",
-                r"C:\Users\user\worktrees",
-            ),
-            (r"C:\Users\.\worktrees", r"C:\Users\worktrees"),
-            (
-                r"C:\Users\user\dev\sub\..\..\worktrees",
-                r"C:\Users\user\worktrees",
-            ),
-            ("C:/Users/user/dev/../worktrees", r"C:\Users\user\worktrees"),
-            (
-                r"C:/Users\user/dev\..\worktrees",
-                r"C:\Users\user\worktrees",
-            ),
-            (r"C:\Users/user\.\worktrees", r"C:\Users\user\worktrees"),
-            (
-                r"\\server\share\dev\..\worktrees",
-                r"\\server\share\worktrees",
-            ),
-            (r"\\server\share\..\worktrees", r"\\server\share\worktrees"),
-            // no normalization inside Path prefixes
-            (
-                r"//server/share/dev\sub\worktrees",
-                r"//server/share\dev\sub\worktrees",
-            ),
-            (r"//./pipe/dev\..\worktrees", r"//./pipe\worktrees"),
-            (r"c:/Users/user", r"c:\Users\user"),
-            // `//?/` is not a verbatim prefix, so it must not become `\\?\`.
-            (r"//?/C:/Users/user", r"//?/C:\Users\user"),
-            (r"\dev\..\worktrees", r"\worktrees"),
-            (r"dev\..\worktrees", r"worktrees"),
-            (r"C:\..\worktrees", r"C:\worktrees"),
-            (r"C:..\worktrees", r"C:..\worktrees"),
-            (r"..\..\worktrees", r"..\..\worktrees"),
-            (r"\\server\share", r"\\server\share\"),
-            (r"\\?\C:\Users/user", r"\\?\C:\Users/user"),
-        ];
-        for (path, normalized) in paths_and_normalized_windows {
-            assert_eq!(
-                PathStyle::Windows.normalize_lexically(path).as_os_str(),
                 OsStr::new(normalized),
                 "normalize_lexically({path:?})"
             );
@@ -493,82 +398,6 @@ mod tests {
     }
 
     #[test]
-    fn test_windows_path_style_starts_with_and_strip_prefix() {
-        let windows_paths_and_prefixes = [
-            (
-                r"C:\src\rust\cargo-test\test\Cargo.toml",
-                r"c:\src\rust\cargo-test\test",
-                true,
-                Some("Cargo.toml"),
-            ),
-            (r"C:\foo\.\bar.txt", r"C:\foo\bar.txt", true, Some("")),
-            (r"C:\foo\.", r"C:\foo", true, Some("")),
-            (r"\\server\share", r"\\server", false, None),
-            (r"\\server\share\foo.txt", r"\\server", false, None),
-            (
-                r"\\server\share\foo.txt",
-                r"\\server\share",
-                true,
-                Some("foo.txt"),
-            ),
-            (
-                r"\\server\share\foo.txt",
-                r"\\server\share\",
-                true,
-                Some("foo.txt"),
-            ),
-            (
-                r"\\server\share\foo.txt",
-                r"\\server\share/",
-                true,
-                Some("foo.txt"),
-            ),
-            (r"\\server\share\foo.txt", r"\\server\other", false, None),
-            (r"\\server\share\foo.txt", r"\\SERVER\share", false, None),
-            (r"\\?\C:\foo\.\bar.txt", r"\\?\C:\foo\bar.txt", false, None),
-            (r"\\?\C:\foo.txt", r"\\?\C:\", true, Some("foo.txt")),
-            (
-                r"\\?\UNC\server\share\foo.txt",
-                r"\\?\UNC\server\share",
-                true,
-                Some(r"\foo.txt"),
-            ),
-            (
-                r"\\?\UNC\server\share\foo.txt",
-                r"\\?\UNC\server\",
-                false,
-                None,
-            ),
-            (r"\\?\bar\foo.txt", r"\\?\bar", true, Some(r"\foo.txt")),
-            (r"\\?\C:\foo/bar.txt", r"\\?\C:\foo", false, None),
-            (r"C:\foo\bar.txt", r"C:\foo", true, Some("bar.txt")),
-            (r"C:\foo\bar.txt", r"C:\foo\", true, Some("bar.txt")),
-            (r"C:\foo\bar.txt", r"C:\", true, Some(r"foo\bar.txt")),
-            (r"C:\foo\bar.txt", "", true, Some(r"C:\foo\bar.txt")),
-            (r"C:\foo\\bar.txt", r"C:\foo\", true, Some("bar.txt")),
-            (r"C:\foobar.txt", r"C:\foo", false, None),
-            (r"C:\foo/bar.txt", r"C:\foo", true, Some("bar.txt")),
-            (r"C:\foo/bar.txt", r"C:\foo\", true, Some("bar.txt")),
-            (r"C:\foo/bar.txt", r"C:\foo/", true, Some("bar.txt")),
-        ];
-
-        for (path, prefix, expected_starts_with, expected_stripped) in windows_paths_and_prefixes {
-            assert_eq!(
-                PathStyle::Windows.starts_with(Path::new(path), Path::new(prefix)),
-                expected_starts_with,
-                "{path:?}.starts_with({prefix:?})"
-            );
-            assert_eq!(
-                PathStyle::Windows
-                    .strip_prefix(Path::new(path), Path::new(prefix))
-                    .ok(),
-                expected_stripped.map(Path::new),
-                "{path:?}.strip_prefix({prefix:?})"
-            );
-        }
-    }
-
-    #[test]
     fn test_unix_path_style_file_name() {
         let unix_paths_and_filenames = [
             (Path::new(""), None),
@@ -586,35 +415,6 @@ mod tests {
 
         for (path, filename) in unix_paths_and_filenames {
             assert_eq!(PathStyle::Unix.file_name(path), filename.map(OsStr::new));
-        }
-    }
-
-    #[test]
-    fn test_windows_path_style_file_name() {
-        let windows_paths_and_filenames = [
-            (Path::new(""), None),
-            (Path::new("."), None),
-            (Path::new(r"C:\usr\bin\"), Some("bin")),
-            (Path::new(r"C:"), None),
-            (Path::new(r"tmp\foo.txt"), Some("foo.txt")),
-            (Path::new("tmp/foo.txt"), Some("foo.txt")),
-            (Path::new(r"foo.txt\."), Some("foo.txt")),
-            (Path::new(r"foo.txt\.\"), Some("foo.txt")),
-            (Path::new(r"foo.txt\.."), None),
-            (Path::new(r"C:\"), None),
-            (Path::new(r"\\server\share"), None),
-            (Path::new(r"\\server\share\foo.txt"), Some("foo.txt")),
-            (Path::new("//server/share"), None),
-            (Path::new("//server/share/foo.txt"), Some("foo.txt")),
-            (Path::new(r"\\?\bar"), None),
-            (Path::new(r"\\?\bar\foo.txt"), Some("foo.txt")),
-            (Path::new(r"\\?\C:/foo/bar"), None),
-            (Path::new(r"\\.\device"), None),
-            (Path::new(r"\\.\device\foo.txt"), Some("foo.txt")),
-        ];
-
-        for (path, filename) in windows_paths_and_filenames {
-            assert_eq!(PathStyle::Windows.file_name(path), filename.map(OsStr::new));
         }
     }
 
@@ -642,52 +442,6 @@ mod tests {
         for (path, parent) in unix_paths_and_parents {
             assert_eq!(
                 PathStyle::Unix.parent(Path::new(path)),
-                parent.map(Path::new)
-            );
-        }
-    }
-
-    #[test]
-    fn test_windows_path_style_parent() {
-        let windows_paths_and_parents = [
-            ("", None),
-            (r"C:\foo\bar", Some(r"C:\foo")),
-            (r"C:\foo", Some(r"C:\")),
-            (r"C:\", None),
-            (r"C:foo", Some("C:")),
-            (r"C:", None),
-            (r"\foo", Some(r"\")),
-            (r"\", None),
-            (r"foo\bar", Some("foo")),
-            (r"foo\\bar", Some("foo")),
-            ("foo/bar", Some("foo")),
-            ("foo", Some("")),
-            (r"foo\.", Some("")),
-            (r"foo\.\bar", Some("foo")),
-            (r"foo\..\bar", Some(r"foo\..")),
-            (r".\a", Some(".")),
-            (r".\.", Some("")),
-            (r"\\server\share", None),
-            (r"\\server\share\foo.txt", Some(r"\\server\share\")),
-            ("//server/share", None),
-            ("//server/share/foo.txt", Some("//server/share/")),
-            (r"\\?\bar", None),
-            (r"\\?\bar\foo.txt", Some(r"\\?\bar\")),
-            (
-                r"\\?\UNC\server\share\foo.txt",
-                Some(r"\\?\UNC\server\share\"),
-            ),
-            (r"\\?\C:\foo.txt", Some(r"\\?\C:\")),
-            (r"\\?\C:/foo/bar", None),
-            (r"\\.\device", None),
-            (r"\\.\device\foo.txt", Some(r"\\.\device\")),
-            (".", Some("")),
-            ("..", Some("")),
-        ];
-
-        for (path, parent) in windows_paths_and_parents {
-            assert_eq!(
-                PathStyle::Windows.parent(Path::new(path)),
                 parent.map(Path::new)
             );
         }

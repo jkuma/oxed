@@ -129,7 +129,7 @@ fn inclusion_parent_patterns(pattern: &str, path_style: PathStyle) -> Vec<String
                     continue;
                 }
                 split_index -= 1;
-            } else if character == '\\' && path_style.is_posix() {
+            } else if character == '\\' {
                 escaped = true;
                 continue;
             }

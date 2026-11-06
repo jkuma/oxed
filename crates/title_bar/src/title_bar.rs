@@ -706,29 +706,11 @@ mod tests {
     use util::paths::PathStyle;
 
     #[test]
-    fn test_foreign_path_style_does_not_use_repository_identity_as_name_anchor() {
-        let (common_dir, foreign_path_style) = match PathStyle::local() {
-            PathStyle::Unix => (Path::new(r"C:\repos\zed"), PathStyle::Windows),
-            PathStyle::Windows => (Path::new("/repos/zed"), PathStyle::Unix),
-        };
-        let repository_identity_path = repo_identity_path_if_local(common_dir, foreign_path_style);
-
-        assert_eq!(
-            linked_worktree_name_anchor(None, repository_identity_path, true),
-            None
-        );
-    }
-
-    #[test]
     fn test_local_path_style_uses_bare_repository_worktree_name() {
         let (repository_identity_path, work_directory_path) = match PathStyle::local() {
             PathStyle::Unix => (
                 Path::new("/repos/zed"),
                 Path::new("/worktrees/zed/plum-warbler/zed"),
-            ),
-            PathStyle::Windows => (
-                Path::new(r"C:\repos\zed"),
-                Path::new(r"C:\worktrees\zed\plum-warbler\zed"),
             ),
         };
 

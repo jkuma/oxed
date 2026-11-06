@@ -70,7 +70,6 @@ impl OpenPathDelegate {
             should_dismiss: true,
             prompt_root: match path_style {
                 PathStyle::Unix => "/".to_string(),
-                PathStyle::Windows => "C:\\".to_string(),
             },
             path_style,
             replace_prompt: Task::ready(()),
@@ -160,7 +159,6 @@ impl OpenPathDelegate {
     fn current_dir(&self) -> &'static str {
         match self.path_style {
             PathStyle::Unix => "./",
-            PathStyle::Windows => ".\\",
         }
     }
 }
@@ -997,21 +995,6 @@ fn get_dir_and_suffix(query: String, path_style: PathStyle) -> (String, String) 
             }
             (dir, suffix)
         }
-        PathStyle::Windows => {
-            let last_sep = query.rfind('\\').into_iter().chain(query.rfind('/')).max();
-            let (mut dir, suffix) = if let Some(index) = last_sep {
-                (
-                    query[..index + 1].to_string(),
-                    query[index + 1..].to_string(),
-                )
-            } else {
-                (query, String::new())
-            };
-            if dir.len() < 3 {
-                dir = "C:\\".to_string();
-            }
-            (dir, suffix)
-        }
     }
 }
 
@@ -1020,68 +1003,6 @@ mod tests {
     use util::paths::PathStyle;
 
     use super::get_dir_and_suffix;
-
-    #[test]
-    fn test_get_dir_and_suffix_with_windows_style() {
-        let (dir, suffix) = get_dir_and_suffix("".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\");
-        assert_eq!(suffix, "");
-
-        let (dir, suffix) = get_dir_and_suffix("C:".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\");
-        assert_eq!(suffix, "");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\");
-        assert_eq!(suffix, "");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\Use".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\");
-        assert_eq!(suffix, "Use");
-
-        let (dir, suffix) =
-            get_dir_and_suffix("C:\\Users\\Junkui\\Docum".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\Users\\Junkui\\");
-        assert_eq!(suffix, "Docum");
-
-        let (dir, suffix) =
-            get_dir_and_suffix("C:\\Users\\Junkui\\Documents".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\Users\\Junkui\\");
-        assert_eq!(suffix, "Documents");
-
-        let (dir, suffix) =
-            get_dir_and_suffix("C:\\Users\\Junkui\\Documents\\".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\Users\\Junkui\\Documents\\");
-        assert_eq!(suffix, "");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\root\\.".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\root\\");
-        assert_eq!(suffix, ".");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\root\\..".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\root\\");
-        assert_eq!(suffix, "..");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\root\\.hidden".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\root\\");
-        assert_eq!(suffix, ".hidden");
-
-        let (dir, suffix) = get_dir_and_suffix("C:/root/".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:/root/");
-        assert_eq!(suffix, "");
-
-        let (dir, suffix) = get_dir_and_suffix("C:/root/Use".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:/root/");
-        assert_eq!(suffix, "Use");
-
-        let (dir, suffix) = get_dir_and_suffix("C:\\root/Use".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:\\root/");
-        assert_eq!(suffix, "Use");
-
-        let (dir, suffix) = get_dir_and_suffix("C:/root\\.hidden".into(), PathStyle::Windows);
-        assert_eq!(dir, "C:/root\\");
-        assert_eq!(suffix, ".hidden");
-    }
 
     #[test]
     fn test_get_dir_and_suffix_with_posix_style() {

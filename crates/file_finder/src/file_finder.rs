@@ -1207,7 +1207,6 @@ impl FileFinderDelegate {
                     let worktree = worktree.read(cx);
                     if worktree.entry_for_path(&query_path).is_none()
                         && !query.path_query().ends_with('/')
-                        && !(path_style.is_windows() && query.path_query().ends_with('\\'))
                     {
                         self.matches.matches.push(Match::CreateNew(ProjectPath {
                             worktree_id: worktree.id(),

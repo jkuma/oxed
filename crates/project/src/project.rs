@@ -841,14 +841,7 @@ impl DirectoryLister {
                 s.push_str(path_style.primary_separator());
                 s
             })
-            .unwrap_or_else(|| {
-                if path_style.is_windows() {
-                    "C:\\"
-                } else {
-                    "~/"
-                }
-                .to_string()
-            })
+            .unwrap_or_else(|| "~/".to_string())
     }
 
     pub fn list_directory(&self, path: String, cx: &mut App) -> Task<Result<Vec<DirectoryItem>>> {

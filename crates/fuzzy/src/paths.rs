@@ -153,18 +153,7 @@ pub async fn match_path_sets<'a, Set: PathMatchCandidateSet<'a>>(
         return Vec::new();
     }
 
-    let path_style = candidate_sets[0].path_style();
-
-    let query = query
-        .chars()
-        .map(|char| {
-            if path_style.is_windows() && char == '\\' {
-                '/'
-            } else {
-                char
-            }
-        })
-        .collect::<Vec<_>>();
+    let query = query.chars().collect::<Vec<_>>();
 
     let lowercase_query = query
         .iter()

@@ -185,10 +185,6 @@ impl<'a> Components<'a> {
         }
     }
 
-    pub(crate) fn prefix(&self) -> Option<Prefix<'_>> {
-        self.prefix
-    }
-
     fn has_prefixes(&self) -> bool {
         self.path_style.has_prefixes()
     }

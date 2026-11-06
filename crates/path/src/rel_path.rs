@@ -14,12 +14,7 @@ use crate::{
 
 /// A file system path that is guaranteed to be relative and normalized.
 ///
-/// This type can be used to represent paths in a uniform way, regardless of
-/// whether they refer to Windows or POSIX file systems, and regardless of
-/// the host platform.
-///
-/// Internally, paths are stored in POSIX ('/'-delimited) format, but they can
-/// be displayed in either POSIX or Windows format.
+/// Paths are stored in POSIX ('/'-delimited) format.
 ///
 /// Relative paths are also guaranteed to be valid unicode.
 #[repr(transparent)]
@@ -60,7 +55,6 @@ impl RelPath {
 
         let (prefixes, suffixes): (&[_], &[_]) = match path_style {
             PathStyle::Unix => (&["./"], &['/']),
-            PathStyle::Windows => (&["./", ".\\"], &['/', '\\']),
         };
 
         while prefixes.iter().any(|prefix| path.starts_with(prefix)) {
@@ -76,15 +70,7 @@ impl RelPath {
             return Err(anyhow!("absolute path not allowed: {path:?}"));
         }
 
-        let mut string = Cow::Borrowed(path);
-        if path_style == PathStyle::Windows && path.contains('\\') {
-            string = Cow::Owned(string.as_ref().replace('\\', "/"))
-        }
-
-        let mut result = match string {
-            Cow::Borrowed(string) => Cow::Borrowed(Self::from_str(string)),
-            Cow::Owned(string) => Cow::Owned(RelPathBuf(string)),
-        };
+        let mut result = Cow::Borrowed(Self::from_str(path));
 
         if result
             .components()
@@ -257,8 +243,6 @@ impl RelPath {
     pub fn display(&self, style: PathStyle) -> Cow<'_, str> {
         match style {
             PathStyle::Unix => Cow::Borrowed(&self.0),
-            PathStyle::Windows if self.0.contains('/') => Cow::Owned(self.0.replace('/', "\\")),
-            PathStyle::Windows => Cow::Borrowed(&self.0),
         }
     }
 
@@ -623,10 +607,6 @@ mod tests {
         assert_eq!(path, rel_path("foo").into());
         assert!(matches!(path, Cow::Borrowed(_)));
 
-        let path = RelPath::new("foo\\".as_ref(), PathStyle::Windows).unwrap();
-        assert_eq!(path, rel_path("foo").into());
-        assert!(matches!(path, Cow::Borrowed(_)));
-
         assert_eq!(
             RelPath::new("foo/bar/../baz/./quux/".as_ref(), PathStyle::local())
                 .unwrap()
@@ -638,23 +618,7 @@ mod tests {
         assert_eq!(path.as_ref(), rel_path("foo/bar"));
         assert!(matches!(path, Cow::Borrowed(_)));
 
-        let path = RelPath::new(".\\foo".as_ref(), PathStyle::Windows).unwrap();
-        assert_eq!(path, rel_path("foo").into());
-        assert!(matches!(path, Cow::Borrowed(_)));
-
-        let path = RelPath::new("./.\\./foo/\\/".as_ref(), PathStyle::Windows).unwrap();
-        assert_eq!(path, rel_path("foo").into());
-        assert!(matches!(path, Cow::Borrowed(_)));
-
         let path = RelPath::new("foo/./bar".as_ref(), PathStyle::Unix).unwrap();
-        assert_eq!(path.as_ref(), rel_path("foo/bar"));
-        assert!(matches!(path, Cow::Owned(_)));
-
-        let path = RelPath::new("./foo/bar".as_ref(), PathStyle::Windows).unwrap();
-        assert_eq!(path.as_ref(), rel_path("foo/bar"));
-        assert!(matches!(path, Cow::Borrowed(_)));
-
-        let path = RelPath::new(".\\foo\\bar".as_ref(), PathStyle::Windows).unwrap();
         assert_eq!(path.as_ref(), rel_path("foo/bar"));
         assert!(matches!(path, Cow::Owned(_)));
     }
@@ -778,11 +742,7 @@ mod tests {
 
     #[test]
     fn test_rel_path_constructors_absolute_path() {
-        assert!(RelPath::new(Path::new("/a/b"), PathStyle::Windows).is_err());
-        assert!(RelPath::new(Path::new("\\a\\b"), PathStyle::Windows).is_err());
         assert!(RelPath::new(Path::new("/a/b"), PathStyle::Unix).is_err());
-        assert!(RelPath::new(Path::new("C:/a/b"), PathStyle::Windows).is_err());
-        assert!(RelPath::new(Path::new("C:\\a\\b"), PathStyle::Windows).is_err());
         assert!(RelPath::new(Path::new("C:/a/b"), PathStyle::Unix).is_ok());
     }
 

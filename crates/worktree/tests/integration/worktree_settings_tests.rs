@@ -179,11 +179,7 @@ fn test_inclusion_parents_close_braces_around_character_classes() {
 
 #[test]
 fn test_inclusion_parents_preserve_literal_braces() {
-    let mut patterns = vec!["ignored/[{]one/file.rs"];
-    if PathStyle::local().is_posix() {
-        patterns.push(r"ignored/\{one/file.rs");
-    }
-    for pattern in patterns {
+    for pattern in ["ignored/[{]one/file.rs", r"ignored/\{one/file.rs"] {
         let settings = settings_with_patterns("file_scan_inclusions", &[pattern]);
         assert!(settings.is_path_always_included(rel_path("ignored/{one/file.rs"), false));
         assert!(settings.is_path_always_included(rel_path("ignored/{one"), true));

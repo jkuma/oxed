@@ -713,7 +713,7 @@ impl PathMatcher {
             .into_iter()
             .map(|as_str| {
                 GlobBuilder::new(as_str.as_ref())
-                    .backslash_escape(path_style.is_posix())
+                    .backslash_escape(true)
                     .build()
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -731,7 +731,7 @@ impl PathMatcher {
             .into_iter()
             .filter_map(|pattern| {
                 match GlobBuilder::new(pattern.as_ref())
-                    .backslash_escape(path_style.is_posix())
+                    .backslash_escape(true)
                     .build()
                 {
                     Ok(glob) => Some(glob),
@@ -1273,26 +1273,15 @@ impl UrlExt for url::Url {
         if let Some(segments) = self.path_segments() {
             let host = match self.host() {
                 None | Some(url::Host::Domain("localhost")) => None,
-                Some(_) if source_path_style.is_windows() && self.scheme() == "file" => {
-                    self.host_str()
-                }
                 _ => return Err(()),
             };
 
             let str_len = self.as_str().len();
-            let estimated_capacity = if source_path_style.is_windows() {
-                // remove scheme: - has possible \\ for hostname
-                str_len.saturating_sub(self.scheme().len() + 1)
-            } else {
-                // remove scheme://
-                str_len.saturating_sub(self.scheme().len() + 3)
-            };
+            // remove scheme://
+            let estimated_capacity = str_len.saturating_sub(self.scheme().len() + 3);
             return match source_path_style {
                 PathStyle::Unix => {
                     file_url_segments_to_pathbuf_posix(estimated_capacity, host, segments)
-                }
-                PathStyle::Windows => {
-                    file_url_segments_to_pathbuf_windows(estimated_capacity, host, segments)
                 }
             };
         }
@@ -1333,76 +1322,6 @@ impl UrlExt for url::Url {
             Ok(PathBuf::from(path))
         }
 
-        fn file_url_segments_to_pathbuf_windows(
-            estimated_capacity: usize,
-            host: Option<&str>,
-            mut segments: std::str::Split<'_, char>,
-        ) -> Result<PathBuf, ()> {
-            use percent_encoding::percent_decode_str;
-            let mut string = String::new();
-            string.try_reserve(estimated_capacity).map_err(|_| ())?;
-            if let Some(host) = host {
-                string.push_str(r"\\");
-                string.push_str(host);
-            } else {
-                let first = segments.next().ok_or(())?;
-
-                match first.len() {
-                    2 => {
-                        if !first.starts_with(|c| char::is_ascii_alphabetic(&c))
-                            || first.as_bytes()[1] != b':'
-                        {
-                            return Err(());
-                        }
-
-                        string.push_str(first);
-                    }
-
-                    4 => {
-                        if !first.starts_with(|c| char::is_ascii_alphabetic(&c)) {
-                            return Err(());
-                        }
-                        let bytes = first.as_bytes();
-                        if bytes[1] != b'%'
-                            || bytes[2] != b'3'
-                            || (bytes[3] != b'a' && bytes[3] != b'A')
-                        {
-                            return Err(());
-                        }
-
-                        string.push_str(&first[0..1]);
-                        string.push(':');
-                    }
-
-                    _ => return Err(()),
-                }
-            };
-
-            for segment in segments {
-                string.push('\\');
-
-                // Currently non-unicode windows paths cannot be represented
-                match percent_decode_str(segment).decode_utf8() {
-                    Ok(s) => string.push_str(&s),
-                    Err(..) => return Err(()),
-                }
-            }
-            // ensure our estimated capacity was good
-            if cfg!(test) {
-                debug_assert!(
-                    string.len() <= estimated_capacity,
-                    "len: {}, capacity: {}",
-                    string.len(),
-                    estimated_capacity
-                );
-            }
-            debug_assert!(
-                PathStyle::Windows.is_absolute(Path::new(&string)),
-                "to_file_path() failed to produce an absolute Path"
-            );
-            let path = PathBuf::from(string);
-            Ok(path)
-        }
         Err(())
     }
 }
@@ -1414,62 +1333,58 @@ mod tests {
 
     #[test]
     fn test_lenient_path_matcher() {
-        for path_style in [PathStyle::Unix, PathStyle::Windows] {
-            let patterns = ["**/.git", "[", "target/**", "{"];
-            let mut errors = Vec::new();
-            let matcher =
-                PathMatcher::new_lenient(patterns, path_style, |error| errors.push(error));
-            let expected = PathMatcher::new(["**/.git", "target/**"], path_style).unwrap();
-            assert_eq!(matcher, expected);
-            assert_eq!(errors.len(), 2);
-            assert_eq!(errors[0].glob(), Some("["));
-            assert_eq!(errors[1].glob(), Some("{"));
-            for path in ["nested/.git", "src/file.rs", "target/file.rs"] {
-                let path = RelPath::from_unix_str(path).unwrap();
-                assert_eq!(matcher.is_match(path), expected.is_match(path));
-            }
-            if path_style == PathStyle::local() {
-                assert!(matcher.is_match(RelPath::from_unix_str("nested/.git").unwrap()));
-                assert!(matcher.is_match(RelPath::from_unix_str("target/file.rs").unwrap()));
-            }
-            assert!(PathMatcher::new(patterns, path_style).is_err());
-
-            let mut errors = Vec::new();
-            let matcher =
-                PathMatcher::new_lenient(["[", "{"], path_style, |error| errors.push(error));
-            assert_eq!(errors.len(), 2);
-            assert_eq!(matcher.path_style, path_style);
-            assert_eq!(matcher.sources().count(), 0);
-            assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
-            assert!(!matcher.is_match_std_path("file.rs"));
-
-            let matcher = PathMatcher::new_lenient([] as [&str; 0], path_style, |_| {
-                panic!("empty patterns are valid")
-            });
-            assert_eq!(matcher.path_style, path_style);
-            assert_eq!(matcher.sources().count(), 0);
-            assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
+        let path_style = PathStyle::Unix;
+        let patterns = ["**/.git", "[", "target/**", "{"];
+        let mut errors = Vec::new();
+        let matcher = PathMatcher::new_lenient(patterns, path_style, |error| errors.push(error));
+        let expected = PathMatcher::new(["**/.git", "target/**"], path_style).unwrap();
+        assert_eq!(matcher, expected);
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0].glob(), Some("["));
+        assert_eq!(errors[1].glob(), Some("{"));
+        for path in ["nested/.git", "src/file.rs", "target/file.rs"] {
+            let path = RelPath::from_unix_str(path).unwrap();
+            assert_eq!(matcher.is_match(path), expected.is_match(path));
         }
+        if path_style == PathStyle::local() {
+            assert!(matcher.is_match(RelPath::from_unix_str("nested/.git").unwrap()));
+            assert!(matcher.is_match(RelPath::from_unix_str("target/file.rs").unwrap()));
+        }
+        assert!(PathMatcher::new(patterns, path_style).is_err());
+
+        let mut errors = Vec::new();
+        let matcher = PathMatcher::new_lenient(["[", "{"], path_style, |error| errors.push(error));
+        assert_eq!(errors.len(), 2);
+        assert_eq!(matcher.path_style, path_style);
+        assert_eq!(matcher.sources().count(), 0);
+        assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
+        assert!(!matcher.is_match_std_path("file.rs"));
+
+        let matcher = PathMatcher::new_lenient([] as [&str; 0], path_style, |_| {
+            panic!("empty patterns are valid")
+        });
+        assert_eq!(matcher.path_style, path_style);
+        assert_eq!(matcher.sources().count(), 0);
+        assert!(!matcher.is_match(RelPath::from_unix_str("file.rs").unwrap()));
     }
 
     #[test]
     fn test_lenient_path_matcher_preserves_escaping() {
-        for path_style in [PathStyle::Unix, PathStyle::Windows] {
-            let patterns = [r"directory\file.rs", r"literal\*", r"literal\[name]"];
-            let strict = PathMatcher::new(patterns, path_style).unwrap();
-            let lenient = PathMatcher::new_lenient(patterns, path_style, |_| {
-                panic!("valid patterns are preserved")
-            });
-            assert_eq!(lenient, strict);
-            for path in [
-                "directory/file.rs",
-                "literal*",
-                "literal/file.rs",
-                "literal[name]",
-            ] {
-                let path = RelPath::from_unix_str(path).unwrap();
-                assert_eq!(lenient.is_match(path), strict.is_match(path));
-            }
+        let path_style = PathStyle::Unix;
+        let patterns = [r"directory\file.rs", r"literal\*", r"literal\[name]"];
+        let strict = PathMatcher::new(patterns, path_style).unwrap();
+        let lenient = PathMatcher::new_lenient(patterns, path_style, |_| {
+            panic!("valid patterns are preserved")
+        });
+        assert_eq!(lenient, strict);
+        for path in [
+            "directory/file.rs",
+            "literal*",
+            "literal/file.rs",
+            "literal[name]",
+        ] {
+            let path = RelPath::from_unix_str(path).unwrap();
+            assert_eq!(lenient.is_match(path), strict.is_match(path));
         }
     }
 
@@ -3142,129 +3057,13 @@ mod tests {
     }
 
     #[test]
-    fn test_url_to_file_path_ext_windows_basic() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file:///C:/Users/user/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\Users\\user\\file.txt"))
-        );
-
-        let url = url::Url::parse("file:///D:/folder/subfolder/file.rs").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("D:\\folder\\subfolder\\file.rs"))
-        );
-
-        let url = url::Url::parse("file:///C:/").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\"))
-        );
-    }
-
-    #[test]
-    fn test_url_to_file_path_ext_windows_encoded_drive_letter() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file:///C%3A/Users/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\Users\\file.txt"))
-        );
-
-        let url = url::Url::parse("file:///c%3a/Users/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("c:\\Users\\file.txt"))
-        );
-
-        let url = url::Url::parse("file:///D%3A/folder/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("D:\\folder\\file.txt"))
-        );
-
-        let url = url::Url::parse("file:///d%3A/folder/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("d:\\folder\\file.txt"))
-        );
-    }
-
-    #[test]
-    fn test_url_to_file_path_ext_windows_unc_path() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file://server/share/path/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("\\\\server\\share\\path\\file.txt"))
-        );
-
-        let url = url::Url::parse("file://server/share").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("\\\\server\\share"))
-        );
-    }
-
-    #[test]
-    fn test_url_to_file_path_ext_windows_percent_encoding() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file:///C:/Users/user/file%20with%20spaces.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\Users\\user\\file with spaces.txt"))
-        );
-
-        let url = url::Url::parse("file:///C:/special%23chars%3F.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\special#chars?.txt"))
-        );
-    }
-
-    #[test]
-    fn test_url_to_file_path_ext_windows_invalid_drive() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file:///1:/path/file.txt").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
-
-        let url = url::Url::parse("file:///CC:/path/file.txt").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
-
-        let url = url::Url::parse("file:///C/path/file.txt").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
-
-        let url = url::Url::parse("file:///invalid").unwrap();
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
-    }
-
-    #[test]
     fn test_url_to_file_path_ext_non_file_scheme() {
         use super::UrlExt;
 
         let url = url::Url::parse("http://example.com/path").unwrap();
         assert_eq!(url.to_file_path_ext(PathStyle::Unix), Err(()));
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
 
         let url = url::Url::parse("https://example.com/path").unwrap();
         assert_eq!(url.to_file_path_ext(PathStyle::Unix), Err(()));
-        assert_eq!(url.to_file_path_ext(PathStyle::Windows), Err(()));
-    }
-
-    #[test]
-    fn test_url_to_file_path_ext_windows_localhost() {
-        use super::UrlExt;
-
-        let url = url::Url::parse("file://localhost/C:/Users/file.txt").unwrap();
-        assert_eq!(
-            url.to_file_path_ext(PathStyle::Windows),
-            Ok(PathBuf::from("C:\\Users\\file.txt"))
-        );
     }
 }

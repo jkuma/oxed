@@ -1604,19 +1604,6 @@ mod tests {
             "/zed/languages/basedpyright/langserver.index.js (node)"
         );
 
-        let node_server_windows = lsp::LanguageServerBinary {
-                path: "C:\\Program Files\\nodejs\\node.exe".into(),
-                arguments: vec![
-                    "C:\\Users\\Zed\\languages\\basedpyright\\node_modules/basedpyright/langserver.index.js".into(),
-                    "--stdio".into(),
-                ],
-                env: None
-        };
-        assert_eq!(
-            tooltip_for_server_binary(&node_server_windows, PathStyle::Windows),
-            "C:\\Users\\Zed\\languages\\basedpyright\\node_modules\\basedpyright\\langserver.index.js (node)"
-        );
-
         let python_server = lsp::LanguageServerBinary {
             path: "/usr/bin/python3".into(),
             arguments: vec!["/zed/languages/pylsp/pylsp".into(), "--stdio".into()],

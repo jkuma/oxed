@@ -566,61 +566,6 @@ mod tests {
     }
 
     #[test]
-    fn accepts_windows_style_ancestor() {
-        let project = Path::new(r"C:\Users\me\dev\wt\t1");
-        let style = PathStyle::Windows;
-
-        assert_eq!(
-            validate_trust_scope(r"C:\Users\me\dev\wt", project, None, style).unwrap(),
-            PathBuf::from(r"C:\Users\me\dev\wt"),
-        );
-
-        assert!(validate_trust_scope(r"C:\Users\me", project, None, style).is_ok());
-
-        assert_eq!(
-            validate_trust_scope(r"C:\Users\me\dev\wt\t1", project, None, style).unwrap(),
-            PathBuf::from(r"C:\Users\me\dev\wt\t1")
-        );
-
-        // Drive letters are matched case-insensitively.
-        assert_eq!(
-            validate_trust_scope(r"c:\Users\me\dev\wt", project, None, style).unwrap(),
-            PathBuf::from(r"c:\Users\me\dev\wt")
-        );
-    }
-
-    #[test]
-    fn rejects_windows_style_non_ancestor() {
-        let project = Path::new(r"C:\Users\me\dev\wt\t1");
-        let style = PathStyle::Windows;
-        assert!(validate_trust_scope(r"C:\Users\other", project, None, style).is_err());
-        // Relative paths are not absolute.
-        assert!(validate_trust_scope(r"dev\wt", project, None, style).is_err());
-        // Deeper than the project is not an ancestor.
-        assert!(validate_trust_scope(r"C:\Users\me\dev\wt\t1\sub", project, None, style).is_err());
-        // A prefix that is not a component boundary is not an ancestor.
-        assert!(
-            validate_trust_scope(
-                r"C:\Users\me\dev\wt",
-                Path::new(r"C:\Users\me\dev\wt2"),
-                None,
-                style,
-            )
-            .is_err()
-        );
-
-        assert!(
-            validate_trust_scope(
-                r"\\server",
-                Path::new(r"\\server\share\project"),
-                None,
-                style
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
     fn expands_leading_tilde() {
         let home = Path::new("/Users/me");
         let project = Path::new("/Users/me/dev/wt/t1");

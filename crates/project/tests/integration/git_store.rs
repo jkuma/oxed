@@ -1294,20 +1294,6 @@ mod git_worktrees {
             worktrees_directory_for_repo(anchor, "../worktrees", PathStyle::Unix).unwrap(),
             PathBuf::from("/home/user/dev/worktrees/lsp-tests")
         );
-
-        // Windows remote: the anchor intentionally mixes `/` and `\` separators.
-        let anchor = Path::new(r"C:\Users/user/dev\lsp-tests");
-
-        assert_eq!(
-            worktrees_directory_for_repo(anchor, "../worktrees", PathStyle::Windows).unwrap(),
-            PathBuf::from(r"C:\Users\user\dev\worktrees\lsp-tests")
-        );
-
-        assert_eq!(
-            worktrees_directory_for_repo(anchor, ".git\\zed-worktrees", PathStyle::Windows)
-                .unwrap(),
-            PathBuf::from(r"C:\Users\user\dev\lsp-tests\.git\zed-worktrees")
-        );
     }
 
     #[gpui::test]
@@ -1946,23 +1932,6 @@ mod resolve_worktree_tests {
     }
 
     #[test]
-    fn test_windows_remote_identity_path() {
-        let examples = [
-            (r"C:\Users\zed\.git", r"C:\Users\zed"),
-            (r"C:\Users\project\.bare", r"C:\Users\project"),
-            (r"C:\Users\zed.git", r"C:\Users\zed.git"),
-            (r"C:\Users\zed", r"C:\Users\zed"),
-        ];
-        for (common_dir, expected) in examples {
-            assert_eq!(
-                repo_identity_path(Path::new(common_dir), PathStyle::Windows),
-                Path::new(expected),
-                "identity path for common_dir {common_dir:?} should be {expected:?}"
-            );
-        }
-    }
-
-    #[test]
     fn test_linked_worktree_short_name() {
         let examples = [
             (
@@ -1984,18 +1953,6 @@ mod resolve_worktree_tests {
                 Some("selectric".into()),
             ),
             ("/home/bob/zed", "/home/bob/zed", PathStyle::Unix, None),
-            (
-                r"C:\Users\bob\dev\zed",
-                r"C:\Users\bob\dev\worktrees\zed\olivetti\zed",
-                PathStyle::Windows,
-                Some("olivetti".into()),
-            ),
-            (
-                r"C:\Users\bob\dev\zed",
-                r"C:\Users\bob\dev\zed2",
-                PathStyle::Windows,
-                Some("zed2".into()),
-            ),
         ];
         for (main_worktree_path, linked_worktree_path, path_style, expected) in examples {
             let short_name = linked_worktree_short_name(

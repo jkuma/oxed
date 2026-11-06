@@ -2096,30 +2096,14 @@ impl ProjectPanel {
         let edit_state = self.state.edit_state.as_mut()?;
         let worktree_id = edit_state.worktree_id;
         let is_new_entry = edit_state.is_new_entry();
-        let mut filename = self.filename_editor.read(cx).text(cx);
+        let filename = self.filename_editor.read(cx).text(cx);
         let path_style = self.project.read(cx).path_style(cx);
-        if path_style.is_windows() {
-            // on windows, trailing dots are ignored in paths
-            // this can cause project panel to create a new entry with a trailing dot
-            // while the actual one without the dot gets populated by the file watcher
-            while let Some(trimmed) = filename.strip_suffix('.') {
-                filename = trimmed.to_string();
-            }
-        }
         if filename.trim().is_empty() {
             return None;
         }
 
-        let filename_indicates_dir = if path_style.is_windows() {
-            filename.ends_with('/') || filename.ends_with('\\')
-        } else {
-            filename.ends_with('/')
-        };
-        let filename = if path_style.is_windows() {
-            filename.trim_start_matches(&['/', '\\'])
-        } else {
-            filename.trim_start_matches('/')
-        };
+        let filename_indicates_dir = filename.ends_with('/');
+        let filename = filename.trim_start_matches('/');
         let filename = RelPath::new(filename.as_ref(), path_style).ok()?.into_arc();
 
         edit_state.is_dir =

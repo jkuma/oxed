@@ -73,7 +73,7 @@ use sum_tree::{Edit, SumTree, TreeMap};
 use text::{Bias, BufferId, OffsetRangeExt, Rope, ToOffset};
 use util::{
     ResultExt, debug_panic,
-    paths::{PathStyle, SanitizedPath, normalize_path},
+    paths::{PathStyle, SanitizedPath},
     post_inc,
     rel_path::RelPath,
 };
@@ -6874,12 +6874,7 @@ pub fn worktrees_directory_for_repo(
         anyhow::bail!("git.worktree_directory must not be \"..\" (use \"../some-name\" instead)");
     }
 
-    let joined = path_style.join_path(repository_anchor_path, trimmed)?;
-    let resolved = if path_style.is_posix() {
-        joined
-    } else {
-        normalize_path(&joined)
-    };
+    let resolved = path_style.join_path(repository_anchor_path, trimmed)?;
     let resolved = if path_style.starts_with(resolved.as_path(), repository_anchor_path) {
         resolved
     } else if let Some(repo_dir_name) = path_style
@@ -7837,53 +7832,6 @@ mod tests {
         assert_eq!(
             path,
             PathBuf::from("/home/user/dev/worktrees/lsp-tests/nimble-sky/lsp-tests")
-        );
-    }
-
-    #[test]
-    fn test_new_worktree_path_uses_windows_style_for_remote_paths_on_unix_host() {
-        let snapshot = RepositorySnapshot::empty(
-            RepositoryId(0),
-            Path::new(r"C:\Users\user\dev\lsp-tests").into(),
-            None,
-            None,
-            None,
-            PathStyle::Windows,
-        );
-        let path = snapshot
-            .path_for_new_linked_worktree("nimble-sky", "../worktrees")
-            .unwrap();
-        assert_eq!(
-            path,
-            PathBuf::from(r"C:\Users\user\dev\worktrees\lsp-tests\nimble-sky\lsp-tests")
-        );
-    }
-
-    #[test]
-    fn test_new_worktree_path_from_windows_remote_linked_worktree_on_unix_host() {
-        let snapshot = RepositorySnapshot::empty(
-            RepositoryId(0),
-            Path::new(r"C:\Users\user\dev\worktrees\lsp-tests\existing-worktree\lsp-tests").into(),
-            Some(Path::new(r"C:\Users\user\dev\lsp-tests\.git\worktrees\existing-worktree").into()),
-            Some(
-                Path::new(
-                    r"C:\Users\user\dev\worktrees\lsp-tests\existing-worktree\lsp-tests\.git",
-                )
-                .into(),
-            ),
-            Some(Path::new(r"C:\Users\user\dev\lsp-tests\.git").into()),
-            PathStyle::Windows,
-        );
-
-        assert_eq!(
-            snapshot.main_worktree_abs_path(),
-            Some(Path::new(r"C:\Users\user\dev\lsp-tests"))
-        );
-        assert_eq!(
-            snapshot
-                .path_for_new_linked_worktree("nimble-sky", "../worktrees")
-                .unwrap(),
-            PathBuf::from(r"C:\Users\user\dev\worktrees\lsp-tests\nimble-sky\lsp-tests")
         );
     }
 

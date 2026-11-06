@@ -292,11 +292,7 @@ pub async fn match_path_sets<'a, Set: PathMatchCandidateSet<'a>>(
 
     let path_style = candidate_sets[0].path_style();
 
-    let query = if path_style.is_windows() {
-        query.replace('\\', "/")
-    } else {
-        query.to_owned()
-    };
+    let query = query.to_owned();
 
     let Some(query) = Query::build(&query, case) else {
         return Vec::new();

@@ -627,21 +627,9 @@ impl LanguageRegistry {
             .file_name()
             .unwrap_or_else(|| file.file_name(cx));
         let paths = [Some(file.full_path(cx)), file.file_system_abs_path(cx)];
-        let path_style = file.path_style(cx);
-        let normalized_paths = paths.each_ref().map(|path| {
-            if path_style.is_windows()
-                && let Some(path) = path.as_deref().and_then(Path::to_str)
-                && path.contains('\\')
-            {
-                Some(PathBuf::from(path.replace('\\', "/")))
-            } else {
-                None
-            }
-        });
         let paths = paths
             .iter()
             .filter_map(Option::as_deref)
-            .chain(normalized_paths.iter().filter_map(Option::as_deref))
             .collect::<SmallVec<[_; 4]>>();
         self.language_for_file_internal(
             Some(filename),
