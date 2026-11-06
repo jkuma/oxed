@@ -394,7 +394,7 @@ mod tests {
     use languages::rust_lang;
     use project::{FakeFs, Project};
     use serde_json::json;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{
         CloseActiveItem, MoveItemToPaneInDirection, MultiWorkspace, OpenOptions,
         item::{Item as _, SaveOptions},
@@ -426,14 +426,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "first.rs": "fn main() { let a = 5; }",
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -466,7 +466,7 @@ mod tests {
         let editor = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/a/first.rs")),
+                    PathBuf::from("/a/first.rs"),
                     OpenOptions::default(),
                     window,
                     cx,
@@ -487,7 +487,7 @@ mod tests {
                 async move {
                     assert_eq!(
                         params.text_document.uri,
-                        lsp::Uri::from_file_path(path!("/a/first.rs")).unwrap()
+                        lsp::Uri::from_file_path("/a/first.rs").unwrap()
                     );
                     requests_made.fetch_add(1, atomic::Ordering::Release);
                     Ok(vec![
@@ -682,7 +682,7 @@ mod tests {
                 async move {
                     assert_eq!(
                         params.text_document.uri,
-                        lsp::Uri::from_file_path(path!("/a/first.rs")).unwrap()
+                        lsp::Uri::from_file_path("/a/first.rs").unwrap()
                     );
                     requests_made.fetch_add(1, atomic::Ordering::Release);
                     Ok(Vec::new())

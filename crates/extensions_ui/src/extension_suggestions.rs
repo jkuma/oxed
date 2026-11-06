@@ -260,7 +260,6 @@ mod tests {
     use project::{Project, WorktreeId};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use util::rel_path::rel_path;
     use workspace::{AppState, SplitDirection};
 
@@ -849,7 +848,7 @@ mod tests {
     ) -> (Entity<Workspace>, &'a mut VisualTestContext) {
         let fs = app_state.fs.as_fake();
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "index.html": "<div></div>",
                 "other.html": "<span></span>",
@@ -858,7 +857,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         project.read_with(cx, |project, _| {
             project
                 .languages()

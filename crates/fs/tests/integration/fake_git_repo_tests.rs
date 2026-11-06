@@ -2,7 +2,6 @@ use fs::{FakeFs, Fs};
 use gpui::{BackgroundExecutor, TestAppContext};
 use serde_json::json;
 use std::path::{Path, PathBuf};
-use util::path;
 
 #[gpui::test]
 async fn test_fake_worktree_lifecycle(cx: &mut TestAppContext) {
@@ -125,7 +124,7 @@ async fn test_fake_worktree_lifecycle(cx: &mut TestAppContext) {
 async fn test_checkpoints(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor);
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "bar": {
                 "baz": "qux"
@@ -170,9 +169,9 @@ async fn test_checkpoints(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files_with_contents(Path::new("")),
         [
-            (Path::new(path!("/bar/baz")).into(), b"qux".into()),
-            (Path::new(path!("/foo/a")).into(), b"lorem".into()),
-            (Path::new(path!("/foo/b")).into(), b"ipsum".into())
+            (Path::new("/bar/baz").into(), b"qux".into()),
+            (Path::new("/foo/a").into(), b"lorem".into()),
+            (Path::new("/foo/b").into(), b"ipsum".into())
         ]
     );
 

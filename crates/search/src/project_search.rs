@@ -3508,7 +3508,7 @@ pub mod tests {
         InlayHintSettingsContent, SearchSettingsContent, SeedQuerySetting, SettingsStore,
         SplicingVec, ThemeColorsContent, ThemeStyleContent,
     };
-    use util::{path, paths::PathStyle, rel_path::rel_path};
+    use util::{paths::PathStyle, rel_path::rel_path};
     use util_macros::perf;
     use workspace::{DeploySearch, MultiWorkspace, SaveIntent};
 
@@ -3543,7 +3543,7 @@ pub mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 ".gitignore": "log/\n",
                 "app": {
@@ -3556,7 +3556,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -3614,7 +3614,7 @@ pub mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "app": {
                     "a.txt": "hello",
@@ -3626,7 +3626,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -3654,7 +3654,7 @@ pub mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "app": {
                     "a.txt": "hello",
@@ -3667,7 +3667,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -3808,7 +3808,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
@@ -3817,7 +3817,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -3981,14 +3981,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -4077,7 +4077,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
@@ -4085,7 +4085,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -4581,7 +4581,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
@@ -4590,7 +4590,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |mw, _| mw.workspace().clone())
@@ -4873,7 +4873,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a": {
                     "one.rs": "const ONE: usize = 1;",
@@ -5010,7 +5010,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
@@ -5019,7 +5019,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |mw, _| mw.workspace().clone())
@@ -5412,13 +5412,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let worktree_id = project.update(cx, |this, cx| {
             this.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -5633,13 +5633,13 @@ pub mod tests {
         // Setup 2 panes, both with a file open and one with a project search.
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let worktree_id = project.update(cx, |this, cx| {
             this.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -5784,7 +5784,7 @@ pub mod tests {
         // We need many lines in the search results to be able to scroll the window
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "1.txt": "\n\n\n\n\n A \n\n\n\n\n",
                 "2.txt": "\n\n\n\n\n A \n\n\n\n\n",
@@ -5809,7 +5809,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -5873,13 +5873,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "z.d\nzed\n",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let worktree_id = project.update(cx, |project, cx| {
             project
                 .worktrees(cx)
@@ -5965,13 +5965,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let worktree_id = project.update(cx, |this, cx| {
             this.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -6045,13 +6045,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -6117,7 +6117,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             // `\n` , a trailing line on the end, is important for the test case
             json!({
                 "main.rs": "fn main() { let a = 2; }\n",
@@ -6127,7 +6127,7 @@ pub mod tests {
 
         let requests_count = Arc::new(AtomicUsize::new(0));
         let closure_requests_count = requests_count.clone();
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         let language = rust_lang();
         language_registry.add(language);
@@ -6217,7 +6217,7 @@ pub mod tests {
         let singleton_editor = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/dir/main.rs")),
+                    PathBuf::from("/dir/main.rs"),
                     workspace::OpenOptions::default(),
                     window,
                     cx,
@@ -6325,7 +6325,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "file_a.txt": "hello world",
                 "file_b.txt": "hello universe",
@@ -6333,7 +6333,7 @@ pub mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -6354,12 +6354,9 @@ pub mod tests {
             .unwrap();
 
         // Delete file_b.txt
-        fs.remove_file(
-            path!("/dir/file_b.txt").as_ref(),
-            fs::RemoveOptions::default(),
-        )
-        .await
-        .unwrap();
+        fs.remove_file("/dir/file_b.txt".as_ref(), fs::RemoveOptions::default())
+            .await
+            .unwrap();
         cx.run_until_parked();
 
         // Verify deleted file's results are removed proactively
@@ -6410,13 +6407,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |mw, _| mw.workspace().clone())
@@ -6587,14 +6584,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.md": file_a_before,
                 "b.md": file_b_before,
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let worktree_id = project.update(cx, |project, cx| {
             project.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -6664,13 +6661,13 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |mw, _| mw.workspace().clone())
@@ -6794,7 +6791,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;\nconst ONEROUS: usize = 2;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
@@ -6804,7 +6801,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -6869,14 +6866,14 @@ pub mod tests {
             .join("\n");
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "small.rs": "fn needle_small() {}",
                 "big.txt": big_file,
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7076,14 +7073,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "aaa.rs": "fn needle() {}",
                 "bbb.rs": "fn needle_stable() {}",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7321,14 +7318,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = one::ONE + one::ONE;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7375,7 +7372,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "1.txt": "\n\n\n\n\n A \n\n\n\n\n",
                 "2.txt": "\n\n\n\n\n A \n\n\n\n\n",
@@ -7390,7 +7387,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7448,7 +7445,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "1.txt": "\n\n\n\n\n A \n\n\n\n\n",
                 "2.txt": "\n\n\n\n\n A \n\n\n\n\n",
@@ -7463,7 +7460,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7553,9 +7550,9 @@ pub mod tests {
         enable_search_on_type(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "one.rs": "const ONE: usize = 1;" }))
+        fs.insert_tree("/dir", json!({ "one.rs": "const ONE: usize = 1;" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7633,9 +7630,9 @@ pub mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "one.rs": "const ONE: usize = 1;" }))
+        fs.insert_tree("/dir", json!({ "one.rs": "const ONE: usize = 1;" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -7998,23 +7995,23 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "aaa.rs": "fn needle_first() {}",
                 "bbb.rs": "fn needle_second() {}",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let buffer_bbb = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/bbb.rs"), cx)
+                project.open_local_buffer("/dir/bbb.rs", cx)
             })
             .await
             .unwrap();
         let buffer_aaa = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/aaa.rs"), cx)
+                project.open_local_buffer("/dir/aaa.rs", cx)
             })
             .await
             .unwrap();
@@ -8088,12 +8085,12 @@ pub mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "one.rs": "fn needle() {}" }))
+        fs.insert_tree("/dir", json!({ "one.rs": "fn needle() {}" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/one.rs"), cx)
+                project.open_local_buffer("/dir/one.rs", cx)
             })
             .await
             .unwrap();
@@ -8128,7 +8125,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.txt": "\n\n\n\n\nAA\n\n\n\n\n",
                 "b.txt": "\n\n\n\n\n A \n\n\n\n\n",
@@ -8143,7 +8140,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8189,7 +8186,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "1.txt": "\n\n\n\n\n A \n\n\n\n\n",
                 "2.txt": "\n\n\n\n\n A \n\n\n\n\n",
@@ -8204,7 +8201,7 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8574,7 +8571,7 @@ pub mod tests {
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/two.rs"), cx)
+                project.open_local_buffer("/dir/two.rs", cx)
             })
             .await
             .unwrap();
@@ -8665,14 +8662,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const ONE_TWO: usize = 2;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8749,14 +8746,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "one.rs": "const ONE: usize = 1;",
                 "two.rs": "const TWO: usize = 2;",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8836,9 +8833,9 @@ pub mod tests {
         enable_search_on_type(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "one.rs": "const ONE: usize = 1;" }))
+        fs.insert_tree("/dir", json!({ "one.rs": "const ONE: usize = 1;" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8905,9 +8902,9 @@ pub mod tests {
             );
         }
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), serde_json::Value::Object(files))
+        fs.insert_tree("/dir", serde_json::Value::Object(files))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -8946,9 +8943,9 @@ pub mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "one.rs": "const ONE: usize = 1;" }))
+        fs.insert_tree("/dir", json!({ "one.rs": "const ONE: usize = 1;" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -9008,14 +9005,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "aaa.rs": "fn needle() {}",
                 "zzz.rs": "fn unrelated() {}",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -9031,7 +9028,7 @@ pub mod tests {
 
         let orphan_buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/zzz.rs"), cx)
+                project.open_local_buffer("/dir/zzz.rs", cx)
             })
             .await
             .unwrap();
@@ -9072,7 +9069,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "aaa.rs": "fn needle_aa() {}",
                 "mmm.rs": "fn needle_mm() {}",
@@ -9080,10 +9077,10 @@ pub mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let _excluded_buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/mmm.rs"), cx)
+                project.open_local_buffer("/dir/mmm.rs", cx)
             })
             .await
             .unwrap();
@@ -9163,14 +9160,14 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "aaa.rs": "fn needle_aa() {}",
                 "zzz.rs": "fn needle_zz() {}",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let search =
             cx.new(|cx| ProjectSearch::new(project.clone(), WeakEntity::new_invalid(), cx));
         let query = SearchOptions::REGEX
@@ -9344,9 +9341,9 @@ pub mod tests {
                 json!(format!("line with needle {ix}\nmore needle text {ix}")),
             );
         }
-        fs.insert_tree(path!("/dir"), serde_json::Value::Object(files))
+        fs.insert_tree("/dir", serde_json::Value::Object(files))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -9552,8 +9549,8 @@ pub mod tests {
         cx: &mut TestAppContext,
     ) -> SearchBarTest {
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), files).await;
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        fs.insert_tree("/dir", files).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window

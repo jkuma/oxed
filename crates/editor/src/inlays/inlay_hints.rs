@@ -1749,7 +1749,6 @@ pub mod tests {
     use std::time::Duration;
     use text::{Bias, BufferId, OffsetRangeExt, Point};
     use ui::App;
-    use util::path;
     use util::paths::natural_sort;
 
     #[gpui::test]
@@ -2253,7 +2252,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() { a } // and some long comment to ensure inlays are not trimmed out",
                 "other.md": "Test md file with some text",
@@ -2261,7 +2260,7 @@ pub mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         let mut rs_fake_servers = None;
@@ -2298,8 +2297,7 @@ pub mod tests {
                                             "Rust" => {
                                                 assert_eq!(
                                                     params.text_document.uri,
-                                                    lsp::Uri::from_file_path(path!("/a/main.rs"))
-                                                        .unwrap(),
+                                                    lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                                                 );
                                                 rs_lsp_request_count.fetch_add(1, Ordering::Release)
                                                     + 1
@@ -2307,7 +2305,7 @@ pub mod tests {
                                             "Markdown" => {
                                                 assert_eq!(
                                                     params.text_document.uri,
-                                                    lsp::Uri::from_file_path(path!("/a/other.md"))
+                                                    lsp::Uri::from_file_path("/a/other.md")
                                                         .unwrap(),
                                                 );
                                                 md_lsp_request_count.fetch_add(1, Ordering::Release)
@@ -2347,7 +2345,7 @@ pub mod tests {
 
         let rs_buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -2384,7 +2382,7 @@ pub mod tests {
         cx.executor().run_until_parked();
         let md_buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/other.md"), cx)
+                project.open_local_buffer("/a/other.md", cx)
             })
             .await
             .unwrap();
@@ -2991,14 +2989,14 @@ pub mod tests {
         let request_gate = Arc::new(Mutex::new(Some(request_gate)));
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "let value = 1;\n".repeat(500),
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
         let mut fake_servers = language_registry.register_fake_lsp(
@@ -3038,7 +3036,7 @@ pub mod tests {
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -3109,7 +3107,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": format!("fn main() {{\n{}\n}}", "let i = 5;\n".repeat(500)),
                 "other.rs": "// Test file",
@@ -3117,7 +3115,7 @@ pub mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
@@ -3145,7 +3143,7 @@ pub mod tests {
                                 async move {
                                     assert_eq!(
                                         params.text_document.uri,
-                                        lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                                        lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                                     );
 
                                     task_lsp_request_ranges.lock().push(params.range);
@@ -3173,7 +3171,7 @@ pub mod tests {
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -3324,7 +3322,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-                path!("/a"),
+                "/a",
                 json!({
                     "main.rs": format!("fn main() {{\n{}\n}}", (0..501).map(|i| format!("let i = {i};\n")).collect::<String>()),
                     "other.rs": format!("fn main() {{\n{}\n}}", (0..501).map(|j| format!("let j = {j};\n")).collect::<String>()),
@@ -3332,7 +3330,7 @@ pub mod tests {
             )
             .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         let language = rust_lang();
@@ -3350,13 +3348,13 @@ pub mod tests {
 
         let (buffer_1, _handle1) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
         let (buffer_2, _handle2) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/other.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/other.rs", cx)
             })
             .await
             .unwrap();
@@ -3406,11 +3404,11 @@ pub mod tests {
                 let task_editor_edited = Arc::clone(&closure_editor_edited);
                 async move {
                     let hint_text = if params.text_document.uri
-                        == lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()
+                        == lsp::Uri::from_file_path("/a/main.rs").unwrap()
                     {
                         "main hint"
                     } else if params.text_document.uri
-                        == lsp::Uri::from_file_path(path!("/a/other.rs")).unwrap()
+                        == lsp::Uri::from_file_path("/a/other.rs").unwrap()
                     {
                         "other hint"
                     } else {
@@ -3693,7 +3691,7 @@ pub mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": format!("fn main() {{\n{}\n}}", (0..200).map(|i| format!("let i = {i};\n")).collect::<String>()),
                 "lib.rs": r#"let a = 1;
@@ -3705,7 +3703,7 @@ let c = 3;"#
 
         let lsp_request_ranges = Arc::new(Mutex::new(Vec::new()));
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         let language = rust_lang();
         language_registry.add(language);
@@ -3725,14 +3723,14 @@ let c = 3;"#
                             let closure_ranges_fetched = closure_ranges_fetched.clone();
                             async move {
                                 let prefix = if params.text_document.uri
-                                    == lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()
+                                    == lsp::Uri::from_file_path("/a/main.rs").unwrap()
                                 {
                                     closure_ranges_fetched
                                         .lock()
                                         .push(("main.rs", params.range));
                                     "main.rs"
                                 } else if params.text_document.uri
-                                    == lsp::Uri::from_file_path(path!("/a/lib.rs")).unwrap()
+                                    == lsp::Uri::from_file_path("/a/lib.rs").unwrap()
                                 {
                                     closure_ranges_fetched.lock().push(("lib.rs", params.range));
                                     "lib.rs"
@@ -3765,13 +3763,13 @@ let c = 3;"#
 
         let (buffer_1, _handle_1) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
         let (buffer_2, _handle_2) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/lib.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/lib.rs", cx)
             })
             .await
             .unwrap();
@@ -3939,7 +3937,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": format!("fn main() {{\n{}\n}}", (0..501).map(|i| format!("let i = {i};\n")).collect::<String>()),
                 "other.rs": format!("fn main() {{\n{}\n}}", (0..501).map(|j| format!("let j = {j};\n")).collect::<String>()),
@@ -3947,7 +3945,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
@@ -3964,13 +3962,13 @@ let c = 3;"#
 
         let (buffer_1, _handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
         let (buffer_2, _handle2) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/other.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/other.rs", cx)
             })
             .await
             .unwrap();
@@ -4004,11 +4002,11 @@ let c = 3;"#
                 let task_editor_edited = Arc::clone(&closure_editor_edited);
                 async move {
                     let hint_text = if params.text_document.uri
-                        == lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()
+                        == lsp::Uri::from_file_path("/a/main.rs").unwrap()
                     {
                         "main hint"
                     } else if params.text_document.uri
-                        == lsp::Uri::from_file_path(path!("/a/other.rs")).unwrap()
+                        == lsp::Uri::from_file_path("/a/other.rs").unwrap()
                     {
                         "other hint"
                     } else {
@@ -4169,7 +4167,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": format!(r#"fn main() {{\n{}\n}}"#, format!("let i = {};\n", "√".repeat(10)).repeat(500)),
                 "other.rs": "// Test file",
@@ -4177,7 +4175,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
@@ -4196,7 +4194,7 @@ let c = 3;"#
                             async move {
                                 assert_eq!(
                                     params.text_document.uri,
-                                    lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                                    lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                                 );
                                 let query_start = params.range.start;
                                 Ok(Some(vec![lsp::InlayHint {
@@ -4219,7 +4217,7 @@ let c = 3;"#
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -4691,7 +4689,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() {
                     let x = 42;
@@ -4706,7 +4704,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
@@ -4722,7 +4720,7 @@ let c = 3;"#
                         move |params, _| async move {
                             assert_eq!(
                                 params.text_document.uri,
-                                lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                                lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                             );
                             Ok(Some(
                                 serde_json::from_value(json!([
@@ -4792,7 +4790,7 @@ let c = 3;"#
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -4852,7 +4850,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": r#"fn main() {
                     let x = 1;
@@ -4912,7 +4910,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         let language = rust_lang();
         language_registry.add(language);
@@ -4935,7 +4933,7 @@ let c = 3;"#
                             async move {
                                 requests_count.fetch_add(1, Ordering::Release);
                                 if params.text_document.uri
-                                    == lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()
+                                    == lsp::Uri::from_file_path("/a/main.rs").unwrap()
                                 {
                                     Ok(Some(vec![
                                         lsp::InlayHint {
@@ -4960,7 +4958,7 @@ let c = 3;"#
                                         },
                                     ]))
                                 } else if params.text_document.uri
-                                    == lsp::Uri::from_file_path(path!("/a/lib.rs")).unwrap()
+                                    == lsp::Uri::from_file_path("/a/lib.rs").unwrap()
                                 {
                                     Ok(Some(vec![
                                         lsp::InlayHint {
@@ -5008,7 +5006,7 @@ let c = 3;"#
                     fake_server.set_request_handler::<lsp::request::InlayHintRequest, _, _>(
                         move |params, _| async move {
                             if params.text_document.uri
-                                == lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()
+                                == lsp::Uri::from_file_path("/a/main.rs").unwrap()
                             {
                                 Ok(Some(vec![
                                     lsp::InlayHint {
@@ -5033,7 +5031,7 @@ let c = 3;"#
                                     },
                                 ]))
                             } else if params.text_document.uri
-                                == lsp::Uri::from_file_path(path!("/a/lib.rs")).unwrap()
+                                == lsp::Uri::from_file_path("/a/lib.rs").unwrap()
                             {
                                 Ok(Some(vec![
                                     lsp::InlayHint {
@@ -5069,13 +5067,13 @@ let c = 3;"#
 
         let (buffer_1, _handle_1) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
         let (buffer_2, _handle_2) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/lib.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/lib.rs", cx)
             })
             .await
             .unwrap();
@@ -5240,7 +5238,7 @@ let c = 3;"#
         }
         file_content.push_str("}\n");
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": file_content,
                 "other.rs": "// Test file",
@@ -5248,7 +5246,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
 
@@ -5293,7 +5291,7 @@ let c = 3;"#
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -5435,7 +5433,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() { let x = 1; } // padding to keep hints from being trimmed",
                 "other.rs": "// Test file",
@@ -5443,7 +5441,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
 
@@ -5553,7 +5551,7 @@ let c = 3;"#
 
         let (buffer, _buffer_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -5691,14 +5689,14 @@ let c = 3;"#
         });
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "first.rs": "fn first() { let a = 1; }\nfn third() { let c = 3; }\n",
                 "second.rs": "fn second() { let b = 2; }\n",
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
         let resolve_gate = Arc::new(Mutex::new(None::<oneshot::Receiver<()>>));
@@ -5774,13 +5772,13 @@ let c = 3;"#
         );
         let (first_buffer, _first_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/first.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/first.rs", cx)
             })
             .await
             .unwrap();
         let (second_buffer, _second_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/second.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/second.rs", cx)
             })
             .await
             .unwrap();
@@ -6212,9 +6210,8 @@ let c = 3;"#
 
         let text = "fn main() { f(x); } // padding to keep hints from being trimmed";
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/a"), json!({ "main.rs": text }))
-            .await;
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        fs.insert_tree("/a", json!({ "main.rs": text })).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |p, _| p.languages().clone());
         language_registry.add(rust_lang());
 
@@ -6293,9 +6290,7 @@ let c = 3;"#
         );
 
         let (buffer, _handle) = project
-            .update(cx, |p, cx| {
-                p.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
-            })
+            .update(cx, |p, cx| p.open_local_buffer_with_lsp("/a/main.rs", cx))
             .await
             .unwrap();
         let editor = cx.add_window(|w, cx| Editor::for_buffer(buffer, Some(project), w, cx));
@@ -6396,7 +6391,7 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() { let x = 1; } // padding to keep hints from being trimmed",
                 "index.ts": "const y = 2; // padding to keep hints from being trimmed in typescript",
@@ -6404,7 +6399,7 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
 
         let mut rs_fake_servers = None;
@@ -6473,13 +6468,13 @@ let c = 3;"#
 
         let (rs_buffer, _rs_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();
         let (ts_buffer, _ts_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/index.ts"), cx)
+                project.open_local_buffer_with_lsp("/a/index.ts", cx)
             })
             .await
             .unwrap();
@@ -6893,7 +6888,7 @@ let c = 3;"#
     ) -> (&'static str, WindowHandle<Editor>, FakeLanguageServer) {
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": text,
                 "other.rs": "// Test file",
@@ -6901,8 +6896,8 @@ let c = 3;"#
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
-        let file_path = path!("/a/main.rs");
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
+        let file_path = "/a/main.rs";
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
@@ -6920,7 +6915,7 @@ let c = 3;"#
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -7009,14 +7004,14 @@ let c = 3;"#
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() { f(x); } // padding to keep hints from being trimmed",
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
 
@@ -7114,7 +7109,7 @@ let c = 3;"#
 
         let (buffer, _buffer_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/a/main.rs", cx)
             })
             .await
             .unwrap();

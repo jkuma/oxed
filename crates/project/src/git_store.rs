@@ -7381,11 +7381,11 @@ mod tests {
 
     #[gpui::test]
     async fn test_merge_base_status_uses_worktree_contents(cx: &mut TestAppContext) {
-        use util::{path, rel_path::rel_path};
+        use util::rel_path::rel_path;
 
         init_test(cx);
 
-        let project_root = Path::new(path!("/project"));
+        let project_root = Path::new("/project");
         let dot_git = project_root.join(".git");
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
@@ -7515,9 +7515,7 @@ mod tests {
         cx: &mut TestAppContext,
         count: usize,
     ) -> (FakeBlobReadGate, Entity<Repository>, Vec<git::Oid>) {
-        use util::path;
-
-        let project_root = Path::new(path!("/project"));
+        let project_root = Path::new("/project");
         let dot_git = project_root.join(".git");
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(project_root, json!({ ".git": {} })).await;
@@ -7548,18 +7546,15 @@ mod tests {
             [(true, false), (false, false), (true, true), (false, true)]
         {
             let fs = FakeFs::new(cx.executor());
-            fs.insert_tree(
-                util::path!("/project"),
-                json!({ ".git": {}, "file.txt": "old\n" }),
-            )
-            .await;
+            fs.insert_tree("/project", json!({ ".git": {}, "file.txt": "old\n" }))
+                .await;
             let oids = fs.set_merge_base_content_for_repo(
-                util::path!("/project/.git").as_ref(),
+                "/project/.git".as_ref(),
                 &[("file.txt", "old\n".to_owned())],
             );
             let oid = *oids.first().expect("base blob");
-            let gate = fs.install_blob_read_gate_for_repo(util::path!("/project/.git").as_ref());
-            let project = Project::test(fs.clone(), [util::path!("/project").as_ref()], cx).await;
+            let gate = fs.install_blob_read_gate_for_repo("/project/.git".as_ref());
+            let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
             project
                 .update(cx, |project, cx| project.git_scans_complete(cx))
                 .await;
@@ -7568,13 +7563,13 @@ mod tests {
             });
             let buffer = project
                 .update(cx, |project, cx| {
-                    project.open_local_buffer(util::path!("/project/file.txt"), cx)
+                    project.open_local_buffer("/project/file.txt", cx)
                 })
                 .await
                 .expect("open buffer");
             let git_store = project.read_with(cx, |project, _| project.git_store().clone());
             let _staged_diff = if fail_index_write {
-                fs.with_git_state(util::path!("/project/.git").as_ref(), false, |state| {
+                fs.with_git_state("/project/.git".as_ref(), false, |state| {
                     state.simulated_index_write_error_message =
                         Some("index write failed".to_owned());
                 })

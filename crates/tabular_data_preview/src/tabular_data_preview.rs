@@ -246,7 +246,6 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use std::path::Path;
-    use util::path;
     use workspace::AppState;
 
     #[gpui::test]
@@ -255,25 +254,25 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({ "inside.csv": "a,b\n1,2\n", "inside.jsonl": "{}\n", "inside.txt": "plain" }),
         )
         .await;
         fs.insert_tree(
-            path!("/elsewhere"),
+            "/elsewhere",
             json!({ "outside.csv": "a,b\n1,2\n", "outside.NDJSON": "{}\n", "outside.txt": "plain" }),
         )
         .await;
 
-        let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/project")], cx).await;
 
         for (abs_path, expected) in [
-            (path!("/project/inside.csv"), true),
-            (path!("/project/inside.jsonl"), true),
-            (path!("/project/inside.txt"), false),
-            (path!("/elsewhere/outside.csv"), true),
-            (path!("/elsewhere/outside.NDJSON"), true),
-            (path!("/elsewhere/outside.txt"), false),
+            ("/project/inside.csv", true),
+            ("/project/inside.jsonl", true),
+            ("/project/inside.txt", false),
+            ("/elsewhere/outside.csv", true),
+            ("/elsewhere/outside.NDJSON", true),
+            ("/elsewhere/outside.txt", false),
         ] {
             let buffer = project
                 .update(cx, |project, cx| project.open_local_buffer(abs_path, cx))
@@ -298,14 +297,14 @@ mod tests {
         let result: anyhow::Result<()> = async {
             let fs = FakeFs::new(cx.executor());
             fs.insert_tree(
-                path!("/project"),
+                "/project",
                 json!({ "records.csv": "id,note\n1,first\n2,\"two\nlines\"\n" }),
             )
             .await;
-            let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+            let project = Project::test(fs, [Path::new("/project")], cx).await;
             let buffer = project
                 .update(cx, |project, cx| {
-                    project.open_local_buffer(path!("/project/records.csv"), cx)
+                    project.open_local_buffer("/project/records.csv", cx)
                 })
                 .await?;
             let (workspace, cx) =
@@ -395,14 +394,14 @@ mod tests {
         let result: anyhow::Result<()> = async {
             let fs = FakeFs::new(cx.executor());
             fs.insert_tree(
-                path!("/project"),
+                "/project",
                 json!({ "records.jsonl": "{\"name\":\"Grace\"}\n{\"name\":\"Ada\"}\n" }),
             )
             .await;
-            let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+            let project = Project::test(fs, [Path::new("/project")], cx).await;
             let buffer = project
                 .update(cx, |project, cx| {
-                    project.open_local_buffer(path!("/project/records.jsonl"), cx)
+                    project.open_local_buffer("/project/records.jsonl", cx)
                 })
                 .await?;
             let (workspace, cx) =

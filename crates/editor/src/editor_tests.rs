@@ -66,7 +66,7 @@ use std::{iter, sync::atomic::AtomicUsize};
 use test::build_editor_with_project;
 use unindent::Unindent;
 use util::{
-    assert_set_eq, path,
+    assert_set_eq,
     rel_path::rel_path,
     test::{TempTree, TextRangeMarker, marked_text_ranges, marked_text_ranges_by, sample_text},
 };
@@ -5523,7 +5523,7 @@ async fn test_expand_excerpts_with_selection_in_removed_path(cx: &mut TestAppCon
     });
 
     let fs = FakeFs::new(cx.executor());
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let (editor, cx) = cx.add_window_view(|window, cx| {
         build_editor_with_project(project, multibuffer.clone(), window, cx)
     });
@@ -11292,17 +11292,15 @@ async fn test_clipboard_line_numbers_from_multibuffer(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_file(
-        path!("/file.txt"),
+        "/file.txt",
         "first line\nsecond line\nthird line\nfourth line\nfifth line\n".into(),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/file.txt").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.txt".as_ref()], cx).await;
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.txt"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.txt", cx))
         .await
         .unwrap();
 
@@ -11353,18 +11351,18 @@ async fn test_copy_file_location_from_multibuffer(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "file.txt": "first line\nsecond line\nthird line\nfourth line\nfifth line\n",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/root/file.txt"), cx)
+            project.open_local_buffer("/root/file.txt", cx)
         })
         .await
         .unwrap();
@@ -11427,15 +11425,15 @@ async fn test_copy_file_name_for_external_file(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "a.txt": "" })).await;
-    fs.insert_tree(path!("/elsewhere"), json!({ "external.csv": "a,b\n" }))
+    fs.insert_tree("/root", json!({ "a.txt": "" })).await;
+    fs.insert_tree("/elsewhere", json!({ "external.csv": "a,b\n" }))
         .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/elsewhere/external.csv"), cx)
+            project.open_local_buffer("/elsewhere/external.csv", cx)
         })
         .await
         .unwrap();
@@ -11469,7 +11467,7 @@ async fn test_copy_file_location_across_buffers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "one.txt": "one\ntwo\nthree\n",
             "two.txt": "four\nfive\nsix\n",
@@ -11477,17 +11475,17 @@ async fn test_copy_file_location_across_buffers(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
 
     let buffer_1 = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/root/one.txt"), cx)
+            project.open_local_buffer("/root/one.txt", cx)
         })
         .await
         .unwrap();
     let buffer_2 = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/root/two.txt"), cx)
+            project.open_local_buffer("/root/two.txt", cx)
         })
         .await
         .unwrap();
@@ -11598,18 +11596,18 @@ async fn test_copy_file_location_in_singleton_buffer(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "file.txt": "first line\nsecond line\nthird line\n",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/root/file.txt"), cx)
+            project.open_local_buffer("/root/file.txt", cx)
         })
         .await
         .unwrap();
@@ -18561,10 +18559,10 @@ async fn test_read_only_buffer_is_not_formatted_or_saved(cx: &mut TestAppContext
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), b"one\ntwo\nthree\n".to_vec())
+    fs.insert_file("/file.rs", b"one\ntwo\nthree\n".to_vec())
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -18602,9 +18600,7 @@ async fn test_read_only_buffer_is_not_formatted_or_saved(cx: &mut TestAppContext
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
     buffer.update(cx, |buffer, cx| buffer.set_capability(Read, cx));
@@ -18638,7 +18634,7 @@ async fn test_read_only_buffer_is_not_formatted_or_saved(cx: &mut TestAppContext
         "one\ntwo\nthree\n"
     );
     assert_eq!(
-        fs.load(path!("/file.rs").as_ref()).await.unwrap(),
+        fs.load("/file.rs".as_ref()).await.unwrap(),
         "one\ntwo\nthree\n"
     );
 }
@@ -18649,21 +18645,21 @@ async fn test_read_only_buffer_can_be_saved_as(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/dir"),
+        "/dir",
         json!({
             "file.rs": "one\ntwo\nthree\n",
         }),
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
     let worktree_id = project.update(cx, |project, cx| {
         project.worktrees(cx).next().unwrap().read(cx).id()
     });
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/dir/file.rs"), cx)
+            project.open_local_buffer("/dir/file.rs", cx)
         })
         .await
         .unwrap();
@@ -18688,11 +18684,11 @@ async fn test_read_only_buffer_can_be_saved_as(cx: &mut TestAppContext) {
     save_as.await.unwrap();
 
     assert_eq!(
-        fs.load(path!("/dir/copy.rs").as_ref()).await.unwrap(),
+        fs.load("/dir/copy.rs".as_ref()).await.unwrap(),
         "one\ntwo\nthree\n"
     );
     assert_eq!(
-        fs.load(path!("/dir/file.rs").as_ref()).await.unwrap(),
+        fs.load("/dir/file.rs".as_ref()).await.unwrap(),
         "one\ntwo\nthree\n"
     );
 }
@@ -18703,7 +18699,7 @@ async fn test_format_and_save_skip_read_only_buffers_in_multi_buffer(cx: &mut Te
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "one\ntwo\nthree\n",
             "other.rs": "one\ntwo\nthree\n",
@@ -18711,7 +18707,7 @@ async fn test_format_and_save_skip_read_only_buffers_in_multi_buffer(cx: &mut Te
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/a".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -18750,13 +18746,13 @@ async fn test_format_and_save_skip_read_only_buffers_in_multi_buffer(cx: &mut Te
 
     let writable_buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/main.rs"), cx)
+            project.open_local_buffer("/a/main.rs", cx)
         })
         .await
         .unwrap();
     let read_only_buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/other.rs"), cx)
+            project.open_local_buffer("/a/other.rs", cx)
         })
         .await
         .unwrap();
@@ -18793,7 +18789,7 @@ async fn test_format_and_save_skip_read_only_buffers_in_multi_buffer(cx: &mut Te
 
     assert_eq!(
         *formatted_uris.lock(),
-        vec![lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap()]
+        vec![lsp::Uri::from_file_path("/a/main.rs").unwrap()]
     );
     writable_buffer.read_with(cx, |buffer, _| {
         assert_eq!(buffer.text(), "one, two\nthree\n");
@@ -18827,11 +18823,11 @@ async fn test_format_and_save_skip_read_only_buffers_in_multi_buffer(cx: &mut Te
     save.await;
 
     assert_eq!(
-        fs.load(path!("/a/main.rs").as_ref()).await.unwrap(),
+        fs.load("/a/main.rs".as_ref()).await.unwrap(),
         "one, two\nthree\n"
     );
     assert_eq!(
-        fs.load(path!("/a/other.rs").as_ref()).await.unwrap(),
+        fs.load("/a/other.rs".as_ref()).await.unwrap(),
         "one\ntwo\nthree\n"
     );
 }
@@ -18841,16 +18837,14 @@ async fn test_save_actions_are_hidden_for_read_only_files(cx: &mut TestAppContex
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), b"one\ntwo\nthree\n".to_vec())
+    fs.insert_file("/file.rs", b"one\ntwo\nthree\n".to_vec())
         .await;
-    let project = Project::test(fs, [path!("/file.rs").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.rs".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
     let multi_buffer = cx.new(|cx| MultiBuffer::singleton(buffer.clone(), cx));
@@ -18899,9 +18893,9 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), Default::default()).await;
+    fs.insert_file("/file.rs", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.rs").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.rs".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -18917,9 +18911,7 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -18939,7 +18931,7 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
             move |params, _| async move {
                 assert_eq!(
                     params.text_document.uri,
-                    lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                    lsp::Uri::from_file_path("/file.rs").unwrap()
                 );
                 assert_eq!(params.options.tab_size, 4);
                 Ok(Some(vec![lsp::TextEdit::new(
@@ -18982,7 +18974,7 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
             move |params, _| async move {
                 assert_eq!(
                     params.text_document.uri,
-                    lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                    lsp::Uri::from_file_path("/file.rs").unwrap()
                 );
                 futures::future::pending::<()>().await;
                 unreachable!()
@@ -19029,7 +19021,7 @@ async fn test_document_format_during_save(cx: &mut TestAppContext) {
         .set_request_handler::<lsp::request::Formatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             assert_eq!(params.options.tab_size, 8);
             Ok(Some(vec![]))
@@ -19056,9 +19048,9 @@ async fn test_auto_formatter_skips_server_without_formatting(cx: &mut TestAppCon
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), Default::default()).await;
+    fs.insert_file("/file.rs", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.rs").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.rs".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -19090,9 +19082,7 @@ async fn test_auto_formatter_skips_server_without_formatting(cx: &mut TestAppCon
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -19111,7 +19101,7 @@ async fn test_auto_formatter_skips_server_without_formatting(cx: &mut TestAppCon
         move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             Ok(Some(vec![lsp::TextEdit::new(
                 lsp::Range::new(lsp::Position::new(0, 3), lsp::Position::new(1, 0)),
@@ -19149,14 +19139,12 @@ async fn test_redo_after_noop_format(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.txt"), "foo".into()).await;
+    fs.insert_file("/file.txt", "foo".into()).await;
 
-    let project = Project::test(fs, [path!("/file.txt").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.txt".as_ref()], cx).await;
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.txt"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.txt", cx))
         .await
         .unwrap();
 
@@ -19234,7 +19222,7 @@ async fn test_multibuffer_format_during_save(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": sample_text_1,
             "other.rs": sample_text_2,
@@ -19243,7 +19231,7 @@ async fn test_multibuffer_format_during_save(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
 
@@ -19510,7 +19498,7 @@ async fn test_autosave_with_dirty_buffers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/dir"),
+        "/dir",
         json!({
             "file1.rs": "fn main() { println!(\"hello\"); }",
             "file2.rs": "fn test() { println!(\"test\"); }",
@@ -19519,7 +19507,7 @@ async fn test_autosave_with_dirty_buffers(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
 
@@ -19604,9 +19592,9 @@ async fn test_autosave_with_dirty_buffers(cx: &mut TestAppContext) {
 
     // Get write counts after file creation (files were created with initial content)
     // We expect each file to have been written once during creation
-    let write_count_after_creation_1 = fs.write_count_for_path(path!("/dir/file1.rs"));
-    let write_count_after_creation_2 = fs.write_count_for_path(path!("/dir/file2.rs"));
-    let write_count_after_creation_3 = fs.write_count_for_path(path!("/dir/file3.rs"));
+    let write_count_after_creation_1 = fs.write_count_for_path("/dir/file1.rs");
+    let write_count_after_creation_2 = fs.write_count_for_path("/dir/file2.rs");
+    let write_count_after_creation_3 = fs.write_count_for_path("/dir/file3.rs");
 
     // Perform autosave
     let save_task = editor.update_in(cx, |editor, window, cx| {
@@ -19625,17 +19613,17 @@ async fn test_autosave_with_dirty_buffers(cx: &mut TestAppContext) {
 
     // Only the dirty buffer should have been saved
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file1.rs")) - write_count_after_creation_1,
+        fs.write_count_for_path("/dir/file1.rs") - write_count_after_creation_1,
         1,
         "Buffer 1 was dirty, so it should have been written once during autosave"
     );
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file2.rs")) - write_count_after_creation_2,
+        fs.write_count_for_path("/dir/file2.rs") - write_count_after_creation_2,
         0,
         "Buffer 2 was clean, so it should not have been written during autosave"
     );
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file3.rs")) - write_count_after_creation_3,
+        fs.write_count_for_path("/dir/file3.rs") - write_count_after_creation_3,
         0,
         "Buffer 3 was clean, so it should not have been written during autosave"
     );
@@ -19663,17 +19651,17 @@ async fn test_autosave_with_dirty_buffers(cx: &mut TestAppContext) {
     // During manual save, clean buffers don't get written to disk
     // They just get did_save called for language server notifications
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file1.rs")) - write_count_after_creation_1,
+        fs.write_count_for_path("/dir/file1.rs") - write_count_after_creation_1,
         1,
         "Buffer 1 should only have been written once total (during autosave, not manual save)"
     );
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file2.rs")) - write_count_after_creation_2,
+        fs.write_count_for_path("/dir/file2.rs") - write_count_after_creation_2,
         0,
         "Buffer 2 should not have been written at all"
     );
     assert_eq!(
-        fs.write_count_for_path(path!("/dir/file3.rs")) - write_count_after_creation_3,
+        fs.write_count_for_path("/dir/file3.rs") - write_count_after_creation_3,
         0,
         "Buffer 3 should not have been written at all"
     );
@@ -19753,9 +19741,9 @@ async fn test_format_selections_action_hidden_without_range_capable_formatter(
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), Default::default()).await;
+    fs.insert_file("/file.rs", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let _ = language_registry.register_fake_lsp(
@@ -19770,9 +19758,7 @@ async fn test_format_selections_action_hidden_without_range_capable_formatter(
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -19823,7 +19809,7 @@ async fn test_range_format_on_save_success(cx: &mut TestAppContext) {
         .set_request_handler::<lsp::request::RangeFormatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             assert_eq!(params.options.tab_size, 4);
             Ok(Some(vec![lsp::TextEdit::new(
@@ -19855,7 +19841,7 @@ async fn test_range_format_on_save_timeout(cx: &mut TestAppContext) {
         move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             futures::future::pending::<()>().await;
             unreachable!()
@@ -19916,7 +19902,7 @@ async fn test_modifications_format_on_save(cx: &mut TestAppContext) {
         .set_request_handler::<lsp::request::RangeFormatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/project/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/project/file.rs").unwrap()
             );
             Ok(Some(vec![lsp::TextEdit::new(
                 lsp::Range::new(lsp::Position::new(0, 3), lsp::Position::new(1, 0)),
@@ -19992,7 +19978,7 @@ async fn test_modifications_format_lsp_no_range_support(cx: &mut TestAppContext)
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".git": {},
             "file.rs": "",
@@ -20002,11 +19988,11 @@ async fn test_modifications_format_lsp_no_range_support(cx: &mut TestAppContext)
 
     let head_content = "one\ntwo\nthree\n";
     fs.set_head_and_index_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
     );
 
-    let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -20024,7 +20010,7 @@ async fn test_modifications_format_lsp_no_range_support(cx: &mut TestAppContext)
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/project/file.rs"), cx)
+            project.open_local_buffer("/project/file.rs", cx)
         })
         .await
         .unwrap();
@@ -20118,7 +20104,7 @@ async fn test_modifications_format_lsp_returns_empty_edits(cx: &mut TestAppConte
         .set_request_handler::<lsp::request::RangeFormatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/project/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/project/file.rs").unwrap()
             );
             Ok(Some(Vec::new()))
         })
@@ -20156,7 +20142,7 @@ async fn test_modifications_format_multiple_hunks(cx: &mut TestAppContext) {
             async move {
                 assert_eq!(
                     params.text_document.uri,
-                    lsp::Uri::from_file_path(path!("/project/file.rs")).unwrap()
+                    lsp::Uri::from_file_path("/project/file.rs").unwrap()
                 );
                 match count {
                     0 => Ok(Some(vec![lsp::TextEdit::new(
@@ -20563,7 +20549,7 @@ async fn test_modifications_format_crlf_line_endings(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".git": {},
             "file.rs": "line0\r\nline1\r\nline2\r\nline3\r\nline4\r\n",
@@ -20573,16 +20559,16 @@ async fn test_modifications_format_crlf_line_endings(cx: &mut TestAppContext) {
 
     let head_content = "line0\nline1\nline2\nline3\nline4\n";
     fs.set_head_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
         "deadbeef",
     );
     fs.set_index_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
     );
 
-    let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -20599,7 +20585,7 @@ async fn test_modifications_format_crlf_line_endings(cx: &mut TestAppContext) {
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/project/file.rs"), cx)
+            project.open_local_buffer("/project/file.rs", cx)
         })
         .await
         .unwrap();
@@ -20836,7 +20822,7 @@ async fn test_modifications_if_available_lsp_no_range_support_falls_back_to_full
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".git": {},
             "file.rs": "",
@@ -20846,16 +20832,16 @@ async fn test_modifications_if_available_lsp_no_range_support_falls_back_to_full
 
     let head_content = "line0\nline1\nline2\n";
     fs.set_head_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
         "deadbeef",
     );
     fs.set_index_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
     );
 
-    let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -20873,7 +20859,7 @@ async fn test_modifications_if_available_lsp_no_range_support_falls_back_to_full
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/project/file.rs"), cx)
+            project.open_local_buffer("/project/file.rs", cx)
         })
         .await
         .unwrap();
@@ -21006,7 +20992,7 @@ async fn test_range_format_respects_language_tab_size_override(cx: &mut TestAppC
         .set_request_handler::<lsp::request::RangeFormatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             assert_eq!(params.options.tab_size, 8);
             Ok(Some(Vec::new()))
@@ -21025,9 +21011,9 @@ async fn test_document_format_manual_trigger(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), Default::default()).await;
+    fs.insert_file("/file.rs", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(Arc::new(Language::new(
@@ -21059,9 +21045,7 @@ async fn test_document_format_manual_trigger(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -21090,7 +21074,7 @@ async fn test_document_format_manual_trigger(cx: &mut TestAppContext) {
         .set_request_handler::<lsp::request::Formatting, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             assert_eq!(params.options.tab_size, 4);
             Ok(Some(vec![lsp::TextEdit::new(
@@ -21114,7 +21098,7 @@ async fn test_document_format_manual_trigger(cx: &mut TestAppContext) {
         move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.rs")).unwrap()
+                lsp::Uri::from_file_path("/file.rs").unwrap()
             );
             futures::future::pending::<()>().await;
             unreachable!()
@@ -21151,10 +21135,10 @@ async fn test_multiple_formatters(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), "one  \ntwo   \nthree".into())
+    fs.insert_file("/file.rs", "one  \ntwo   \nthree".into())
         .await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -21175,9 +21159,7 @@ async fn test_multiple_formatters(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -21200,7 +21182,7 @@ async fn test_multiple_formatters(cx: &mut TestAppContext) {
             let requested_code_actions = params.context.only.expect("Expected code action request");
             assert_eq!(requested_code_actions.len(), 1);
 
-            let uri = lsp::Uri::from_file_path(path!("/file.rs")).unwrap();
+            let uri = lsp::Uri::from_file_path("/file.rs").unwrap();
             let code_action = match requested_code_actions[0].as_str() {
                 "code-action-1" => lsp::CodeAction {
                     kind: Some("code-action-1".into()),
@@ -21265,7 +21247,7 @@ async fn test_multiple_formatters(cx: &mut TestAppContext) {
                             edit: lsp::WorkspaceEdit {
                                 changes: Some(
                                     [(
-                                        lsp::Uri::from_file_path(path!("/file.rs")).unwrap(),
+                                        lsp::Uri::from_file_path("/file.rs").unwrap(),
                                         vec![lsp::TextEdit {
                                             range: lsp::Range::new(
                                                 lsp::Position::new(0, 0),
@@ -21414,19 +21396,19 @@ async fn test_markdown_save_respects_disabled_trailing_whitespace_removal(cx: &m
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_file(
-        path!("/.editorconfig"),
+        "/.editorconfig",
         "root = true\n[*]\ntrim_trailing_whitespace = true\n".into(),
     )
     .await;
-    fs.insert_file(path!("/README.md"), "".into()).await;
+    fs.insert_file("/README.md", "".into()).await;
 
-    let project = Project::test(fs.clone(), [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(markdown_lang());
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/README.md"), cx)
+            project.open_local_buffer("/README.md", cx)
         })
         .await
         .unwrap();
@@ -21460,7 +21442,7 @@ async fn test_markdown_save_respects_disabled_trailing_whitespace_removal(cx: &m
         "line with spaces  \n"
     );
     assert_eq!(
-        fs.load(path!("/README.md").as_ref())
+        fs.load("/README.md".as_ref())
             .await
             .unwrap()
             .replace("\r\n", "\n"),
@@ -21477,9 +21459,9 @@ async fn test_organize_imports_manual_trigger(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.ts"), Default::default()).await;
+    fs.insert_file("/file.ts", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(Arc::new(Language::new(
@@ -21509,9 +21491,7 @@ async fn test_organize_imports_manual_trigger(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.ts"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.ts", cx))
         .await
         .unwrap();
 
@@ -21543,7 +21523,7 @@ async fn test_organize_imports_manual_trigger(cx: &mut TestAppContext) {
         .set_request_handler::<lsp::request::CodeActionRequest, _, _>(move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.ts")).unwrap()
+                lsp::Uri::from_file_path("/file.ts").unwrap()
             );
             Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
                 lsp::CodeAction {
@@ -21590,7 +21570,7 @@ async fn test_organize_imports_manual_trigger(cx: &mut TestAppContext) {
         move |params, _| async move {
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/file.ts")).unwrap()
+                lsp::Uri::from_file_path("/file.ts").unwrap()
             );
             futures::future::pending::<()>().await;
             unreachable!()
@@ -21624,10 +21604,9 @@ async fn test_formatter_failure_does_not_abort_subsequent_formatters(cx: &mut Te
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), "fn main() {}\n".into())
-        .await;
+    fs.insert_file("/file.rs", "fn main() {}\n".into()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -21644,9 +21623,7 @@ async fn test_formatter_failure_does_not_abort_subsequent_formatters(cx: &mut Te
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -21665,7 +21642,7 @@ async fn test_formatter_failure_does_not_abort_subsequent_formatters(cx: &mut Te
     // Formatter #2 (CodeAction) returns a successful edit
     fake_server.set_request_handler::<lsp::request::CodeActionRequest, _, _>(
         move |_params, _| async move {
-            let uri = lsp::Uri::from_file_path(path!("/file.rs")).unwrap();
+            let uri = lsp::Uri::from_file_path("/file.rs").unwrap();
             Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
                 lsp::CodeAction {
                     kind: Some("organize-imports".into()),
@@ -21724,10 +21701,9 @@ async fn test_explicit_formatter_failure_is_recorded(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), "fn main() {}\n".into())
-        .await;
+    fs.insert_file("/file.rs", "fn main() {}\n".into()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -21762,9 +21738,7 @@ async fn test_explicit_formatter_failure_is_recorded(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -21822,10 +21796,9 @@ async fn test_auto_formatter_failure_is_silent(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), "fn main() {}\n".into())
-        .await;
+    fs.insert_file("/file.rs", "fn main() {}\n".into()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -21848,9 +21821,7 @@ async fn test_auto_formatter_failure_is_silent(cx: &mut TestAppContext) {
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -21901,17 +21872,14 @@ async fn test_external_formatter_with_no_output_leaves_buffer_unchanged(cx: &mut
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), "fn main() {}\n".into())
-        .await;
+    fs.insert_file("/file.rs", "fn main() {}\n".into()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -24024,14 +23992,14 @@ async fn test_completion_in_multibuffer_with_replace_range(cx: &mut TestAppConte
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": buffer_text,
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -24054,7 +24022,7 @@ async fn test_completion_in_multibuffer_with_replace_range(cx: &mut TestAppConte
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/main.rs"), cx)
+            project.open_local_buffer("/a/main.rs", cx)
         })
         .await
         .unwrap();
@@ -24173,7 +24141,7 @@ async fn test_completion_in_multibuffer_with_newest_selection_in_other_buffer(
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": main_text,
             "other.rs": other_text,
@@ -24181,7 +24149,7 @@ async fn test_completion_in_multibuffer_with_newest_selection_in_other_buffer(
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -24204,13 +24172,13 @@ async fn test_completion_in_multibuffer_with_newest_selection_in_other_buffer(
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let main_buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/main.rs"), cx)
+            project.open_local_buffer("/a/main.rs", cx)
         })
         .await
         .unwrap();
     let other_buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/other.rs"), cx)
+            project.open_local_buffer("/a/other.rs", cx)
         })
         .await
         .unwrap();
@@ -24637,14 +24605,14 @@ async fn test_completion_can_run_commands(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let command_calls = Arc::new(AtomicUsize::new(0));
@@ -24715,7 +24683,7 @@ async fn test_completion_can_run_commands(cx: &mut TestAppContext) {
     let editor = workspace
         .update_in(cx, |workspace, window, cx| {
             workspace.open_abs_path(
-                PathBuf::from(path!("/a/main.rs")),
+                PathBuf::from("/a/main.rs"),
                 OpenOptions::default(),
                 window,
                 cx,
@@ -25438,14 +25406,14 @@ async fn test_multiline_completion(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.ts": "a",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     let typescript_language = Arc::new(Language::new(
         LanguageConfig {
@@ -25503,7 +25471,7 @@ async fn test_multiline_completion(cx: &mut TestAppContext) {
 
     let _buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/a/main.ts"), cx)
+            project.open_local_buffer_with_lsp("/a/main.ts", cx)
         })
         .await
         .unwrap();
@@ -27195,7 +27163,7 @@ async fn go_to_prev_overlapping_diagnostic(executor: BackgroundExecutor, cx: &mu
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![
                             lsp::Diagnostic {
@@ -27300,7 +27268,7 @@ async fn go_to_diagnostic(executor: BackgroundExecutor, cx: &mut TestAppContext)
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![
                             lsp::Diagnostic {
@@ -28089,14 +28057,14 @@ async fn test_on_type_formatting_not_triggered(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "fn main() { let a = 5; }",
             "other.rs": "// Test file",
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(Arc::new(Language::new(
@@ -28150,7 +28118,7 @@ async fn test_on_type_formatting_not_triggered(cx: &mut TestAppContext) {
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/main.rs"), cx)
+            project.open_local_buffer("/a/main.rs", cx)
         })
         .await
         .unwrap();
@@ -28169,7 +28137,7 @@ async fn test_on_type_formatting_not_triggered(cx: &mut TestAppContext) {
         |params, _| async move {
             assert_eq!(
                 params.text_document_position.text_document.uri,
-                lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                lsp::Uri::from_file_path("/a/main.rs").unwrap(),
             );
             assert_eq!(
                 params.text_document_position.position,
@@ -28354,7 +28322,7 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "fn main() { let a = 5; }",
             "other.rs": "// Test file",
@@ -28362,7 +28330,7 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
     let server_restarts = Arc::new(AtomicUsize::new(0));
     let closure_restarts = Arc::clone(&server_restarts);
@@ -28403,7 +28371,7 @@ async fn test_language_server_restart_due_to_settings_change(cx: &mut TestAppCon
     let _window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let _buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/a/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/a/main.rs", cx)
         })
         .await
         .unwrap();
@@ -29142,7 +29110,7 @@ async fn test_context_menus_hide_hover_popover(cx: &mut gpui::TestAppContext) {
                     edit: Some(lsp::WorkspaceEdit {
                         changes: Some(
                             [(
-                                lsp::Uri::from_file_path(path!("/file.rs")).unwrap(),
+                                lsp::Uri::from_file_path("/file.rs").unwrap(),
                                 vec![lsp::TextEdit {
                                     range: lsp::Range::new(
                                         lsp::Position::new(5, 4),
@@ -29666,9 +29634,9 @@ async fn test_document_format_with_prettier(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.ts"), Default::default()).await;
+    fs.insert_file("/file.ts", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.ts").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.ts".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
 
     language_registry.add(Arc::new(Language::new(
@@ -29698,9 +29666,7 @@ async fn test_document_format_with_prettier(cx: &mut TestAppContext) {
 
     let prettier_format_suffix = project::TEST_PRETTIER_FORMAT_SUFFIX;
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.ts"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.ts", cx))
         .await
         .unwrap();
 
@@ -29756,10 +29722,9 @@ async fn test_document_format_with_prettier_explicit_language(cx: &mut TestAppCo
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.settings"), Default::default())
-        .await;
+    fs.insert_file("/file.settings", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.settings").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.settings".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
 
     let ts_lang = Arc::new(Language::new(
@@ -29794,7 +29759,7 @@ async fn test_document_format_with_prettier_explicit_language(cx: &mut TestAppCo
     let prettier_format_suffix = project::TEST_PRETTIER_FORMAT_SUFFIX;
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.settings"), cx)
+            project.open_local_buffer("/file.settings", cx)
         })
         .await
         .unwrap();
@@ -29860,9 +29825,9 @@ async fn test_range_format_with_prettier(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.ts"), Default::default()).await;
+    fs.insert_file("/file.ts", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.ts").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.ts".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
 
     language_registry.add(Arc::new(Language::new(
@@ -29892,9 +29857,7 @@ async fn test_range_format_with_prettier(cx: &mut TestAppContext) {
 
     let prettier_range_format_suffix = project::TEST_PRETTIER_RANGE_FORMAT_SUFFIX;
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.ts"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.ts", cx))
         .await
         .unwrap();
 
@@ -29936,10 +29899,9 @@ async fn test_range_format_with_prettier_explicit_language(cx: &mut TestAppConte
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.settings"), Default::default())
-        .await;
+    fs.insert_file("/file.settings", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/file.settings").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.settings".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
 
     let ts_lang = Arc::new(Language::new(
@@ -29974,7 +29936,7 @@ async fn test_range_format_with_prettier_explicit_language(cx: &mut TestAppConte
     let prettier_range_format_suffix = project::TEST_PRETTIER_RANGE_FORMAT_SUFFIX;
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.settings"), cx)
+            project.open_local_buffer("/file.settings", cx)
         })
         .await
         .unwrap();
@@ -30474,7 +30436,7 @@ async fn test_multibuffer_reverts(cx: &mut TestAppContext) {
     });
 
     let fs = FakeFs::new(cx.executor());
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
     let (editor, cx) = cx
         .add_window_view(|window, cx| build_editor_with_project(project, multibuffer, window, cx));
     editor.update_in(cx, |editor, _window, cx| {
@@ -30841,7 +30803,7 @@ async fn test_merge_base_diff_hunks_are_read_only(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".git": {},
             "file.rs": "worktree\n",
@@ -30849,21 +30811,21 @@ async fn test_merge_base_diff_hunks_are_read_only(cx: &mut TestAppContext) {
     )
     .await;
     fs.set_head_and_index_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", "head\n".to_string())],
     );
     fs.set_merge_base_content_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", "base\n".to_string())],
     );
 
-    let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
     project
         .update(cx, |project, cx| project.git_scans_complete(cx))
         .await;
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/project/file.rs"), cx)
+            project.open_local_buffer("/project/file.rs", cx)
         })
         .await
         .unwrap();
@@ -30903,11 +30865,9 @@ async fn test_merge_base_diff_hunks_are_read_only(cx: &mut TestAppContext) {
         "worktree\n"
     );
     let index_contents = fs
-        .with_git_state(
-            std::path::Path::new(path!("/project/.git")),
-            false,
-            |state| state.index_contents.clone(),
-        )
+        .with_git_state(std::path::Path::new("/project/.git"), false, |state| {
+            state.index_contents.clone()
+        })
         .unwrap();
     assert_eq!(
         index_contents,
@@ -33469,7 +33429,7 @@ async fn test_display_diff_hunks(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             ".git": {},
             "file-1": "ONE\n",
@@ -33480,7 +33440,7 @@ async fn test_display_diff_hunks(cx: &mut TestAppContext) {
     .await;
 
     fs.set_head_for_repo(
-        path!("/test/.git").as_ref(),
+        "/test/.git".as_ref(),
         &[
             ("file-1", "one\n".into()),
             ("file-2", "two\n".into()),
@@ -33489,12 +33449,12 @@ async fn test_display_diff_hunks(cx: &mut TestAppContext) {
         "deadbeef",
     );
 
-    let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs, ["/test".as_ref()], cx).await;
     let mut buffers = vec![];
     for i in 1..=3 {
         let buffer = project
             .update(cx, |project, cx| {
-                let path = format!(path!("/test/file-{}"), i);
+                let path = format!("/test/file-{}", i);
                 project.open_local_buffer(path, cx)
             })
             .await
@@ -34892,7 +34852,7 @@ async fn test_folding_buffers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "first.rs": sample_text_1,
             "second.rs": sample_text_2,
@@ -34900,7 +34860,7 @@ async fn test_folding_buffers(cx: &mut TestAppContext) {
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let worktree = project.update(cx, |project, cx| {
@@ -35062,7 +35022,7 @@ async fn test_folded_buffers_cleared_on_excerpts_removed(cx: &mut TestAppContext
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "file_a.txt": "File A\nFile A\nFile A",
             "file_b.txt": "File B\nFile B\nFile B",
@@ -35070,7 +35030,7 @@ async fn test_folded_buffers_cleared_on_excerpts_removed(cx: &mut TestAppContext
     )
     .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let worktree = project.update(cx, |project, cx| {
@@ -35137,7 +35097,7 @@ async fn test_folding_buffers_with_one_excerpt(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "first.rs": sample_text_1,
             "second.rs": sample_text_2,
@@ -35145,7 +35105,7 @@ async fn test_folding_buffers_with_one_excerpt(cx: &mut TestAppContext) {
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let worktree = project.update(cx, |project, cx| {
@@ -35280,13 +35240,13 @@ async fn test_folding_buffer_when_multibuffer_has_only_one_excerpt(cx: &mut Test
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": sample_text,
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
     let worktree = project.update(cx, |project, cx| {
@@ -35546,13 +35506,13 @@ async fn build_gutter_hover_test_editor(saved: bool, cx: &mut TestAppContext) ->
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "fn main() {}\n",
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
 
     let buffer = if saved {
         let worktree_id = project.read_with(cx, |project, cx| {
@@ -35708,7 +35668,7 @@ async fn test_gutter_context_menu_anchor_in_multibuffer(cx: &mut TestAppContext)
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    let root_path = path!("/root");
+    let root_path = "/root";
     fs.insert_tree(
         root_path,
         json!({
@@ -35825,13 +35785,13 @@ impl BookmarkTestContext {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": sample_text,
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window
@@ -36342,12 +36302,9 @@ async fn test_clear_bookmarks_action_repaints_workspace_editor(cx: &mut TestAppC
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(
-        path!("/a"),
-        json!({ "main.rs": "Line 0\nLine 1\nLine 2\nLine 3" }),
-    )
-    .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    fs.insert_tree("/a", json!({ "main.rs": "Line 0\nLine 1\nLine 2\nLine 3" }))
+        .await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let mut cx = VisualTestContext::from_window(*window, cx);
     let workspace = window
@@ -36883,7 +36840,7 @@ async fn test_view_bookmarks_without_resolvable_bookmarks_opens_no_tab(cx: &mut 
     let bookmark_store = cx.update(|_window, cx| project.read(cx).bookmark_store());
     load_test_bookmarks(
         &bookmark_store,
-        vec![(bookmark_path(path!("/a/third.rs")), vec![99])],
+        vec![(bookmark_path("/a/third.rs"), vec![99])],
         &mut cx,
     )
     .await;
@@ -36977,13 +36934,13 @@ async fn test_bookmark_resolution_drop_emits_store_event(cx: &mut TestAppContext
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "line0\nline1\n",
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let worktree_id = project.read_with(cx, |project, cx| {
         project
             .worktrees(cx)
@@ -37148,11 +37105,11 @@ async fn test_bookmarks_tab_keeps_unopenable_paths(cx: &mut TestAppContext) {
     .await;
 
     let bookmark_store = cx.update(|_window, cx| project.read(cx).bookmark_store());
-    let unopenable_path = bookmark_path(path!("/a/unopenable.rs"));
+    let unopenable_path = bookmark_path("/a/unopenable.rs");
     load_test_bookmarks(
         &bookmark_store,
         vec![
-            (bookmark_path(path!("/a/main.rs")), vec![0]),
+            (bookmark_path("/a/main.rs"), vec![0]),
             (Arc::clone(&unopenable_path), vec![0]),
         ],
         &mut cx,
@@ -37369,11 +37326,11 @@ async fn test_worktree_add_retries_only_contained_failed_paths(cx: &mut TestAppC
     .await;
 
     let bookmark_store = cx.update(|_window, cx| project.read(cx).bookmark_store());
-    let elsewhere_path = bookmark_path(path!("/elsewhere/file.rs"));
+    let elsewhere_path = bookmark_path("/elsewhere/file.rs");
     load_test_bookmarks(
         &bookmark_store,
         vec![
-            (bookmark_path(path!("/a/main.rs")), vec![0]),
+            (bookmark_path("/a/main.rs"), vec![0]),
             (Arc::clone(&elsewhere_path), vec![0]),
         ],
         &mut cx,
@@ -37404,11 +37361,11 @@ async fn test_worktree_add_retries_only_contained_failed_paths(cx: &mut TestAppC
 
     let fs = project.read_with(&cx, |project, _| project.fs().clone());
     fs.as_fake()
-        .insert_tree(path!("/unrelated"), json!({ "other.rs": "other0\n" }))
+        .insert_tree("/unrelated", json!({ "other.rs": "other0\n" }))
         .await;
     project
         .update(&mut cx, |project, cx| {
-            project.create_worktree(path!("/unrelated"), true, cx)
+            project.create_worktree("/unrelated", true, cx)
         })
         .await
         .expect("creating the unrelated worktree should succeed");
@@ -37426,11 +37383,11 @@ async fn test_worktree_add_retries_only_contained_failed_paths(cx: &mut TestAppC
     );
 
     fs.as_fake()
-        .insert_tree(path!("/elsewhere"), json!({ "file.rs": "else0\n" }))
+        .insert_tree("/elsewhere", json!({ "file.rs": "else0\n" }))
         .await;
     project
         .update(&mut cx, |project, cx| {
-            project.create_worktree(path!("/elsewhere"), true, cx)
+            project.create_worktree("/elsewhere", true, cx)
         })
         .await
         .expect("creating the containing worktree should succeed");
@@ -37460,11 +37417,11 @@ async fn test_bookmarks_tab_retries_failed_path_when_file_appears(cx: &mut TestA
     .await;
 
     let bookmark_store = cx.update(|_window, cx| project.read(cx).bookmark_store());
-    let late_path = bookmark_path(path!("/a/late.rs"));
+    let late_path = bookmark_path("/a/late.rs");
     load_test_bookmarks(
         &bookmark_store,
         vec![
-            (bookmark_path(path!("/a/main.rs")), vec![0]),
+            (bookmark_path("/a/main.rs"), vec![0]),
             (Arc::clone(&late_path), vec![0]),
         ],
         &mut cx,
@@ -37485,7 +37442,7 @@ async fn test_bookmarks_tab_retries_failed_path_when_file_appears(cx: &mut TestA
 
     let fs = project.read_with(&cx, |project, _| project.fs().clone());
     fs.remove_dir(
-        std::path::Path::new(path!("/a/late.rs")),
+        std::path::Path::new("/a/late.rs"),
         fs::RemoveOptions {
             recursive: true,
             ignore_if_not_exists: false,
@@ -37494,7 +37451,7 @@ async fn test_bookmarks_tab_retries_failed_path_when_file_appears(cx: &mut TestA
     .await
     .expect("removing the placeholder directory should succeed");
     fs.as_fake()
-        .insert_file(path!("/a/late.rs"), "late0\n".as_bytes().to_vec())
+        .insert_file("/a/late.rs", "late0\n".as_bytes().to_vec())
         .await;
     cx.run_until_parked();
 
@@ -37999,14 +37956,14 @@ async fn test_apply_code_lens_actions_with_commands(cx: &mut gpui::TestAppContex
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/dir"),
+        "/dir",
         json!({
             "a.ts": "a",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+    let project = Project::test(fs, ["/dir".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -38046,7 +38003,7 @@ async fn test_apply_code_lens_actions_with_commands(cx: &mut gpui::TestAppContex
     let editor = workspace
         .update_in(cx, |workspace, window, cx| {
             workspace.open_abs_path(
-                PathBuf::from(path!("/dir/a.ts")),
+                PathBuf::from("/dir/a.ts"),
                 OpenOptions::default(),
                 window,
                 cx,
@@ -38150,7 +38107,7 @@ async fn test_apply_code_lens_actions_with_commands(cx: &mut gpui::TestAppContex
                                 edit: lsp::WorkspaceEdit {
                                     changes: Some(
                                         [(
-                                            lsp::Uri::from_file_path(path!("/dir/a.ts")).unwrap(),
+                                            lsp::Uri::from_file_path("/dir/a.ts").unwrap(),
                                             vec![lsp::TextEdit {
                                                 range: lsp::Range::new(
                                                     lsp::Position::new(0, 0),
@@ -38224,9 +38181,9 @@ async fn test_reveal_if_open_uses_user_setting_for_loaded_editor(cx: &mut TestAp
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "file.txt": "content" }))
+    fs.insert_tree("/root", json!({ "file.txt": "content" }))
         .await;
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace =
@@ -38297,7 +38254,7 @@ println!("5");
 }"#;
     let lib_text = "mod foo {}";
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "lib.rs": lib_text,
             "main.rs": main_text,
@@ -38305,7 +38262,7 @@ println!("5");
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -38568,7 +38525,7 @@ println!("5");
 }"#;
     let lib_text = "mod foo {}";
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "lib.rs": lib_text,
             "main.rs": main_text,
@@ -38576,7 +38533,7 @@ println!("5");
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -38843,10 +38800,9 @@ async fn test_html_linked_edits_on_completion(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.html"), Default::default())
-        .await;
+    fs.insert_file("/file.html", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     let html_language = Arc::new(Language::new(
@@ -38899,7 +38855,7 @@ async fn test_html_linked_edits_on_completion(cx: &mut TestAppContext) {
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/file.html"), cx)
+            project.open_local_buffer_with_lsp("/file.html", cx)
         })
         .await
         .unwrap();
@@ -39152,7 +39108,7 @@ async fn test_invisible_worktree_servers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "a": {
                 "main.rs": "fn main() {}",
@@ -39166,7 +39122,7 @@ async fn test_invisible_worktree_servers(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs, [path!("/root/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let _fake_servers = language_registry.register_fake_lsp(
@@ -40728,7 +40684,7 @@ async fn test_pulling_diagnostics(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "first.rs": "fn main() { let a = 5; }",
             "second.rs": "// Test file",
@@ -40736,7 +40692,7 @@ async fn test_pulling_diagnostics(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -40766,7 +40722,7 @@ async fn test_pulling_diagnostics(cx: &mut TestAppContext) {
     let editor = workspace
         .update_in(cx, |workspace, window, cx| {
             workspace.open_abs_path(
-                PathBuf::from(path!("/a/first.rs")),
+                PathBuf::from("/a/first.rs"),
                 OpenOptions::default(),
                 window,
                 cx,
@@ -40784,7 +40740,7 @@ async fn test_pulling_diagnostics(cx: &mut TestAppContext) {
             let result_id = Some(new_result_id.to_string());
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/a/first.rs")).unwrap()
+                lsp::Uri::from_file_path("/a/first.rs").unwrap()
             );
             async move {
                 Ok(lsp::DocumentDiagnosticReportResult::Report(
@@ -41144,14 +41100,14 @@ async fn test_inlay_hints_request_timeout(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/a"),
+        "/a",
         json!({
             "main.rs": "fn main() { let a = 5; }",
         }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -41171,7 +41127,7 @@ async fn test_inlay_hints_request_timeout(cx: &mut TestAppContext) {
                             let count = request_count.fetch_add(1, atomic::Ordering::Release) + 1;
                             assert_eq!(
                                 params.text_document.uri,
-                                lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                                lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                             );
                             Ok(Some(vec![lsp::InlayHint {
                                 position: lsp::Position::new(0, 1),
@@ -41193,7 +41149,7 @@ async fn test_inlay_hints_request_timeout(cx: &mut TestAppContext) {
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/a/main.rs"), cx)
+            project.open_local_buffer("/a/main.rs", cx)
         })
         .await
         .unwrap();
@@ -42250,10 +42206,10 @@ async fn test_format_echoing_received_line_endings_keeps_cursor(cx: &mut TestApp
     let crlf_content = lf_content.replace('\n', "\r\n");
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), crlf_content.clone().into())
+    fs.insert_file("/file.rs", crlf_content.clone().into())
         .await;
 
-    let project = Project::test(fs, [path!("/file.rs").as_ref()], cx).await;
+    let project = Project::test(fs, ["/file.rs".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -42281,9 +42237,7 @@ async fn test_format_echoing_received_line_endings_keeps_cursor(cx: &mut TestApp
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -42356,7 +42310,7 @@ async fn test_race_in_multibuffer_save(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             "first.rs": "# First Document\nSome content here.",
             "second.rs": "Plain text content for second file.",
@@ -42364,7 +42318,7 @@ async fn test_race_in_multibuffer_save(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs, ["/project".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(*window, cx);
 
@@ -42380,13 +42334,13 @@ async fn test_race_in_multibuffer_save(cx: &mut TestAppContext) {
 
     let buffer1 = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(PathBuf::from(path!("/project/first.rs")), cx)
+            project.open_local_buffer(PathBuf::from("/project/first.rs"), cx)
         })
         .await
         .unwrap();
     let buffer2 = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(PathBuf::from(path!("/project/second.rs")), cx)
+            project.open_local_buffer(PathBuf::from("/project/second.rs"), cx)
         })
         .await
         .unwrap();
@@ -44710,7 +44664,7 @@ async fn test_local_worktree_trust(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".oxed": {
                 "settings.json": r#"{"languages":{"Rust":{"language_servers":["override-rust-analyzer"]}}}"#
@@ -44722,7 +44676,7 @@ async fn test_local_worktree_trust(cx: &mut TestAppContext) {
 
     let lsp_inlay_hint_request_count = Arc::new(AtomicUsize::new(0));
     let server_name = "override-rust-analyzer";
-    let project = Project::test_with_worktree_trust(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test_with_worktree_trust(fs, ["/project".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -46787,13 +46741,13 @@ async fn test_in_preview_key_context(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         serde_json::json!({
             "test.txt": "hello",
         }),
     )
     .await;
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -46857,9 +46811,9 @@ async fn setup_range_format_test_with_capabilities(
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_file(path!("/file.rs"), Default::default()).await;
+    fs.insert_file("/file.rs", Default::default()).await;
 
-    let project = Project::test(fs, [path!("/").as_ref()], cx).await;
+    let project = Project::test(fs, ["/".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -46872,9 +46826,7 @@ async fn setup_range_format_test_with_capabilities(
     );
 
     let buffer = project
-        .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/file.rs"), cx)
-        })
+        .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
         .await
         .unwrap();
 
@@ -46928,7 +46880,7 @@ async fn setup_range_format_test_with_git<'a>(
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/project"),
+        "/project",
         json!({
             ".git": {},
             "file.rs": "",
@@ -46937,16 +46889,16 @@ async fn setup_range_format_test_with_git<'a>(
     .await;
 
     fs.set_head_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", head_content.to_string())],
         "deadbeef",
     );
     fs.set_index_for_repo(
-        std::path::Path::new(path!("/project/.git")),
+        std::path::Path::new("/project/.git"),
         &[("file.rs", index_content.to_string())],
     );
 
-    let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+    let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
@@ -46964,7 +46916,7 @@ async fn setup_range_format_test_with_git<'a>(
 
     let buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer(path!("/project/file.rs"), cx)
+            project.open_local_buffer("/project/file.rs", cx)
         })
         .await
         .unwrap();
@@ -47042,7 +46994,7 @@ async fn assert_range_format_merge(
                 async move {
                     assert_eq!(
                         params.text_document.uri,
-                        lsp::Uri::from_file_path(path!("/project/file.rs")).unwrap()
+                        lsp::Uri::from_file_path("/project/file.rs").unwrap()
                     );
                     match responses.get(count) {
                         Some(edits) => Ok(Some(edits.clone())),
@@ -47097,8 +47049,8 @@ async fn init_bookmarks_tab_test(
     init_test(cx, |_| {});
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/a"), files).await;
-    let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+    fs.insert_tree("/a", files).await;
+    let project = Project::test(fs, ["/a".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())

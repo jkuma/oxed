@@ -273,7 +273,6 @@ fn create_empty_stub(temp_dir: &mut TempDir, rel: &Path) -> anyhow::Result<PathB
 mod tests {
     use super::*;
     use serde_json::json;
-    use util::path;
     use util::paths::SanitizedPath;
     use util::test::TempTree;
 
@@ -304,17 +303,17 @@ mod tests {
     #[test]
     fn test_parse_non_existing_path() {
         // Absolute path
-        let result = parse_path_with_position(path!("/non/existing/path.txt")).unwrap();
-        assert_path_eq!(result, path!("/non/existing/path.txt"));
+        let result = parse_path_with_position("/non/existing/path.txt").unwrap();
+        assert_path_eq!(result, "/non/existing/path.txt");
 
         // Absolute path in cwd
-        let path = cwd().join(path!("non/existing/path.txt"));
+        let path = cwd().join("non/existing/path.txt");
         let expected = path.to_string_lossy().to_string();
         let result = parse_path_with_position(&expected).unwrap();
         assert_path_eq!(result, expected);
 
         // Relative path
-        let result = parse_path_with_position(path!("non/existing/path.txt")).unwrap();
+        let result = parse_path_with_position("non/existing/path.txt").unwrap();
         assert_path_eq!(result, expected)
     }
 

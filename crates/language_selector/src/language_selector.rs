@@ -342,7 +342,7 @@ mod tests {
     use project::{Project, ProjectPath};
     use serde_json::json;
     use std::sync::Arc;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{AppState, MultiWorkspace, Workspace};
 
     fn init_test(cx: &mut TestAppContext) -> Arc<AppState> {
@@ -558,7 +558,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/test"),
+                "/test",
                 json!({
                     "rust_file.rs": "fn main() {}\n",
                     "typescript_file.ts": "const value = 1;\n",
@@ -566,7 +566,7 @@ mod tests {
             )
             .await;
 
-        let project = Project::test(app_state.fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(app_state.fs.clone(), ["/test".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace =
@@ -601,13 +601,9 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         let app_state = init_test(cx);
-        app_state
-            .fs
-            .as_fake()
-            .insert_tree(path!("/test"), json!({}))
-            .await;
+        app_state.fs.as_fake().insert_tree("/test", json!({})).await;
 
-        let project = Project::test(app_state.fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(app_state.fs.clone(), ["/test".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace =

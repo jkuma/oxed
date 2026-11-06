@@ -574,7 +574,6 @@ mod tests {
     use project::Project;
     use serde_json::json;
     use theme::{Appearance, ThemeFamily, ThemeRegistry, default_color_scales};
-    use util::path;
     use workspace::MultiWorkspace;
 
     fn init_test(cx: &mut TestAppContext) -> Arc<workspace::AppState> {
@@ -619,11 +618,7 @@ mod tests {
     async fn setup_test(cx: &mut TestAppContext) -> Arc<workspace::AppState> {
         let app_state = init_test(cx);
         register_test_themes(cx);
-        app_state
-            .fs
-            .as_fake()
-            .insert_tree(path!("/test"), json!({}))
-            .await;
+        app_state.fs.as_fake().insert_tree("/test", json!({})).await;
         app_state
     }
 
@@ -670,7 +665,7 @@ mod tests {
     #[gpui::test]
     async fn test_theme_selector_preserves_selection_on_empty_filter(cx: &mut TestAppContext) {
         let app_state = setup_test(cx).await;
-        let project = Project::test(app_state.fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(app_state.fs.clone(), ["/test".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace =

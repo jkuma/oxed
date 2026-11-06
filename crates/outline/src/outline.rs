@@ -497,7 +497,7 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{AppState, MultiWorkspace, Workspace};
 
     #[gpui::test]
@@ -505,7 +505,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": indoc!{"
                                        // display line 0
@@ -520,7 +520,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         project.read_with(cx, |project, _| {
             project.languages().add(language::rust_lang())
         });
@@ -535,9 +535,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -640,7 +638,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": indoc! {"
                                        // display line 0
@@ -656,7 +654,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         project.read_with(cx, |project, _| {
             project.languages().add(language::rust_lang())
         });
@@ -671,9 +669,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -753,10 +749,9 @@ mod tests {
         }
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({ "a.rs": source }))
-            .await;
+        fs.insert_tree("/dir", json!({ "a.rs": source })).await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         project.read_with(cx, |project, _| {
             project.languages().add(language::rust_lang())
         });
@@ -771,9 +766,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         workspace
@@ -812,7 +805,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": indoc! {"
                     struct A;
@@ -837,7 +830,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         project.read_with(cx, |project, _| {
             project.languages().add(language::rust_lang())
         });
@@ -852,9 +845,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -1012,7 +1003,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": indoc!{"
                     struct Foo {
@@ -1024,7 +1015,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| {
             project.languages().add(language::rust_lang());
             project.languages().clone()
@@ -1109,9 +1100,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace

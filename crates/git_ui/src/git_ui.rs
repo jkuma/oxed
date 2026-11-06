@@ -1437,7 +1437,6 @@ mod view_commit_tests {
     use std::path::Path;
     use std::sync::Arc;
     use theme::LoadThemes;
-    use util::path;
     use workspace::WorkspaceSettings;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -1475,7 +1474,7 @@ mod view_commit_tests {
         fs: Arc<FakeFs>,
         cx: &mut TestAppContext,
     ) -> (Entity<Project>, WindowHandle<Workspace>) {
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let workspace =
             cx.add_window(|window, cx| Workspace::test_new(project.clone(), window, cx));
         cx.read(|cx| {

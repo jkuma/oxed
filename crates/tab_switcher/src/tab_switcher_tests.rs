@@ -5,7 +5,7 @@ use menu::SelectPrevious;
 use project::{Project, ProjectPath};
 use serde_json::json;
 use settings::SettingsStore;
-use util::{path, rel_path::rel_path};
+use util::rel_path::rel_path;
 use workspace::{ActivatePreviousItem, AppState, MultiWorkspace, Workspace, item::test::TestItem};
 
 #[ctor::ctor(unsafe)]
@@ -23,7 +23,7 @@ async fn test_open_with_prev_tab_selected_and_cycle_on_toggle_action(
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "First file",
                 "2.txt": "Second file",
@@ -33,7 +33,7 @@ async fn test_open_with_prev_tab_selected_and_cycle_on_toggle_action(
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -81,7 +81,7 @@ async fn test_open_with_last_tab_selected(cx: &mut gpui::TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "First file",
                 "2.txt": "Second file",
@@ -90,7 +90,7 @@ async fn test_open_with_last_tab_selected(cx: &mut gpui::TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -117,7 +117,7 @@ async fn test_open_item_on_modifiers_release(cx: &mut gpui::TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "First file",
                 "2.txt": "Second file",
@@ -125,7 +125,7 @@ async fn test_open_item_on_modifiers_release(cx: &mut gpui::TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -197,10 +197,10 @@ async fn test_open_with_single_item(cx: &mut gpui::TestAppContext) {
     app_state
         .fs
         .as_fake()
-        .insert_tree(path!("/root"), json!({"1.txt": "Single file"}))
+        .insert_tree("/root", json!({"1.txt": "Single file"}))
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -221,7 +221,7 @@ async fn test_close_selected_item(cx: &mut gpui::TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "First file",
                 "2.txt": "Second file",
@@ -231,7 +231,7 @@ async fn test_close_selected_item(cx: &mut gpui::TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -389,7 +389,7 @@ async fn test_open_in_active_pane_deduplicates_files_by_path(cx: &mut gpui::Test
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "",
                 "2.txt": "",
@@ -397,7 +397,7 @@ async fn test_open_in_active_pane_deduplicates_files_by_path(cx: &mut gpui::Test
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -432,10 +432,10 @@ async fn test_open_in_active_pane_clones_files_to_current_pane(cx: &mut gpui::Te
     app_state
         .fs
         .as_fake()
-        .insert_tree(path!("/root"), json!({"1.txt": ""}))
+        .insert_tree("/root", json!({"1.txt": ""}))
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -534,10 +534,10 @@ async fn test_open_in_active_pane_closes_file_in_all_panes(cx: &mut gpui::TestAp
     app_state
         .fs
         .as_fake()
-        .insert_tree(path!("/root"), json!({"1.txt": ""}))
+        .insert_tree("/root", json!({"1.txt": ""}))
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -582,7 +582,7 @@ async fn test_toggle_all_stays_open_after_closing_last_tab_in_active_pane(
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "a.txt": "",
                 "b.txt": "",
@@ -590,7 +590,7 @@ async fn test_toggle_all_stays_open_after_closing_last_tab_in_active_pane(
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -636,7 +636,7 @@ async fn test_show_file_preview_false(cx: &mut gpui::TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "1.txt": "First file",
                 "2.txt": "Second file",
@@ -644,7 +644,7 @@ async fn test_show_file_preview_false(cx: &mut gpui::TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());

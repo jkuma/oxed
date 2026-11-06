@@ -14,14 +14,14 @@ async fn test_dynamic_semantic_tokens_registration(cx: &mut gpui::TestAppContext
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/the-root"),
+        "/the-root",
         json!({
             "a.rs": "fn main() {}",
         }),
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -36,7 +36,7 @@ async fn test_dynamic_semantic_tokens_registration(cx: &mut gpui::TestAppContext
 
     let _buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -145,7 +145,7 @@ async fn test_local_semantic_tokens_request_uses_matching_dynamic_registration(
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -225,7 +225,7 @@ async fn test_local_semantic_tokens_request_uses_matching_dynamic_registration(
             semantic_token_request_count.fetch_add(1, atomic::Ordering::SeqCst);
             assert_eq!(
                 params.text_document.uri,
-                lsp::Uri::from_file_path(path!("/the-root/a.rs")).unwrap()
+                lsp::Uri::from_file_path("/the-root/a.rs").unwrap()
             );
             async move {
                 Ok(Some(lsp::SemanticTokensResult::Tokens(
@@ -309,7 +309,7 @@ async fn test_semantic_tokens_refresh_when_duplicate_removal_changes_provider_or
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -405,7 +405,7 @@ async fn test_completion_resolve_uses_matching_dynamic_registration(cx: &mut gpu
     let method = "textDocument/completion";
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -497,7 +497,7 @@ async fn test_code_lens_resolve_uses_matching_dynamic_registration(cx: &mut gpui
     let method = "textDocument/codeLens";
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -581,7 +581,7 @@ async fn test_inlay_hint_resolve_state_uses_matching_dynamic_registration(
     let method = "textDocument/inlayHint";
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -1300,7 +1300,7 @@ async fn test_selector_aware_routing_with_duplicate_content_registrations(
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -1406,7 +1406,7 @@ async fn test_multi_registration_completion_triggers(cx: &mut gpui::TestAppConte
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -1555,7 +1555,7 @@ async fn test_refresh_during_code_lens_fetch_does_not_resurrect_stale_data(
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -1674,7 +1674,7 @@ async fn test_multi_registration_completion_static_restore(cx: &mut gpui::TestAp
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -1835,11 +1835,11 @@ async fn test_per_server_refreshes_keep_other_servers_data(cx: &mut gpui::TestAp
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/the-root"),
+        "/the-root",
         json!({ "a.rs": "fn main() {\n}\n", "b.md": "# title\ntext\n" }),
     )
     .await;
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     language_registry.add(markdown_lang());
@@ -1871,13 +1871,13 @@ async fn test_per_server_refreshes_keep_other_servers_data(cx: &mut gpui::TestAp
 
     let (rust_buffer, _rust_lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
     let (markdown_buffer, _markdown_lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/b.md"), cx)
+            project.open_local_buffer_with_lsp("/the-root/b.md", cx)
         })
         .await
         .unwrap();
@@ -2043,9 +2043,9 @@ async fn test_dynamic_registration_refreshes_lsp_data(cx: &mut gpui::TestAppCont
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/the-root"), json!({ "a.rs": "fn main() {\n}\n" }))
+    fs.insert_tree("/the-root", json!({ "a.rs": "fn main() {\n}\n" }))
         .await;
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -2074,7 +2074,7 @@ async fn test_dynamic_registration_refreshes_lsp_data(cx: &mut gpui::TestAppCont
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2214,7 +2214,7 @@ async fn test_semantic_tokens_server_set_shrink_invalidates_completed_task(
     let method = "textDocument/semanticTokens";
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2291,9 +2291,9 @@ async fn test_semantic_tokens_refresh_invalidates_only_the_refreshed_server(
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/the-root"), json!({ "a.rs": "fn main() {}" }))
+    fs.insert_tree("/the-root", json!({ "a.rs": "fn main() {}" }))
         .await;
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -2328,7 +2328,7 @@ async fn test_semantic_tokens_refresh_invalidates_only_the_refreshed_server(
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2423,7 +2423,7 @@ async fn test_semantic_tokens_refresh_during_fetch_does_not_resurrect_stale_data
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2517,7 +2517,7 @@ async fn test_code_lens_concurrent_fetches_are_deduplicated(cx: &mut gpui::TestA
 
     let (buffer, _lsp_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2563,7 +2563,7 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "a.rs": "",
@@ -2576,7 +2576,7 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -2591,7 +2591,7 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/root/src/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/root/src/a.rs", cx)
         })
         .await
         .unwrap();
@@ -2608,7 +2608,7 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
         "reg-1",
         serde_json::to_value(lsp::DidChangeWatchedFilesRegistrationOptions {
             watchers: vec![lsp::FileSystemWatcher {
-                glob_pattern: lsp::GlobPattern::String(path!("/root/src/*.rs").to_string()),
+                glob_pattern: lsp::GlobPattern::String("/root/src/*.rs".to_string()),
                 kind: None,
             }],
         })
@@ -2622,7 +2622,7 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
         "reg-2",
         serde_json::to_value(lsp::DidChangeWatchedFilesRegistrationOptions {
             watchers: vec![lsp::FileSystemWatcher {
-                glob_pattern: lsp::GlobPattern::String(path!("/root/docs/*.md").to_string()),
+                glob_pattern: lsp::GlobPattern::String("/root/docs/*.md".to_string()),
                 kind: None,
             }],
         })
@@ -2642,29 +2642,23 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
     cx.executor().run_until_parked();
 
     // Both registrations should match their respective patterns.
-    fs.create_file(
-        path!("/root/src/c.rs").as_ref(),
-        fs::CreateOptions::default(),
-    )
-    .await
-    .unwrap();
-    fs.create_file(
-        path!("/root/docs/guide.md").as_ref(),
-        fs::CreateOptions::default(),
-    )
-    .await
-    .unwrap();
+    fs.create_file("/root/src/c.rs".as_ref(), fs::CreateOptions::default())
+        .await
+        .unwrap();
+    fs.create_file("/root/docs/guide.md".as_ref(), fs::CreateOptions::default())
+        .await
+        .unwrap();
     cx.executor().run_until_parked();
 
     assert_eq!(
         &*file_changes.lock(),
         &[
             lsp::FileEvent {
-                uri: lsp::Uri::from_file_path(path!("/root/docs/guide.md")).unwrap(),
+                uri: lsp::Uri::from_file_path("/root/docs/guide.md").unwrap(),
                 typ: lsp::FileChangeType::CREATED,
             },
             lsp::FileEvent {
-                uri: lsp::Uri::from_file_path(path!("/root/src/c.rs")).unwrap(),
+                uri: lsp::Uri::from_file_path("/root/src/c.rs").unwrap(),
                 typ: lsp::FileChangeType::CREATED,
             },
         ]
@@ -2676,24 +2670,18 @@ async fn test_multiple_did_change_watched_files_registrations(cx: &mut gpui::Tes
     cx.executor().run_until_parked();
 
     // Only the second registration should still match.
-    fs.create_file(
-        path!("/root/src/d.rs").as_ref(),
-        fs::CreateOptions::default(),
-    )
-    .await
-    .unwrap();
-    fs.create_file(
-        path!("/root/docs/notes.md").as_ref(),
-        fs::CreateOptions::default(),
-    )
-    .await
-    .unwrap();
+    fs.create_file("/root/src/d.rs".as_ref(), fs::CreateOptions::default())
+        .await
+        .unwrap();
+    fs.create_file("/root/docs/notes.md".as_ref(), fs::CreateOptions::default())
+        .await
+        .unwrap();
     cx.executor().run_until_parked();
 
     assert_eq!(
         &*file_changes.lock(),
         &[lsp::FileEvent {
-            uri: lsp::Uri::from_file_path(path!("/root/docs/notes.md")).unwrap(),
+            uri: lsp::Uri::from_file_path("/root/docs/notes.md").unwrap(),
             typ: lsp::FileChangeType::CREATED,
         }]
     );
@@ -2704,10 +2692,9 @@ async fn setup_dynamic_registration_test(
     capabilities: lsp::ServerCapabilities,
 ) -> (Entity<Project>, lsp::FakeLanguageServer) {
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/the-root"), json!({ "a.rs": "" }))
-        .await;
+    fs.insert_tree("/the-root", json!({ "a.rs": "" })).await;
 
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp(
@@ -2723,7 +2710,7 @@ async fn setup_dynamic_registration_test(
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/a.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/a.rs", cx)
         })
         .await
         .unwrap();

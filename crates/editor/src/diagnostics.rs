@@ -623,7 +623,6 @@ mod tests {
         Arc,
         atomic::{self, AtomicUsize},
     };
-    use util::path;
 
     fn setup_inline_diagnostics(cx: &mut EditorTestContext) {
         cx.update(|_, cx| {
@@ -653,7 +652,7 @@ mod tests {
                     .update_diagnostics(
                         LanguageServerId(0),
                         lsp::PublishDiagnosticsParams {
-                            uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                            uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                             version: None,
                             diagnostics: vec![lsp::Diagnostic {
                                 range: lsp::Range::new(

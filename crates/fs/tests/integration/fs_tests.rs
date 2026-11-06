@@ -15,12 +15,11 @@ use fs::*;
 use gpui::{BackgroundExecutor, TestAppContext};
 use serde_json::json;
 use tempfile::TempDir;
-use util::path;
 
 #[gpui::test]
 async fn test_watcher_diagnostics_do_not_change_event_delivery(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor);
-    let root = Path::new(path!("/root"));
+    let root = Path::new("/root");
     let file = root.join("file");
     fs.create_dir(root).await.unwrap();
     let (mut events, watcher) = fs.watch(root, Duration::ZERO).await;
@@ -71,7 +70,7 @@ async fn test_watcher_diagnostics_do_not_change_event_delivery(executor: Backgro
 async fn test_fake_fs(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "a": "A",
@@ -90,33 +89,31 @@ async fn test_fake_fs(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/dir1/a")),
-            PathBuf::from(path!("/root/dir1/b")),
-            PathBuf::from(path!("/root/dir2/c")),
-            PathBuf::from(path!("/root/dir2/dir3/d")),
+            PathBuf::from("/root/dir1/a"),
+            PathBuf::from("/root/dir1/b"),
+            PathBuf::from("/root/dir2/c"),
+            PathBuf::from("/root/dir2/dir3/d"),
         ]
     );
 
-    fs.create_symlink(path!("/root/dir2/link-to-dir3").as_ref(), "./dir3".into())
+    fs.create_symlink("/root/dir2/link-to-dir3".as_ref(), "./dir3".into())
         .await
         .unwrap();
 
     assert_eq!(
-        fs.canonicalize(path!("/root/dir2/link-to-dir3").as_ref())
+        fs.canonicalize("/root/dir2/link-to-dir3".as_ref())
             .await
             .unwrap(),
-        PathBuf::from(path!("/root/dir2/dir3")),
+        PathBuf::from("/root/dir2/dir3"),
     );
     assert_eq!(
-        fs.canonicalize(path!("/root/dir2/link-to-dir3/d").as_ref())
+        fs.canonicalize("/root/dir2/link-to-dir3/d".as_ref())
             .await
             .unwrap(),
-        PathBuf::from(path!("/root/dir2/dir3/d")),
+        PathBuf::from("/root/dir2/dir3/d"),
     );
     assert_eq!(
-        fs.load(path!("/root/dir2/link-to-dir3/d").as_ref())
-            .await
-            .unwrap(),
+        fs.load("/root/dir2/link-to-dir3/d".as_ref()).await.unwrap(),
         "D",
     );
 }
@@ -125,7 +122,7 @@ async fn test_fake_fs(executor: BackgroundExecutor) {
 async fn test_copy_recursive_with_single_file(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/outer"),
+        "/outer",
         json!({
             "a": "A",
             "b": "B",
@@ -136,14 +133,11 @@ async fn test_copy_recursive_with_single_file(executor: BackgroundExecutor) {
 
     assert_eq!(
         fs.files(),
-        vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/b")),
-        ]
+        vec![PathBuf::from("/outer/a"), PathBuf::from("/outer/b"),]
     );
 
-    let source = Path::new(path!("/outer/a"));
-    let target = Path::new(path!("/outer/a copy"));
+    let source = Path::new("/outer/a");
+    let target = Path::new("/outer/a copy");
     copy_recursive(fs.as_ref(), source, target, Default::default())
         .await
         .unwrap();
@@ -151,14 +145,14 @@ async fn test_copy_recursive_with_single_file(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/a copy")),
-            PathBuf::from(path!("/outer/b")),
+            PathBuf::from("/outer/a"),
+            PathBuf::from("/outer/a copy"),
+            PathBuf::from("/outer/b"),
         ]
     );
 
-    let source = Path::new(path!("/outer/a"));
-    let target = Path::new(path!("/outer/inner/a copy"));
+    let source = Path::new("/outer/a");
+    let target = Path::new("/outer/inner/a copy");
     copy_recursive(fs.as_ref(), source, target, Default::default())
         .await
         .unwrap();
@@ -166,10 +160,10 @@ async fn test_copy_recursive_with_single_file(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/a copy")),
-            PathBuf::from(path!("/outer/b")),
-            PathBuf::from(path!("/outer/inner/a copy")),
+            PathBuf::from("/outer/a"),
+            PathBuf::from("/outer/a copy"),
+            PathBuf::from("/outer/b"),
+            PathBuf::from("/outer/inner/a copy"),
         ]
     );
 }
@@ -178,7 +172,7 @@ async fn test_copy_recursive_with_single_file(executor: BackgroundExecutor) {
 async fn test_copy_recursive_with_single_dir(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/outer"),
+        "/outer",
         json!({
             "a": "A",
             "empty": {},
@@ -192,22 +186,22 @@ async fn test_copy_recursive_with_single_dir(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/non-empty/b")),
+            PathBuf::from("/outer/a"),
+            PathBuf::from("/outer/non-empty/b"),
         ]
     );
     assert_eq!(
         fs.directories(false),
         vec![
-            PathBuf::from(path!("/")),
-            PathBuf::from(path!("/outer")),
-            PathBuf::from(path!("/outer/empty")),
-            PathBuf::from(path!("/outer/non-empty")),
+            PathBuf::from("/"),
+            PathBuf::from("/outer"),
+            PathBuf::from("/outer/empty"),
+            PathBuf::from("/outer/non-empty"),
         ]
     );
 
-    let source = Path::new(path!("/outer/empty"));
-    let target = Path::new(path!("/outer/empty copy"));
+    let source = Path::new("/outer/empty");
+    let target = Path::new("/outer/empty copy");
     copy_recursive(fs.as_ref(), source, target, Default::default())
         .await
         .unwrap();
@@ -215,23 +209,23 @@ async fn test_copy_recursive_with_single_dir(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/non-empty/b")),
+            PathBuf::from("/outer/a"),
+            PathBuf::from("/outer/non-empty/b"),
         ]
     );
     assert_eq!(
         fs.directories(false),
         vec![
-            PathBuf::from(path!("/")),
-            PathBuf::from(path!("/outer")),
-            PathBuf::from(path!("/outer/empty")),
-            PathBuf::from(path!("/outer/empty copy")),
-            PathBuf::from(path!("/outer/non-empty")),
+            PathBuf::from("/"),
+            PathBuf::from("/outer"),
+            PathBuf::from("/outer/empty"),
+            PathBuf::from("/outer/empty copy"),
+            PathBuf::from("/outer/non-empty"),
         ]
     );
 
-    let source = Path::new(path!("/outer/non-empty"));
-    let target = Path::new(path!("/outer/non-empty copy"));
+    let source = Path::new("/outer/non-empty");
+    let target = Path::new("/outer/non-empty copy");
     copy_recursive(fs.as_ref(), source, target, Default::default())
         .await
         .unwrap();
@@ -239,20 +233,20 @@ async fn test_copy_recursive_with_single_dir(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/a")),
-            PathBuf::from(path!("/outer/non-empty/b")),
-            PathBuf::from(path!("/outer/non-empty copy/b")),
+            PathBuf::from("/outer/a"),
+            PathBuf::from("/outer/non-empty/b"),
+            PathBuf::from("/outer/non-empty copy/b"),
         ]
     );
     assert_eq!(
         fs.directories(false),
         vec![
-            PathBuf::from(path!("/")),
-            PathBuf::from(path!("/outer")),
-            PathBuf::from(path!("/outer/empty")),
-            PathBuf::from(path!("/outer/empty copy")),
-            PathBuf::from(path!("/outer/non-empty")),
-            PathBuf::from(path!("/outer/non-empty copy")),
+            PathBuf::from("/"),
+            PathBuf::from("/outer"),
+            PathBuf::from("/outer/empty"),
+            PathBuf::from("/outer/empty copy"),
+            PathBuf::from("/outer/non-empty"),
+            PathBuf::from("/outer/non-empty copy"),
         ]
     );
 }
@@ -261,7 +255,7 @@ async fn test_copy_recursive_with_single_dir(executor: BackgroundExecutor) {
 async fn test_copy_recursive(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/outer"),
+        "/outer",
         json!({
             "inner1": {
                 "a": "A",
@@ -281,26 +275,26 @@ async fn test_copy_recursive(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/inner3/d")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/inner3/d"),
         ]
     );
     assert_eq!(
         fs.directories(false),
         vec![
-            PathBuf::from(path!("/")),
-            PathBuf::from(path!("/outer")),
-            PathBuf::from(path!("/outer/inner1")),
-            PathBuf::from(path!("/outer/inner2")),
-            PathBuf::from(path!("/outer/inner1/inner3")),
-            PathBuf::from(path!("/outer/inner1/inner4")),
+            PathBuf::from("/"),
+            PathBuf::from("/outer"),
+            PathBuf::from("/outer/inner1"),
+            PathBuf::from("/outer/inner2"),
+            PathBuf::from("/outer/inner1/inner3"),
+            PathBuf::from("/outer/inner1/inner4"),
         ]
     );
 
-    let source = Path::new(path!("/outer"));
-    let target = Path::new(path!("/outer/inner1/outer"));
+    let source = Path::new("/outer");
+    let target = Path::new("/outer/inner1/outer");
     copy_recursive(fs.as_ref(), source, target, Default::default())
         .await
         .unwrap();
@@ -308,30 +302,30 @@ async fn test_copy_recursive(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/inner3/d")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner1/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/inner3/d")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/inner3/d"),
+            PathBuf::from("/outer/inner1/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/outer/inner1/b"),
+            PathBuf::from("/outer/inner1/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/inner3/d"),
         ]
     );
     assert_eq!(
         fs.directories(false),
         vec![
-            PathBuf::from(path!("/")),
-            PathBuf::from(path!("/outer")),
-            PathBuf::from(path!("/outer/inner1")),
-            PathBuf::from(path!("/outer/inner2")),
-            PathBuf::from(path!("/outer/inner1/inner3")),
-            PathBuf::from(path!("/outer/inner1/inner4")),
-            PathBuf::from(path!("/outer/inner1/outer")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1")),
-            PathBuf::from(path!("/outer/inner1/outer/inner2")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/inner3")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/inner4")),
+            PathBuf::from("/"),
+            PathBuf::from("/outer"),
+            PathBuf::from("/outer/inner1"),
+            PathBuf::from("/outer/inner2"),
+            PathBuf::from("/outer/inner1/inner3"),
+            PathBuf::from("/outer/inner1/inner4"),
+            PathBuf::from("/outer/inner1/outer"),
+            PathBuf::from("/outer/inner1/outer/inner1"),
+            PathBuf::from("/outer/inner1/outer/inner2"),
+            PathBuf::from("/outer/inner1/outer/inner1/inner3"),
+            PathBuf::from("/outer/inner1/outer/inner1/inner4"),
         ]
     );
 }
@@ -340,7 +334,7 @@ async fn test_copy_recursive(executor: BackgroundExecutor) {
 async fn test_copy_recursive_with_overwriting(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/outer"),
+        "/outer",
         json!({
             "inner1": {
                 "a": "A",
@@ -361,21 +355,21 @@ async fn test_copy_recursive_with_overwriting(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/a")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/a"),
         ]
     );
     assert_eq!(
-        fs.load(path!("/outer/inner1/outer/inner1/a").as_ref())
+        fs.load("/outer/inner1/outer/inner1/a".as_ref())
             .await
             .unwrap(),
         "B",
     );
 
-    let source = Path::new(path!("/outer"));
-    let target = Path::new(path!("/outer/inner1/outer"));
+    let source = Path::new("/outer");
+    let target = Path::new("/outer/inner1/outer");
     copy_recursive(
         fs.as_ref(),
         source,
@@ -391,17 +385,17 @@ async fn test_copy_recursive_with_overwriting(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner1/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/outer/inner1/a")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/outer/inner1/b"),
+            PathBuf::from("/outer/inner1/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/outer/inner1/a"),
         ]
     );
     assert_eq!(
-        fs.load(path!("/outer/inner1/outer/inner1/a").as_ref())
+        fs.load("/outer/inner1/outer/inner1/a".as_ref())
             .await
             .unwrap(),
         "A"
@@ -412,7 +406,7 @@ async fn test_copy_recursive_with_overwriting(executor: BackgroundExecutor) {
 async fn test_copy_recursive_with_ignoring(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/outer"),
+        "/outer",
         json!({
             "inner1": {
                 "a": "A",
@@ -433,21 +427,21 @@ async fn test_copy_recursive_with_ignoring(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/a")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/a"),
         ]
     );
     assert_eq!(
-        fs.load(path!("/outer/inner1/outer/inner1/a").as_ref())
+        fs.load("/outer/inner1/outer/inner1/a".as_ref())
             .await
             .unwrap(),
         "B",
     );
 
-    let source = Path::new(path!("/outer"));
-    let target = Path::new(path!("/outer/inner1/outer"));
+    let source = Path::new("/outer");
+    let target = Path::new("/outer/inner1/outer");
     copy_recursive(
         fs.as_ref(),
         source,
@@ -463,17 +457,17 @@ async fn test_copy_recursive_with_ignoring(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/a")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/b")),
-            PathBuf::from(path!("/outer/inner1/outer/inner2/c")),
-            PathBuf::from(path!("/outer/inner1/outer/inner1/outer/inner1/a")),
+            PathBuf::from("/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/b"),
+            PathBuf::from("/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/a"),
+            PathBuf::from("/outer/inner1/outer/inner1/b"),
+            PathBuf::from("/outer/inner1/outer/inner2/c"),
+            PathBuf::from("/outer/inner1/outer/inner1/outer/inner1/a"),
         ]
     );
     assert_eq!(
-        fs.load(path!("/outer/inner1/outer/inner1/a").as_ref())
+        fs.load("/outer/inner1/outer/inner1/a".as_ref())
             .await
             .unwrap(),
         "B"
@@ -511,7 +505,7 @@ async fn test_realfs_atomic_write_non_existing_file(executor: BackgroundExecutor
 async fn test_rename(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "file_a.txt": "content a",
@@ -522,8 +516,8 @@ async fn test_rename(executor: BackgroundExecutor) {
     .await;
 
     fs.rename(
-        Path::new(path!("/root/src/file_a.txt")),
-        Path::new(path!("/root/src/new/renamed_a.txt")),
+        Path::new("/root/src/file_a.txt"),
+        Path::new("/root/src/new/renamed_a.txt"),
         RenameOptions {
             create_parents: true,
             ..Default::default()
@@ -537,15 +531,15 @@ async fn test_rename(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/src/file_b.txt")),
-            PathBuf::from(path!("/root/src/new/renamed_a.txt")),
+            PathBuf::from("/root/src/file_b.txt"),
+            PathBuf::from("/root/src/new/renamed_a.txt"),
         ]
     );
 
     let result = fs
         .rename(
-            Path::new(path!("/root/src/file_b.txt")),
-            Path::new(path!("/root/src/old/renamed_b.txt")),
+            Path::new("/root/src/file_b.txt"),
+            Path::new("/root/src/old/renamed_b.txt"),
             RenameOptions {
                 create_parents: false,
                 ..Default::default()
@@ -560,8 +554,8 @@ async fn test_rename(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/src/file_b.txt")),
-            PathBuf::from(path!("/root/src/new/renamed_a.txt")),
+            PathBuf::from("/root/src/file_b.txt"),
+            PathBuf::from("/root/src/new/renamed_a.txt"),
         ]
     );
 }
@@ -629,7 +623,7 @@ async fn test_fake_fs_rename_ignore_if_exists_leaves_source_and_target_unchanged
 ) {
     let fs = FakeFs::new(executor);
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "source.txt": "from source",
             "target.txt": "from target",
@@ -637,15 +631,12 @@ async fn test_fake_fs_rename_ignore_if_exists_leaves_source_and_target_unchanged
     )
     .await;
 
-    let handle = fs
-        .open_handle(Path::new(path!("/root/source.txt")))
-        .await
-        .unwrap();
+    let handle = fs.open_handle(Path::new("/root/source.txt")).await.unwrap();
 
     let result = fs
         .rename(
-            Path::new(path!("/root/source.txt")),
-            Path::new(path!("/root/target.txt")),
+            Path::new("/root/source.txt"),
+            Path::new("/root/target.txt"),
             RenameOptions {
                 ignore_if_exists: true,
                 ..Default::default()
@@ -656,11 +647,11 @@ async fn test_fake_fs_rename_ignore_if_exists_leaves_source_and_target_unchanged
     assert!(result.is_ok());
 
     assert_eq!(
-        fs.load(Path::new(path!("/root/source.txt"))).await.unwrap(),
+        fs.load(Path::new("/root/source.txt")).await.unwrap(),
         "from source"
     );
     assert_eq!(
-        fs.load(Path::new(path!("/root/target.txt"))).await.unwrap(),
+        fs.load(Path::new("/root/target.txt")).await.unwrap(),
         "from target"
     );
 
@@ -668,7 +659,7 @@ async fn test_fake_fs_rename_ignore_if_exists_leaves_source_and_target_unchanged
     // file is actually at, not the one it never went to.
     assert_eq!(
         handle.current_path(&(fs.clone() as Arc<dyn Fs>)).unwrap(),
-        PathBuf::from(path!("/root/source.txt"))
+        PathBuf::from("/root/source.txt")
     );
 }
 
@@ -745,7 +736,7 @@ async fn test_realfs_copy_and_remove_semantics(cx: &mut TestAppContext) {
 async fn test_fake_fs_copy_and_remove_semantics(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor);
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "source.txt": "from source",
             "target.txt": "from target",
@@ -753,10 +744,10 @@ async fn test_fake_fs_copy_and_remove_semantics(executor: BackgroundExecutor) {
         }),
     )
     .await;
-    fs.insert_symlink(path!("/root/link"), PathBuf::from(path!("/root/dir")))
+    fs.insert_symlink("/root/link", PathBuf::from("/root/dir"))
         .await;
 
-    let root = Path::new(path!("/root"));
+    let root = Path::new("/root");
     assert_copy_and_remove_semantics(root, fs.as_ref()).await;
     assert_remove_file_unlinks_symlink(root, fs.as_ref()).await;
 }
@@ -765,14 +756,14 @@ async fn test_fake_fs_copy_and_remove_semantics(executor: BackgroundExecutor) {
 async fn test_fake_fs_rename_onto_itself_keeps_the_file(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor);
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "a.txt": "content",
         }),
     )
     .await;
 
-    let path = Path::new(path!("/root/a.txt"));
+    let path = Path::new("/root/a.txt");
     let result = fs
         .rename(
             path,
@@ -872,7 +863,7 @@ async fn test_realfs_symlink_loop_metadata(executor: BackgroundExecutor) {
 async fn test_fake_fs_trash(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "file_c.txt": "File C",
@@ -885,7 +876,7 @@ async fn test_fake_fs_trash(executor: BackgroundExecutor) {
     .await;
 
     // Trashing a file.
-    let path = path!("/root/file_a.txt").as_ref();
+    let path = "/root/file_a.txt".as_ref();
     fs.trash(path, Default::default())
         .await
         .expect("should be able to trash {path:?}");
@@ -893,14 +884,14 @@ async fn test_fake_fs_trash(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/file_b.txt")),
-            PathBuf::from(path!("/root/src/file_c.txt")),
-            PathBuf::from(path!("/root/src/file_d.txt"))
+            PathBuf::from("/root/file_b.txt"),
+            PathBuf::from("/root/src/file_c.txt"),
+            PathBuf::from("/root/src/file_d.txt")
         ]
     );
 
     // Trashing a directory.
-    let path = path!("/root/src").as_ref();
+    let path = "/root/src".as_ref();
     fs.trash(
         path,
         RemoveOptions {
@@ -911,14 +902,14 @@ async fn test_fake_fs_trash(executor: BackgroundExecutor) {
     .await
     .expect("should be able to trash {path:?}");
 
-    assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_b.txt"))]);
+    assert_eq!(fs.files(), vec![PathBuf::from("/root/file_b.txt")]);
 }
 
 #[gpui::test]
 async fn test_fake_fs_restore(executor: BackgroundExecutor) {
     let fs = FakeFs::new(executor.clone());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "file_a.txt": "File A",
@@ -932,7 +923,7 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
     // Attempt deleting a file, asserting that the filesystem no longer reports
     // it as part of its list of files, restore it and verify that the list of
     // files and trash has been updated accordingly.
-    let path = path!("/root/src/file_a.txt").as_ref();
+    let path = "/root/src/file_a.txt".as_ref();
     let trashed_entry = fs.trash(path, Default::default()).await.unwrap();
 
     assert_eq!(
@@ -946,9 +937,9 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/file_c.txt")),
-            PathBuf::from(path!("/root/src/file_a.txt")),
-            PathBuf::from(path!("/root/src/file_b.txt"))
+            PathBuf::from("/root/file_c.txt"),
+            PathBuf::from("/root/src/file_a.txt"),
+            PathBuf::from("/root/src/file_b.txt")
         ]
     );
 
@@ -959,32 +950,32 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
         recursive: true,
         ..Default::default()
     };
-    let path = path!("/root/src/").as_ref();
+    let path = "/root/src/".as_ref();
     let trashed_entry = fs.trash(path, options).await.unwrap();
 
-    assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_c.txt"))]);
+    assert_eq!(fs.files(), vec![PathBuf::from("/root/file_c.txt")]);
 
     fs.restore(trashed_entry).await.unwrap();
 
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/file_c.txt")),
-            PathBuf::from(path!("/root/src/file_a.txt")),
-            PathBuf::from(path!("/root/src/file_b.txt"))
+            PathBuf::from("/root/file_c.txt"),
+            PathBuf::from("/root/src/file_a.txt"),
+            PathBuf::from("/root/src/file_b.txt")
         ]
     );
 
     // A collision error should be returned in case a file is being restored to
     // a path where a file already exists.
-    let path = path!("/root/src/file_a.txt").as_ref();
+    let path = "/root/src/file_a.txt".as_ref();
     let trashed_entry = fs.trash(path, Default::default()).await.unwrap();
 
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/file_c.txt")),
-            PathBuf::from(path!("/root/src/file_b.txt"))
+            PathBuf::from("/root/file_c.txt"),
+            PathBuf::from("/root/src/file_b.txt")
         ]
     );
 
@@ -993,9 +984,9 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
     assert_eq!(
         fs.files(),
         vec![
-            PathBuf::from(path!("/root/file_c.txt")),
-            PathBuf::from(path!("/root/src/file_a.txt")),
-            PathBuf::from(path!("/root/src/file_b.txt"))
+            PathBuf::from("/root/file_c.txt"),
+            PathBuf::from("/root/src/file_a.txt"),
+            PathBuf::from("/root/src/file_b.txt")
         ]
     );
 
@@ -1012,19 +1003,19 @@ async fn test_fake_fs_restore(executor: BackgroundExecutor) {
         recursive: true,
         ..Default::default()
     };
-    let path = path!("/root/src/").as_ref();
+    let path = "/root/src/".as_ref();
     let trashed_entry = fs.trash(path, options).await.unwrap();
 
-    assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_c.txt"))]);
+    assert_eq!(fs.files(), vec![PathBuf::from("/root/file_c.txt")]);
 
     fs.create_dir(path).await.unwrap();
 
-    assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_c.txt"))]);
+    assert_eq!(fs.files(), vec![PathBuf::from("/root/file_c.txt")]);
 
     let result = fs.restore(trashed_entry).await;
     assert!(result.is_err());
 
-    assert_eq!(fs.files(), vec![PathBuf::from(path!("/root/file_c.txt"))]);
+    assert_eq!(fs.files(), vec![PathBuf::from("/root/file_c.txt")]);
 }
 
 /// Create a directory symlink (`link` -> `target`).
@@ -1383,10 +1374,9 @@ async fn test_realfs_watch_stress_reports_missed_paths(
 #[gpui::test]
 async fn restore_can_be_retried_after_collision(cx: &mut TestAppContext) {
     let fs = FakeFs::new(cx.background_executor.clone());
-    let path = path!("/root/a.txt");
+    let path = "/root/a.txt";
     let remove_options = RemoveOptions::default();
-    fs.insert_tree(path!("/root"), json!({ "a.txt": "original"}))
-        .await;
+    fs.insert_tree("/root", json!({ "a.txt": "original"})).await;
 
     // We'll first trash the `a.txt` file so we can hold onto its `TrashId`,
     // allowing us to later attempt restoring it again, ensuring that it didn't

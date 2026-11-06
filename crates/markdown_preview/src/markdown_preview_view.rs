@@ -2347,7 +2347,6 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
-    use util::path;
     use util::paths::{PathStyle, PathWithPosition};
     use util::rel_path::{RelPath, rel_path};
     use util::test::TempTree;
@@ -2465,8 +2464,8 @@ mod tests {
         assert_eq!(
             preview_titles,
             [
-                format!("Preview {}", path!("docs/README.md")),
-                format!("Preview {}", path!("guide/README.md")),
+                format!("Preview {}", "docs/README.md"),
+                format!("Preview {}", "guide/README.md"),
             ]
         );
     }
@@ -2477,13 +2476,13 @@ mod tests {
     ) {
         let (project, workspace, multi_workspace) = markdown_workspace(cx, json!({}), false).await;
         let fs = project.read_with(cx, |project, _| project.fs().as_fake());
-        fs.insert_tree(path!("/outside"), json!({ "README.md": "# Readme\n" }))
+        fs.insert_tree("/outside", json!({ "README.md": "# Readme\n" }))
             .await;
         multi_workspace
             .update(cx, |_, window, cx| {
                 workspace.update(cx, |workspace, cx| {
                     workspace.open_abs_path(
-                        PathBuf::from(path!("/outside/README.md")),
+                        PathBuf::from("/outside/README.md"),
                         OpenOptions {
                             visible: Some(OpenVisible::None),
                             ..Default::default()
@@ -2571,14 +2570,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "docs": {"guide.txt": "alpha\nbeta\ngamma\n"},
                 "src": {"main.rs": "first\nsecond\nthird\n"}
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         register_markdown_language(&project, cx);
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
@@ -2590,7 +2589,7 @@ mod tests {
             open_preview_url(
                 "../src/main.rs:2:4".into(),
                 None,
-                Some(PathBuf::from(path!("/project/docs"))),
+                Some(PathBuf::from("/project/docs")),
                 None,
                 &workspace_weak,
                 window,
@@ -2617,7 +2616,7 @@ mod tests {
             open_preview_url(
                 "../src/main.rs".into(),
                 Some("L3".into()),
-                Some(PathBuf::from(path!("/project/docs"))),
+                Some(PathBuf::from("/project/docs")),
                 None,
                 &workspace_weak,
                 window,
@@ -2639,7 +2638,7 @@ mod tests {
             open_preview_url(
                 "guide.txt:2".into(),
                 None,
-                Some(PathBuf::from(path!("/project/docs"))),
+                Some(PathBuf::from("/project/docs")),
                 None,
                 &workspace_weak,
                 window,
@@ -2674,7 +2673,7 @@ mod tests {
             open_preview_url(
                 "main.rs:2".into(),
                 None,
-                Some(PathBuf::from(path!("/project/docs"))),
+                Some(PathBuf::from("/project/docs")),
                 None,
                 &workspace_weak,
                 window,
@@ -2697,7 +2696,7 @@ mod tests {
             open_preview_url(
                 "tel:123".into(),
                 None,
-                Some(PathBuf::from(path!("/project/docs"))),
+                Some(PathBuf::from("/project/docs")),
                 None,
                 &workspace_weak,
                 window,
@@ -2720,14 +2719,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "notes.md": notes,
                 "other.md": "# Other\n\nshort\n",
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         register_markdown_language(&project, cx);
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
@@ -2739,7 +2738,7 @@ mod tests {
             open_preview_url(
                 "notes.md".into(),
                 Some("target-section".into()),
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2789,7 +2788,7 @@ mod tests {
             open_preview_url(
                 "notes.md".into(),
                 None,
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2812,7 +2811,7 @@ mod tests {
             open_preview_url(
                 "notes.md:105:1".into(),
                 None,
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2843,7 +2842,7 @@ mod tests {
             open_preview_url(
                 "notes.md".into(),
                 Some("L3".into()),
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2874,7 +2873,7 @@ mod tests {
             open_preview_url(
                 "other.md".into(),
                 Some("missing-heading".into()),
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2909,7 +2908,7 @@ mod tests {
             open_preview_url(
                 "notes.md:5:3".into(),
                 None,
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -2955,9 +2954,9 @@ mod tests {
         notes.push_str("## Target Section\n\nfound it\n");
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), json!({ "notes.md": notes }))
+        fs.insert_tree("/project", json!({ "notes.md": notes }))
             .await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         register_markdown_language(&project, cx);
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
@@ -2969,7 +2968,7 @@ mod tests {
             open_preview_url(
                 "notes.md:180:1".into(),
                 None,
-                Some(PathBuf::from(path!("/project"))),
+                Some(PathBuf::from("/project")),
                 None,
                 &workspace_weak,
                 window,
@@ -3017,7 +3016,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "todo.md": "- [ ] Finish work\n"
                 }),
@@ -3026,7 +3025,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir/todo.md"))],
+                &[PathBuf::from("/dir/todo.md")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3082,11 +3081,7 @@ mod tests {
         cx.run_until_parked();
 
         assert_eq!(
-            app_state
-                .fs
-                .load(path!("/dir/todo.md").as_ref())
-                .await
-                .unwrap(),
+            app_state.fs.load("/dir/todo.md".as_ref()).await.unwrap(),
             "- [x] Finish work\n"
         );
     }
@@ -3098,7 +3093,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "note.md": "new\n"
                 }),
@@ -3107,7 +3102,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir/note.md"))],
+                &[PathBuf::from("/dir/note.md")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3171,7 +3166,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "todo.md": "- [ ] Finish work\n"
                 }),
@@ -3180,7 +3175,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir/todo.md"))],
+                &[PathBuf::from("/dir/todo.md")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3513,7 +3508,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "todo.md": "![image](image.png)\n",
                     "subdir": {},
@@ -3523,7 +3518,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir"))],
+                &[PathBuf::from("/dir")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3597,7 +3592,7 @@ mod tests {
 
         assert_eq!(
             saved_preview_path(cx, preview.entity_id().as_u64(), workspace_id),
-            PathBuf::from(path!("/dir/todo.md"))
+            PathBuf::from("/dir/todo.md")
         );
 
         let (entry_id, worktree_id, destination_path) = preview.read_with(cx, |preview, cx| {
@@ -3628,11 +3623,11 @@ mod tests {
 
         assert_eq!(
             preview.read_with(cx, |preview, _| preview.base_directory.clone()),
-            Some(PathBuf::from(path!("/dir/subdir")))
+            Some(PathBuf::from("/dir/subdir"))
         );
         assert_eq!(
             saved_preview_path(cx, preview.entity_id().as_u64(), workspace_id),
-            PathBuf::from(path!("/dir/subdir/renamed.md"))
+            PathBuf::from("/dir/subdir/renamed.md")
         );
     }
 
@@ -3645,7 +3640,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "a.md": "# A\n",
                     "b.md": "# B\n",
@@ -3655,7 +3650,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir"))],
+                &[PathBuf::from("/dir")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3745,7 +3740,7 @@ mod tests {
 
         assert_eq!(
             saved_preview_path(cx, preview.entity_id().as_u64(), workspace_id),
-            PathBuf::from(path!("/dir/a.md"))
+            PathBuf::from("/dir/a.md")
         );
 
         multi_workspace
@@ -3762,7 +3757,7 @@ mod tests {
 
         assert_eq!(
             saved_preview_path(cx, preview.entity_id().as_u64(), workspace_id),
-            PathBuf::from(path!("/dir/b.md")),
+            PathBuf::from("/dir/b.md"),
             "a Follow preview should persist the source editor it most recently followed"
         );
     }
@@ -3774,7 +3769,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "todo.md": "- [ ] Finish work\n"
                 }),
@@ -3783,7 +3778,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir/todo.md"))],
+                &[PathBuf::from("/dir/todo.md")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -3864,12 +3859,12 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/dir"), serde_json::Value::Object(entries))
+            .insert_tree("/dir", serde_json::Value::Object(entries))
             .await;
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir")).join(file_name)],
+                &[PathBuf::from("/dir").join(file_name)],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -4287,7 +4282,7 @@ mod tests {
         cx.update(|cx| set_auto_preview_enabled(cx, true));
         let open_target = OpenTarget::Path(
             PathWithPosition {
-                path: PathBuf::from(path!("/project/note.md")),
+                path: PathBuf::from("/project/note.md"),
                 row: Some(4),
                 column: Some(3),
             },
@@ -4344,7 +4339,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/dir"),
+                "/dir",
                 json!({
                     "a.md": "# A\n",
                     "b.md": "# B\n"
@@ -4354,7 +4349,7 @@ mod tests {
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/dir/a.md"))],
+                &[PathBuf::from("/dir/a.md")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -4371,9 +4366,7 @@ mod tests {
             .unwrap();
         let project = workspace.read_with(cx, |workspace, _| workspace.project().clone());
         let b_buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/b.md"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/b.md", cx))
             .await
             .unwrap();
 
@@ -4477,8 +4470,8 @@ mod tests {
     ) {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), files).await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        fs.insert_tree("/project", files).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         if lazy_language {
             register_lazy_markdown_language(&project, cx);
         } else {

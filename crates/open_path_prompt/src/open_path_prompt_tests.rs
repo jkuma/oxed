@@ -5,7 +5,6 @@ use gpui::{AppContext, Entity, TestAppContext, VisualTestContext};
 use picker::{Picker, PickerDelegate};
 use project::Project;
 use serde_json::json;
-use util::path;
 use workspace::{AppState, MultiWorkspace};
 
 use crate::{CandidateInfo, DirectoryState, OpenPathDelegate};
@@ -17,7 +16,7 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".a1": ".A1",
                 ".b1": ".B1",
@@ -37,21 +36,21 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
 
     let (picker, cx) = build_open_path_prompt(project, false, false, cx);
 
-    insert_query(path!("sadjaoislkdjasldj"), &picker, cx).await;
+    insert_query("sadjaoislkdjasldj", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), Vec::<String>::new());
 
-    let query = path!("/root");
+    let query = "/root";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["root"]);
 
     let expected_separator = "./";
 
     // If the query ends with a slash, the picker should show the contents of the directory and not show any of the hidden entries.
-    let query = path!("/root/");
+    let query = "/root/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
@@ -59,7 +58,7 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
     );
 
     // Show candidates for the query "a".
-    let query = path!("/root/a");
+    let query = "/root/a";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
@@ -67,15 +66,15 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
     );
 
     // Show candidates for the query "d".
-    let query = path!("/root/d");
+    let query = "/root/d";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir1", "dir2"]);
 
-    let query = path!("/root/dir2");
+    let query = "/root/dir2";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir2"]);
 
-    let query = path!("/root/dir2/");
+    let query = "/root/dir2/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
@@ -83,30 +82,30 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
     );
 
     // Show candidates for the query "d".
-    let query = path!("/root/dir2/d");
+    let query = "/root/dir2/d";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
         vec!["dir3", "dir4", "d1", "d2", "d3"]
     );
 
-    let query = path!("/root/dir2/di");
+    let query = "/root/dir2/di";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir3", "dir4"]);
 
     // Don't show candidates for the query ".".
-    let query = path!("/root/.");
+    let query = "/root/.";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), Vec::<String>::new());
 
     // Don't show any candidates for the query ".a".
-    let query = path!("/root/.a");
+    let query = "/root/.a";
     insert_query(query, &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), Vec::<String>::new());
 
     // Show candidates for the query "./".
     // Should show current directory and contents.
-    let query = path!("/root/./");
+    let query = "/root/./";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
@@ -114,7 +113,7 @@ async fn test_open_path_prompt(cx: &mut TestAppContext) {
     );
 
     // Show candidates for the query "../". Show parent contents.
-    let query = path!("/root/dir1/../");
+    let query = "/root/dir1/../";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
@@ -129,7 +128,7 @@ async fn test_open_path_prompt_completion(cx: &mut TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "a": "A",
                 "dir1": {},
@@ -143,20 +142,17 @@ async fn test_open_path_prompt_completion(cx: &mut TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
 
     let (picker, cx) = build_open_path_prompt(project, false, false, cx);
 
     // Confirm completion for the query "/root", since it's a directory, it should add a trailing slash.
-    let query = path!("/root");
+    let query = "/root";
     insert_query(query, &picker, cx).await;
-    assert_eq!(
-        confirm_completion(query, 0, &picker, cx).unwrap(),
-        path!("/root/")
-    );
+    assert_eq!(confirm_completion(query, 0, &picker, cx).unwrap(), "/root/");
 
     // Confirm completion for the query "/root/", selecting the first candidate "dir1", since it's a directory, it should add a trailing slash.
-    let query = path!("/root/");
+    let query = "/root/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 0, &picker, cx),
@@ -165,72 +161,72 @@ async fn test_open_path_prompt_completion(cx: &mut TestAppContext) {
     );
     assert_eq!(
         confirm_completion(query, 1, &picker, cx).unwrap(),
-        path!("/root/dir1/"),
+        "/root/dir1/",
         "Second entry is the first directory"
     );
 
     // Confirm completion for the query "/root/", selecting the third candidate "a", since it's a file, it should not add a trailing slash.
-    let query = path!("/root/");
+    let query = "/root/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 3, &picker, cx).unwrap(),
-        path!("/root/a")
+        "/root/a"
     );
 
-    let query = path!("/root/a");
+    let query = "/root/a";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 0, &picker, cx).unwrap(),
-        path!("/root/a")
+        "/root/a"
     );
 
-    let query = path!("/root/d");
+    let query = "/root/d";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 1, &picker, cx).unwrap(),
-        path!("/root/dir2/")
+        "/root/dir2/"
     );
 
-    let query = path!("/root/dir2");
+    let query = "/root/dir2";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 0, &picker, cx).unwrap(),
-        path!("/root/dir2/")
+        "/root/dir2/"
     );
 
-    let query = path!("/root/dir2/");
+    let query = "/root/dir2/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 1, &picker, cx).unwrap(),
-        path!("/root/dir2/dir3/")
+        "/root/dir2/dir3/"
     );
 
-    let query = path!("/root/dir2/");
+    let query = "/root/dir2/";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 3, &picker, cx).unwrap(),
-        path!("/root/dir2/c")
+        "/root/dir2/c"
     );
 
-    let query = path!("/root/dir2/d");
+    let query = "/root/dir2/d";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 0, &picker, cx).unwrap(),
-        path!("/root/dir2/dir3/")
+        "/root/dir2/dir3/"
     );
 
-    let query = path!("/root/dir2/d");
+    let query = "/root/dir2/d";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 1, &picker, cx).unwrap(),
-        path!("/root/dir2/dir4/")
+        "/root/dir2/dir4/"
     );
 
-    let query = path!("/root/dir2/di");
+    let query = "/root/dir2/di";
     insert_query(query, &picker, cx).await;
     assert_eq!(
         confirm_completion(query, 1, &picker, cx).unwrap(),
-        path!("/root/dir2/dir4/")
+        "/root/dir2/dir4/"
     );
 }
 
@@ -241,7 +237,7 @@ async fn test_new_path_prompt(cx: &mut TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "a1": "A1",
                 "a2": "A2",
@@ -259,39 +255,35 @@ async fn test_new_path_prompt(cx: &mut TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
 
     let (picker, cx) = build_open_path_prompt(project, true, false, cx);
 
-    insert_query(path!("/root"), &picker, cx).await;
+    insert_query("/root", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["root"]);
 
-    insert_query(path!("/root/d"), &picker, cx).await;
+    insert_query("/root/d", &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
         vec!["d", "dir1", "dir2"]
     );
 
-    insert_query(path!("/root/dir1"), &picker, cx).await;
+    insert_query("/root/dir1", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir1"]);
 
-    insert_query(path!("/root/dir12"), &picker, cx).await;
+    insert_query("/root/dir12", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir12"]);
 
-    insert_query(path!("/root/dir1"), &picker, cx).await;
+    insert_query("/root/dir1", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec!["dir1"]);
 }
 
 #[gpui::test]
 async fn test_open_path_prompt_panics_with_stale_highlight_positions(cx: &mut TestAppContext) {
     let app_state = init_test(cx);
-    app_state
-        .fs
-        .as_fake()
-        .insert_tree(path!("/root"), json!({}))
-        .await;
+    app_state.fs.as_fake().insert_tree("/root", json!({})).await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (picker, cx) = build_open_path_prompt(project, false, false, cx);
 
     picker.update_in(cx, |picker, window, cx| {
@@ -322,7 +314,7 @@ async fn test_open_path_prompt_with_show_hidden(cx: &mut TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "directory_1": {},
                 "directory_2": {},
@@ -331,19 +323,19 @@ async fn test_open_path_prompt_with_show_hidden(cx: &mut TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
 
     let (picker, cx) = build_open_path_prompt(project, false, true, cx);
 
     let expected_separator = "./";
 
-    insert_query(path!("/root/"), &picker, cx).await;
+    insert_query("/root/", &picker, cx).await;
     assert_eq!(
         collect_match_candidates(&picker, cx),
         vec![expected_separator, ".hidden", "directory_1", "directory_2"]
     );
 
-    insert_query(path!("/root/."), &picker, cx).await;
+    insert_query("/root/.", &picker, cx).await;
     assert_eq!(collect_match_candidates(&picker, cx), vec![".hidden"]);
 }
 
@@ -354,7 +346,7 @@ async fn test_dismiss_cancels_in_flight_match(cx: &mut TestAppContext) {
         .fs
         .as_fake()
         .insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "a1": "A1",
                 "a2": "A2",
@@ -363,10 +355,10 @@ async fn test_dismiss_cancels_in_flight_match(cx: &mut TestAppContext) {
         )
         .await;
 
-    let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
     let (picker, cx) = build_open_path_prompt(project, false, false, cx);
 
-    insert_query(path!("/root/a"), &picker, cx).await;
+    insert_query("/root/a", &picker, cx).await;
 
     let cancel_flag = picker.read_with(cx, |picker, _| picker.delegate.cancel_flag.clone());
     assert!(

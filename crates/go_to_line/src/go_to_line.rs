@@ -360,7 +360,7 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use std::{num::NonZeroU32, sync::Arc, time::Duration};
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{AppState, MultiWorkspace, Workspace};
 
     #[gpui::test]
@@ -368,7 +368,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": indoc!{"
                     struct SingleLine; // display line 0
@@ -389,7 +389,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -399,9 +399,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -589,14 +587,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": "ēlo"
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -613,9 +611,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -675,14 +671,14 @@ mod tests {
         let text = "ēlo你好";
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": text
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -699,9 +695,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -754,14 +748,14 @@ mod tests {
         let text = "ēlo你好";
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 "a.rs": text
             }),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -778,9 +772,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -963,10 +955,9 @@ mod tests {
             .map(|i| format!("struct Line{};", i))
             .collect::<Vec<_>>()
             .join("\n");
-        fs.insert_tree(path!("/dir"), json!({"a.rs": file_content}))
-            .await;
+        fs.insert_tree("/dir", json!({"a.rs": file_content})).await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -976,9 +967,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -1021,10 +1010,9 @@ mod tests {
             .map(|i| format!("struct Line{};", i))
             .collect::<Vec<_>>()
             .join("\n");
-        fs.insert_tree(path!("/dir"), json!({"a.rs": file_content}))
-            .await;
+        fs.insert_tree("/dir", json!({"a.rs": file_content})).await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1034,9 +1022,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace
@@ -1077,10 +1063,9 @@ mod tests {
             .map(|i| format!("struct Line{};", i))
             .collect::<Vec<_>>()
             .join("\n");
-        fs.insert_tree(path!("/dir"), json!({"a.rs": file_content}))
-            .await;
+        fs.insert_tree("/dir", json!({"a.rs": file_content})).await;
 
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1090,9 +1075,7 @@ mod tests {
             })
         });
         let _buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let editor = workspace

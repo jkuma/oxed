@@ -809,10 +809,7 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
     use unindent::Unindent as _;
-    use util::{
-        path,
-        rel_path::{RelPath, rel_path},
-    };
+    use util::rel_path::{RelPath, rel_path};
     use workspace::MultiWorkspace;
 
     use super::*;
@@ -858,7 +855,7 @@ mod tests {
         let initial_conflict_text = build_conflict_text(0);
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "helper.txt": "same\n",
@@ -866,14 +863,14 @@ mod tests {
             }),
         )
         .await;
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state
                 .refs
                 .insert("MERGE_HEAD".into(), "conflict-head".into());
         })
         .unwrap();
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[(
                 "conflict.txt",
                 FileStatus::Unmerged(UnmergedStatus {
@@ -883,14 +880,14 @@ mod tests {
             )],
         );
         fs.set_merge_base_content_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("conflict.txt", build_conflict_text(1)),
                 ("helper.txt", "same\n".to_string()),
             ],
         );
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -904,7 +901,7 @@ mod tests {
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/conflict.txt"), cx)
+                project.open_local_buffer("/project/conflict.txt", cx)
             })
             .await
             .unwrap();
@@ -917,13 +914,13 @@ mod tests {
             window
                 .spawn(cx, async move |cx| {
                     cx.background_executor().simulate_random_delay().await;
-                    fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+                    fs.with_git_state("/project/.git".as_ref(), true, |state| {
                         state.refs.insert("HEAD".into(), "head-1".into());
                         state.refs.remove("MERGE_HEAD");
                     })
                     .unwrap();
                     fs.set_status_for_repo(
-                        path!("/project/.git").as_ref(),
+                        "/project/.git".as_ref(),
                         &[
                             (
                                 "conflict.txt",
@@ -944,7 +941,7 @@ mod tests {
                     // FakeFs assigns deterministic OIDs by entry position; flipping order churns
                     // conflict diff identity without reaching into view internals.
                     fs.set_merge_base_content_for_repo(
-                        path!("/project/.git").as_ref(),
+                        "/project/.git".as_ref(),
                         &[
                             ("helper.txt", "helper-base\n".to_string()),
                             ("conflict.txt", build_conflict_text(2)),
@@ -993,7 +990,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "C",
@@ -1003,7 +1000,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1016,12 +1013,12 @@ mod tests {
         cx.run_until_parked();
 
         fs.set_head_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("a.txt", "B".into()), ("d.txt", "created-in-head".into())],
             "sha",
         );
         fs.set_merge_base_content_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[
                 ("a.txt", "A".into()),
                 ("c.txt", "in-merge-base-and-work-tree".into()),
@@ -1090,14 +1087,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "changed",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());

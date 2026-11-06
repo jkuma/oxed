@@ -27,7 +27,7 @@ use std::{
     str::FromStr,
 };
 use unindent::Unindent as _;
-use util::{RandomCharIter, path, post_inc, rel_path::rel_path};
+use util::{RandomCharIter, post_inc, rel_path::rel_path};
 use workspace::MultiWorkspace;
 
 #[ctor::ctor(unsafe)]
@@ -41,7 +41,7 @@ async fn test_diagnostics(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "consts.rs": "
                 const a: i32 = 'a';
@@ -67,14 +67,14 @@ async fn test_diagnostics(cx: &mut TestAppContext) {
     .await;
 
     let language_server_id = LanguageServerId(0);
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
         .unwrap();
-    let uri = lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap();
+    let uri = lsp::Uri::from_file_path("/test/main.rs").unwrap();
 
     // Create some diagnostics
     lsp_store.update(cx, |lsp_store, cx| {
@@ -177,7 +177,7 @@ async fn test_diagnostics(cx: &mut TestAppContext) {
             .update_diagnostics(
                 language_server_id,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/consts.rs")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/consts.rs").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(
                             lsp::Position::new(0, 15),
@@ -257,7 +257,7 @@ async fn test_diagnostics(cx: &mut TestAppContext) {
             .update_diagnostics(
                 language_server_id,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/consts.rs")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/consts.rs").unwrap(),
                     diagnostics: vec![
                         lsp::Diagnostic {
                             range: lsp::Range::new(
@@ -338,7 +338,7 @@ async fn test_diagnostics_with_folds(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "main.js": "
             function test() {
@@ -353,7 +353,7 @@ async fn test_diagnostics_with_folds(cx: &mut TestAppContext) {
 
     let server_id_1 = LanguageServerId(100);
     let server_id_2 = LanguageServerId(101);
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -374,14 +374,14 @@ async fn test_diagnostics_with_folds(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_1,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.js").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(4, 0), lsp::Position::new(4, 4)),
                         severity: Some(lsp::DiagnosticSeverity::WARNING),
                         message: lsp::DiagnosticMessage::from("no method `tset`"),
                         related_information: Some(vec![lsp::DiagnosticRelatedInformation {
                             location: lsp::Location::new(
-                                lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                                lsp::Uri::from_file_path("/test/main.js").unwrap(),
                                 lsp::Range::new(
                                     lsp::Position::new(0, 9),
                                     lsp::Position::new(0, 13),
@@ -448,7 +448,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "main.js": "
                 a();
@@ -463,7 +463,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
 
     let server_id_1 = LanguageServerId(100);
     let server_id_2 = LanguageServerId(101);
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -484,7 +484,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_1,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.js").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(0, 0), lsp::Position::new(0, 1)),
                         severity: Some(lsp::DiagnosticSeverity::WARNING),
@@ -528,7 +528,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_2,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.js").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(1, 0), lsp::Position::new(1, 1)),
                         severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -571,7 +571,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_1,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.js").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(2, 0), lsp::Position::new(2, 1)),
                         severity: Some(lsp::DiagnosticSeverity::WARNING),
@@ -590,7 +590,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_2,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.rs").unwrap(),
                     diagnostics: vec![],
                     version: None,
                 },
@@ -627,7 +627,7 @@ async fn test_diagnostics_multiple_servers(cx: &mut TestAppContext) {
             .update_diagnostics(
                 server_id_2,
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/test/main.js")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/test/main.js").unwrap(),
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(3, 0), lsp::Position::new(3, 1)),
                         severity: Some(lsp::DiagnosticSeverity::WARNING),
@@ -673,9 +673,9 @@ async fn test_random_diagnostics_blocks(cx: &mut TestAppContext, mut rng: StdRng
         .unwrap_or(10);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/test"), json!({})).await;
+    fs.insert_tree("/test", json!({})).await;
 
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -728,7 +728,7 @@ async fn test_random_diagnostics_blocks(cx: &mut TestAppContext, mut rng: StdRng
                         // insert a set of diagnostics for a new path
                         _ => {
                             let path: PathBuf =
-                                format!(path!("/test/{}.rs"), post_inc(&mut next_filename)).into();
+                                format!("/test/{}.rs", post_inc(&mut next_filename)).into();
                             let len = rng.random_range(128..256);
                             let content =
                                 RandomCharIter::new(&mut rng).take(len).collect::<String>();
@@ -848,9 +848,9 @@ async fn test_random_diagnostics_with_inlays(cx: &mut TestAppContext, mut rng: S
         .unwrap_or(10);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/test"), json!({})).await;
+    fs.insert_tree("/test", json!({})).await;
 
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -930,7 +930,7 @@ async fn test_random_diagnostics_with_inlays(cx: &mut TestAppContext, mut rng: S
                         // insert a set of diagnostics for a new path
                         _ => {
                             let path: PathBuf =
-                                format!(path!("/test/{}.rs"), post_inc(&mut next_filename)).into();
+                                format!("/test/{}.rs", post_inc(&mut next_filename)).into();
                             let len = rng.random_range(128..256);
                             let content =
                                 RandomCharIter::new(&mut rng).take(len).collect::<String>();
@@ -1019,7 +1019,7 @@ async fn active_diagnostics_dismiss_after_invalidation(cx: &mut TestAppContext) 
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![lsp::Diagnostic {
                             range: lsp::Range::new(
@@ -1060,7 +1060,7 @@ async fn active_diagnostics_dismiss_after_invalidation(cx: &mut TestAppContext) 
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![lsp::Diagnostic {
                             range: lsp::Range::new(
@@ -1103,7 +1103,7 @@ async fn active_diagnostics_dismiss_after_invalidation(cx: &mut TestAppContext) 
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: Vec::new(),
                     },
@@ -1153,7 +1153,7 @@ async fn cycle_through_same_place_diagnostics(cx: &mut TestAppContext) {
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![
                             lsp::Diagnostic {
@@ -1321,7 +1321,7 @@ async fn test_diagnostics_with_links(cx: &mut TestAppContext) {
             lsp_store.update_diagnostics(
                 LanguageServerId(0),
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                     version: None,
                     diagnostics: vec![lsp::Diagnostic {
                         range: lsp::Range::new(lsp::Position::new(0, 8), lsp::Position::new(0, 12)),
@@ -1421,7 +1421,7 @@ async fn test_markup_content_diagnostic_messages_render_as_markdown(cx: &mut Tes
             lsp_store.update_diagnostics(
                 LanguageServerId(0),
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                     version: None,
                     diagnostics: vec![
                         lsp::Diagnostic {
@@ -1550,10 +1550,9 @@ async fn test_diagnostics_views_update_when_only_markdown_changes(cx: &mut TestA
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/test"), json!({ "main.rs": "x\n" }))
-        .await;
+    fs.insert_tree("/test", json!({ "main.rs": "x\n" })).await;
 
-    let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs, ["/test".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -1572,7 +1571,7 @@ async fn test_diagnostics_views_update_when_only_markdown_changes(cx: &mut TestA
         })
         .await
         .unwrap();
-    let uri = lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap();
+    let uri = lsp::Uri::from_file_path("/test/main.rs").unwrap();
     let language_server_id = LanguageServerId(0);
 
     lsp_store
@@ -1710,7 +1709,7 @@ async fn test_hover_diagnostic_and_info_popovers(cx: &mut gpui::TestAppContext) 
             lsp_store.update_diagnostics(
                 LanguageServerId(0),
                 lsp::PublishDiagnosticsParams {
-                    uri: lsp::Uri::from_file_path(path!("/root/dir/file.rs")).unwrap(),
+                    uri: lsp::Uri::from_file_path("/root/dir/file.rs").unwrap(),
                     version: None,
                     diagnostics: vec![lsp::Diagnostic {
                         range,
@@ -1766,7 +1765,7 @@ async fn test_diagnostics_with_code(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "main.js": "
                 function test() {
@@ -1782,14 +1781,14 @@ async fn test_diagnostics_with_code(cx: &mut TestAppContext) {
     .await;
 
     let language_server_id = LanguageServerId(0);
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
         .unwrap();
-    let uri = lsp::Uri::from_file_path(path!("/root/main.js")).unwrap();
+    let uri = lsp::Uri::from_file_path("/root/main.js").unwrap();
 
     // Create diagnostics with code fields
     lsp_store.update(cx, |lsp_store, cx| {
@@ -1877,7 +1876,7 @@ async fn go_to_diagnostic_with_severity(cx: &mut TestAppContext) {
                 .update_diagnostics(
                     LanguageServerId(0),
                     lsp::PublishDiagnosticsParams {
-                        uri: lsp::Uri::from_file_path(path!("/root/file")).unwrap(),
+                        uri: lsp::Uri::from_file_path("/root/file").unwrap(),
                         version: None,
                         diagnostics: vec![
                             lsp::Diagnostic {
@@ -1996,7 +1995,7 @@ async fn test_buffer_diagnostics(cx: &mut TestAppContext) {
     // `ProjectDiagnosticsEditor`.
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "main.rs": "
                 fn main() {
@@ -2020,7 +2019,7 @@ async fn test_buffer_diagnostics(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
     let project_path = project::ProjectPath {
@@ -2038,7 +2037,7 @@ async fn test_buffer_diagnostics(cx: &mut TestAppContext) {
 
     // Create the diagnostics for `main.rs`.
     let language_server_id = LanguageServerId(0);
-    let uri = lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap();
+    let uri = lsp::Uri::from_file_path("/test/main.rs").unwrap();
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
 
     lsp_store.update(cx, |lsp_store, cx| {
@@ -2089,7 +2088,7 @@ async fn test_buffer_diagnostics(cx: &mut TestAppContext) {
         // diagnostics are not included in `BufferDiagnosticsEditor` when it is
         // deployed for main.rs.
         lsp_store.update_diagnostics(language_server_id, lsp::PublishDiagnosticsParams {
-            uri: lsp::Uri::from_file_path(path!("/test/other.rs")).unwrap(),
+            uri: lsp::Uri::from_file_path("/test/other.rs").unwrap(),
             diagnostics: vec![
                 lsp::Diagnostic{
                     range: lsp::Range::new(lsp::Position::new(1, 8), lsp::Position::new(1, 14)),
@@ -2163,7 +2162,7 @@ async fn test_buffer_diagnostics_without_warnings(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "main.rs": "
                 fn main() {
@@ -2180,7 +2179,7 @@ async fn test_buffer_diagnostics_without_warnings(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
     let project_path = project::ProjectPath {
@@ -2197,7 +2196,7 @@ async fn test_buffer_diagnostics_without_warnings(cx: &mut TestAppContext) {
         .ok();
 
     let language_server_id = LanguageServerId(0);
-    let uri = lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap();
+    let uri = lsp::Uri::from_file_path("/test/main.rs").unwrap();
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
 
     lsp_store.update(cx, |lsp_store, cx| {
@@ -2296,7 +2295,7 @@ async fn test_buffer_diagnostics_multiple_servers(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/test"),
+        "/test",
         json!({
             "main.rs": "
                 fn main() {
@@ -2313,7 +2312,7 @@ async fn test_buffer_diagnostics_multiple_servers(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let cx = &mut VisualTestContext::from_window(window.into(), cx);
     let project_path = project::ProjectPath {
@@ -2334,7 +2333,7 @@ async fn test_buffer_diagnostics_multiple_servers(cx: &mut TestAppContext) {
     // assert that both warnings are rendered in the editor.
     let language_server_id_a = LanguageServerId(0);
     let language_server_id_b = LanguageServerId(1);
-    let uri = lsp::Uri::from_file_path(path!("/test/main.rs")).unwrap();
+    let uri = lsp::Uri::from_file_path("/test/main.rs").unwrap();
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
 
     lsp_store.update(cx, |lsp_store, cx| {

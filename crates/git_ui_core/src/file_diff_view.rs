@@ -469,7 +469,6 @@ mod tests {
     use settings::{DiffViewStyle, SettingsStore};
     use std::path::PathBuf;
     use unindent::unindent;
-    use util::path;
     use workspace::MultiWorkspace;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -491,7 +490,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             serde_json::json!({
                 "old_file.txt": "old line 1\nline 2\nold line 3\nline 4\n",
                 "new_file.txt": "new line 1\nline 2\nnew line 3\nline 4\n"
@@ -499,7 +498,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
 
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
@@ -508,8 +507,8 @@ mod tests {
         let diff_view = workspace
             .update_in(cx, |workspace, window, cx| {
                 FileDiffView::open(
-                    path!("/test/old_file.txt").into(),
-                    path!("/test/new_file.txt").into(),
+                    "/test/old_file.txt".into(),
+                    "/test/new_file.txt".into(),
                     None,
                     workspace.weak_handle(),
                     window,
@@ -539,7 +538,7 @@ mod tests {
 
         // Modify the new file on disk
         fs.save(
-            path!("/test/new_file.txt").as_ref(),
+            "/test/new_file.txt".as_ref(),
             &unindent(
                 "
                 new line 1
@@ -577,7 +576,7 @@ mod tests {
 
         // Modify the old file on disk
         fs.save(
-            path!("/test/old_file.txt").as_ref(),
+            "/test/old_file.txt".as_ref(),
             &unindent(
                 "
                 new line 1
@@ -618,11 +617,7 @@ mod tests {
             );
             assert_eq!(
                 diff_view.tab_tooltip_text(cx).unwrap(),
-                format!(
-                    "{} ↔ {}",
-                    path!("test/old_file.txt"),
-                    path!("test/new_file.txt")
-                )
+                format!("{} ↔ {}", "test/old_file.txt", "test/new_file.txt")
             );
             let (breadcrumbs, _) = diff_view.breadcrumbs(cx).unwrap();
             assert_eq!(
@@ -669,7 +664,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             serde_json::json!({
                 "old_file.rs": "fn main() {}\n",
                 "new_file.rs": "fn main() { unimplemented!() }\n",
@@ -677,7 +672,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -685,8 +680,8 @@ mod tests {
         let diff_view = workspace
             .update_in(cx, |workspace, window, cx| {
                 FileDiffView::open(
-                    path!("/test/old_file.rs").into(),
-                    path!("/test/new_file.rs").into(),
+                    "/test/old_file.rs".into(),
+                    "/test/new_file.rs".into(),
                     None,
                     workspace.weak_handle(),
                     window,
@@ -739,7 +734,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             serde_json::json!({
                 "old_file.txt": "old line 1\nline 2\nold line 3\nline 4\n",
                 "new_file.txt": "new line 1\nline 2\nnew line 3\nline 4\n"
@@ -756,8 +751,8 @@ mod tests {
         let diff_view = workspace
             .update_in(cx, |workspace, window, cx| {
                 FileDiffView::open(
-                    PathBuf::from(path!("/test/old_file.txt")),
-                    PathBuf::from(path!("/test/new_file.txt")),
+                    PathBuf::from("/test/old_file.txt"),
+                    PathBuf::from("/test/new_file.txt"),
                     None,
                     workspace.weak_handle(),
                     window,
@@ -792,7 +787,7 @@ mod tests {
 
         save_task.await.expect("Save should succeed");
 
-        let saved_content = fs.load(path!("/test/new_file.txt").as_ref()).await.unwrap();
+        let saved_content = fs.load("/test/new_file.txt".as_ref()).await.unwrap();
         assert_eq!(
             saved_content,
             "modified new line 1\nline 2\nnew line 3\nline 4\n"

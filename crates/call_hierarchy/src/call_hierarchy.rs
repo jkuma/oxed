@@ -1247,7 +1247,7 @@ mod tests {
         atomic::{AtomicBool, Ordering},
     };
     use theme::SyntaxTheme;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{AppState, MultiWorkspace};
 
     #[gpui::test]
@@ -1255,13 +1255,13 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"src": {"main.rs": source()}}))
+        fs.insert_tree("/test", json!({"src": {"main.rs": source()}}))
             .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "my_function",
-            path!("/test/src/main.rs").as_ref(),
+            "/test/src/main.rs".as_ref(),
             10,
             None,
             &project,
@@ -1289,14 +1289,13 @@ mod tests {
             .join("main.rs");
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
         fs.insert_tree(
             &home_dir,
             json!({"projects": {"app": {"src": {"main.rs": source()}}}}),
         )
         .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call("my_function", &external_path, 10, None, &project, cx).await;
         let display = cx.update(|cx| compute_call_display(&call, cx));
@@ -1313,13 +1312,13 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"src": {"lib.rs": source()}}))
+        fs.insert_tree("/test", json!({"src": {"lib.rs": source()}}))
             .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "helper",
-            path!("/test/src/lib.rs").as_ref(),
+            "/test/src/lib.rs".as_ref(),
             5,
             Some("fn helper() -> i32".to_string()),
             &project,
@@ -1340,13 +1339,13 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"src": {"lib.rs": source()}}))
+        fs.insert_tree("/test", json!({"src": {"lib.rs": source()}}))
             .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let mut call = make_call(
             "helper",
-            path!("/test/src/lib.rs").as_ref(),
+            "/test/src/lib.rs".as_ref(),
             5,
             Some("fn helper(&self) -> i32".to_string()),
             &project,
@@ -1368,13 +1367,13 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"src": {"lib.rs": source()}}))
+        fs.insert_tree("/test", json!({"src": {"lib.rs": source()}}))
             .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "helper",
-            path!("/test/src/lib.rs").as_ref(),
+            "/test/src/lib.rs".as_ref(),
             5,
             Some("fn helper(&self, arg: i32) -> i32".to_string()),
             &project,
@@ -1391,13 +1390,12 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "foo",
-            path!("/test/main.rs").as_ref(),
+            "/test/main.rs".as_ref(),
             0,
             Some("line1\nline2\nline3".to_string()),
             &project,
@@ -1415,13 +1413,12 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "contains",
-            path!("/test/main.rs").as_ref(),
+            "/test/main.rs".as_ref(),
             0,
             Some(
                 "fn contains<Q>(&self, value: &Q) -> bool\nwhere\n    Q: ?Sized,\n    T: Borrow<Q>,"
@@ -1444,13 +1441,12 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "hints",
-            path!("/test/main.rs").as_ref(),
+            "/test/main.rs".as_ref(),
             0,
             Some(
                 "fn hints(\n    hints: &mut Vec<InlayHint>,\n    ctx: &mut InlayHintCtx,\n)"
@@ -1473,13 +1469,12 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "f",
-            path!("/test/main.rs").as_ref(),
+            "/test/main.rs".as_ref(),
             0,
             Some("fn f()".to_string()),
             &project,
@@ -1496,13 +1491,12 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"main.rs": source()}))
-            .await;
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        fs.insert_tree("/test", json!({"main.rs": source()})).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
 
         let call = make_call(
             "handle_event",
-            path!("/test/main.rs").as_ref(),
+            "/test/main.rs".as_ref(),
             0,
             Some("fn handle_event(\n    ctx: &mut InlayHintCtx<'_>,\n) -> bool".to_string()),
             &project,
@@ -2120,7 +2114,7 @@ mod tests {
                 cx.emit(project::Event::LanguageServerBufferRegistered {
                     server_id: lsp::LanguageServerId(0),
                     buffer_id,
-                    buffer_abs_path: std::path::PathBuf::from(path!("/test/src/main.rs")),
+                    buffer_abs_path: std::path::PathBuf::from("/test/src/main.rs"),
                     name: None,
                 });
             });
@@ -2494,10 +2488,10 @@ mod tests {
         &'a mut VisualTestContext,
     ) {
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/test"), json!({"src": {"main.rs": source_text}}))
+        fs.insert_tree("/test", json!({"src": {"main.rs": source_text}}))
             .await;
 
-        let project = Project::test(fs, [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs, ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
 
         let mut fake_servers = project.read_with(cx, |project, _| {
@@ -2543,7 +2537,7 @@ mod tests {
 
         let fake_server = fake_servers.next().await.unwrap();
         cx.executor().run_until_parked();
-        let test_uri = lsp::Uri::from_file_path(path!("/test/src/main.rs")).unwrap();
+        let test_uri = lsp::Uri::from_file_path("/test/src/main.rs").unwrap();
         (workspace, fake_server, test_uri, cx)
     }
 }

@@ -2172,7 +2172,6 @@ mod tests {
     use rand::{Rng, rngs::StdRng};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use workspace::MultiWorkspace;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -2374,7 +2373,7 @@ mod tests {
     ) -> (Arc<FakeFs>, Entity<Project>, Entity<Repository>) {
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/dir"),
+            "/dir",
             json!({
                 ".git": {},
                 "file.txt": "buffer_text".to_string()
@@ -2382,16 +2381,16 @@ mod tests {
         )
         .await;
         fs.set_head_for_repo(
-            path!("/dir/.git").as_ref(),
+            "/dir/.git".as_ref(),
             &[("file.txt", "test".to_string())],
             "deadbeef",
         );
         fs.set_index_for_repo(
-            path!("/dir/.git").as_ref(),
+            "/dir/.git".as_ref(),
             &[("file.txt", "index_text".to_string())],
         );
 
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let repository = cx.read(|cx| project.read(cx).active_repository(cx));
 
         (fs, project, repository.unwrap())
@@ -2629,7 +2628,7 @@ mod tests {
         cx.run_until_parked();
 
         let branch_to_delete = "feature-auth";
-        fs.with_git_state(path!("/dir/.git").as_ref(), true, |state| {
+        fs.with_git_state("/dir/.git".as_ref(), true, |state| {
             state
                 .branches_requiring_force_delete
                 .insert(branch_to_delete.to_string());
@@ -2702,7 +2701,7 @@ mod tests {
         cx.run_until_parked();
 
         let branch_to_delete = "feature-auth";
-        fs.with_git_state(path!("/dir/.git").as_ref(), true, |state| {
+        fs.with_git_state("/dir/.git".as_ref(), true, |state| {
             state
                 .branches_requiring_force_delete
                 .insert(branch_to_delete.to_string());
@@ -2793,7 +2792,7 @@ mod tests {
         cx.run_until_parked();
 
         let branch_to_delete = "feature-auth";
-        fs.with_git_state(path!("/dir/.git").as_ref(), true, |state| {
+        fs.with_git_state("/dir/.git".as_ref(), true, |state| {
             state
                 .branches_requiring_force_delete
                 .insert(branch_to_delete.to_string());

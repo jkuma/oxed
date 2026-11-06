@@ -6,7 +6,6 @@ use project::{Project, ProjectEntryId, project_search::PathInclusionMatcher, sea
 use serde_json::json;
 use settings::Settings;
 use util::{
-    path,
     paths::{PathMatcher, PathStyle},
     rel_path::RelPath,
 };
@@ -33,7 +32,7 @@ async fn test_path_inclusion_matcher(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let worktree = project.update(cx, |project, cx| project.worktrees(cx).next().unwrap());
     let (worktree_settings, worktree_snapshot) = worktree.update(cx, |worktree, cx| {
         let settings_location = worktree.settings_location(cx);

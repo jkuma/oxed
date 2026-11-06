@@ -1395,7 +1395,6 @@ mod tests {
     use serde_json::json;
     use settings::Settings as _;
     use settings::SettingsStore;
-    use util::path;
     use workspace::MultiWorkspace;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -1437,7 +1436,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "project": {
                     ".git": {},
@@ -1448,18 +1447,18 @@ mod tests {
         )
         .await;
         fs.set_head_for_repo(
-            path!("/root/project/.git").as_ref(),
+            "/root/project/.git".as_ref(),
             &[("file.txt", "buffer_text".to_string())],
             "deadbeef",
         );
 
-        let project = Project::test(fs.clone(), [path!("/root/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root/project".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
             project.repositories(cx).values().next().unwrap().clone()
         });
-        let worktree_path = PathBuf::from(path!("/root/worktrees/dirty-wt"));
+        let worktree_path = PathBuf::from("/root/worktrees/dirty-wt");
 
         cx.update(|cx| {
             repository.update(cx, |repository, _| {
@@ -1680,7 +1679,7 @@ mod tests {
         let (fs, worktree_picker, repository, worktree_path, mut cx) =
             init_worktree_picker_test(cx).await;
 
-        fs.with_git_state(path!("/root/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/root/project/.git".as_ref(), true, |state| {
             state
                 .worktrees_requiring_force_delete
                 .insert(worktree_path.clone());
@@ -1723,7 +1722,7 @@ mod tests {
         let (fs, worktree_picker, _repository, worktree_path, mut cx) =
             init_worktree_picker_test(cx).await;
 
-        fs.with_git_state(path!("/root/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/root/project/.git".as_ref(), true, |state| {
             state
                 .worktrees_requiring_force_delete
                 .insert(worktree_path.clone());
@@ -1788,7 +1787,7 @@ mod tests {
         let (fs, worktree_picker, repository, worktree_path, mut cx) =
             init_worktree_picker_test(cx).await;
 
-        fs.with_git_state(path!("/root/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/root/project/.git".as_ref(), true, |state| {
             state
                 .worktrees_requiring_force_delete
                 .insert(worktree_path.clone());
@@ -1825,7 +1824,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "project": {
                     ".git": {},
@@ -1836,18 +1835,18 @@ mod tests {
         )
         .await;
         fs.set_head_for_repo(
-            path!("/root/project/.git").as_ref(),
+            "/root/project/.git".as_ref(),
             &[("file.txt", "buffer_text".to_string())],
             "deadbeef",
         );
 
-        let project = Project::test(fs.clone(), [path!("/root/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root/project".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
             project.repositories(cx).values().next().unwrap().clone()
         });
-        let second_worktree_path = PathBuf::from(path!("/root/worktrees/second-wt"));
+        let second_worktree_path = PathBuf::from("/root/worktrees/second-wt");
 
         cx.update(|cx| {
             repository.update(cx, |repository, _| {
@@ -1886,7 +1885,7 @@ mod tests {
         });
         cx.run_until_parked();
 
-        let project_path = PathBuf::from(path!("/root/project"));
+        let project_path = PathBuf::from("/root/project");
         worktree_picker.update(&mut cx, |worktree_picker, cx| {
             worktree_picker.picker.update(cx, |picker, _| {
                 let matches = &picker.delegate.matches;

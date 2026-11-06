@@ -637,7 +637,6 @@ mod tests {
     use gpui::TestAppContext;
     use indoc::indoc;
     use settings::CodeLens;
-    use util::path;
 
     use multi_buffer::{MultiBufferRow, ToPoint as _};
     use text::Point;
@@ -1615,10 +1614,10 @@ mod tests {
         let resolved_lines = Arc::new(Mutex::new(Vec::<u32>::new()));
 
         let fs = project::FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), serde_json::json!({ "main.ts": lines }))
+        fs.insert_tree("/dir", serde_json::json!({ "main.ts": lines }))
             .await;
 
-        let project = project::Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = project::Project::test(fs, ["/dir".as_ref()], cx).await;
         let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
             workspace::MultiWorkspace::test_new(project.clone(), window, cx)
         });
@@ -1654,7 +1653,7 @@ mod tests {
         let editor = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    std::path::PathBuf::from(path!("/dir/main.ts")),
+                    std::path::PathBuf::from("/dir/main.ts"),
                     workspace::OpenOptions::default(),
                     window,
                     cx,

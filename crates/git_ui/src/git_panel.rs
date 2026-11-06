@@ -9245,7 +9245,6 @@ mod tests {
     use settings::SettingsStore;
     use std::any::TypeId;
     use theme::LoadThemes;
-    use util::path;
     use util::rel_path::{RelPath, rel_path};
 
     use workspace::{
@@ -9418,11 +9417,11 @@ mod tests {
         VisualTestContext,
     ) {
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/project"), tree).await;
+        fs.insert_tree("/project", tree).await;
 
         if !status_entries.is_empty() {
             fs.set_status_for_repo(
-                path!("/project/.git").as_ref(),
+                "/project/.git".as_ref(),
                 &status_entries
                     .iter()
                     .map(|(path, status)| (*path, status.worktree()))
@@ -9430,7 +9429,7 @@ mod tests {
             );
         }
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -9514,7 +9513,7 @@ mod tests {
             assert!(!panel.skip_hooks_enabled());
         });
         let commit_count = fs
-            .with_git_state(path!("/project/.git").as_ref(), false, |state| {
+            .with_git_state("/project/.git".as_ref(), false, |state| {
                 state.commit_history.len()
             })
             .expect("fake repository should exist");
@@ -9535,12 +9534,12 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("file", StatusCode::Modified.index())],
         );
         cx.run_until_parked();
         await_git_panel_entries(&panel, &mut cx).await;
-        fs.with_git_state(path!("/project/.git").as_ref(), false, |state| {
+        fs.with_git_state("/project/.git".as_ref(), false, |state| {
             state.index_contents = state.head_contents.clone();
         })
         .expect("fake repository should exist");
@@ -9562,7 +9561,7 @@ mod tests {
             assert!(panel.skip_hooks_enabled());
         });
         let commit_count = fs
-            .with_git_state(path!("/project/.git").as_ref(), false, |state| {
+            .with_git_state("/project/.git".as_ref(), false, |state| {
                 state.commit_history.len()
             })
             .expect("fake repository should exist");
@@ -9575,7 +9574,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "tracked": "tracked\n",
@@ -9584,11 +9583,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("tracked", "old tracked\n".into())],
         );
 
-        let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -9633,7 +9632,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "tracked": "tracked\n",
@@ -9643,11 +9642,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("tracked", "old tracked\n".into())],
         );
 
-        let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -9767,11 +9766,7 @@ mod tests {
             panel.copy_path(&CopyPath, window, cx);
             assert_eq!(
                 cx.read_from_clipboard().and_then(|item| item.text()),
-                Some(format!(
-                    "{}\n{}",
-                    path!("/project/a.txt"),
-                    path!("/project/b.txt")
-                ))
+                Some(format!("{}\n{}", "/project/a.txt", "/project/b.txt"))
             );
             panel.view_file(&ViewFile, window, cx);
         });
@@ -9832,13 +9827,13 @@ mod tests {
 
         let expected = "new1.txt\nnew2.txt\n";
         assert_eq!(
-            fs.load(Path::new(path!("/project/.gitignore")))
+            fs.load(Path::new("/project/.gitignore"))
                 .await
                 .expect(".gitignore should exist"),
             expected
         );
         assert_eq!(
-            fs.load(Path::new(path!("/project/.git/info/exclude")))
+            fs.load(Path::new("/project/.git/info/exclude"))
                 .await
                 .expect(".git/info/exclude should exist"),
             expected
@@ -9887,13 +9882,13 @@ mod tests {
         cx.dispatch_action(CopyRelativePath);
         assert_eq!(
             cx.read_from_clipboard().and_then(|item| item.text()),
-            Some(path!("src/main.rs").to_owned())
+            Some("src/main.rs".to_owned())
         );
 
         cx.dispatch_action(CopyPath);
         assert_eq!(
             cx.read_from_clipboard().and_then(|item| item.text()),
-            Some(path!("/project/src/main.rs").to_owned())
+            Some("/project/src/main.rs".to_owned())
         );
 
         panel.update(&mut cx, |panel, _| {
@@ -9910,13 +9905,13 @@ mod tests {
         cx.dispatch_action(CopyRelativePath);
         assert_eq!(
             cx.read_from_clipboard().and_then(|item| item.text()),
-            Some(path!("src").to_owned())
+            Some("src".to_owned())
         );
 
         cx.dispatch_action(CopyPath);
         assert_eq!(
             cx.read_from_clipboard().and_then(|item| item.text()),
-            Some(path!("/project/src").to_owned())
+            Some("/project/src".to_owned())
         );
 
         panel.update(&mut cx, |panel, _| {
@@ -9936,7 +9931,7 @@ mod tests {
             .expect("selected paths should be copied");
         assert_eq!(
             copied_paths.lines().collect::<HashSet<_>>(),
-            HashSet::from_iter([path!("src"), path!("other.txt")]),
+            HashSet::from_iter(["src", "other.txt"]),
         );
     }
 
@@ -9944,7 +9939,7 @@ mod tests {
         fs: Arc<FakeFs>,
         cx: &mut TestAppContext,
     ) -> Entity<GitPanel> {
-        let project = Project::test(fs, [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -9989,7 +9984,7 @@ mod tests {
         fs.insert_tree("/root", json!({ "project": { ".git": {} } }))
             .await;
 
-        let dot_git = Path::new(path!("/root/project/.git"));
+        let dot_git = Path::new("/root/project/.git");
         fs.set_branch_name(dot_git, Some("main"));
         fs.with_git_state(dot_git, false, |state| {
             state.refs.remove("HEAD");
@@ -10012,7 +10007,7 @@ mod tests {
         fs.insert_tree("/root", json!({ "project": { ".git": {} } }))
             .await;
 
-        let dot_git = Path::new(path!("/root/project/.git"));
+        let dot_git = Path::new("/root/project/.git");
         let sha: Oid = "0123456789012345678901234567890123456789".parse().unwrap();
         fs.with_git_state(dot_git, false, |state| {
             state.current_branch_name = None;
@@ -10047,7 +10042,7 @@ mod tests {
         fs.insert_tree("/root", json!({ "project": { ".git": {} } }))
             .await;
 
-        let dot_git = Path::new(path!("/root/project/.git"));
+        let dot_git = Path::new("/root/project/.git");
         let sha: Oid = "0123456789012345678901234567890123456789".parse().unwrap();
         fs.with_git_state(dot_git, false, |state| {
             state.current_branch_name = None;
@@ -10088,10 +10083,10 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/demo"), json!({ "plain.txt": "hello" }))
+        fs.insert_tree("/demo", json!({ "plain.txt": "hello" }))
             .await;
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/demo/plain.txt"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/demo/plain.txt")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10109,7 +10104,7 @@ mod tests {
             "git init should ask for a directory instead of running in a single-file worktree"
         );
         assert!(
-            !fs.is_dir(Path::new(path!("/demo/plain.txt/.git"))).await,
+            !fs.is_dir(Path::new("/demo/plain.txt/.git")).await,
             "git init should not run inside a single-file worktree"
         );
     }
@@ -10183,14 +10178,13 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/zed/.git")),
+            Path::new("/root/zed/.git"),
             &[
                 ("crates/gpui/gpui.rs", StatusCode::Modified.worktree()),
                 ("crates/util/util.rs", StatusCode::Modified.worktree()),
             ],
         );
-        let project =
-            Project::test(fs.clone(), [path!("/root/zed/crates/gpui").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root/zed/crates/gpui".as_ref()], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10299,11 +10293,11 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[("__somefile__", StatusCode::Modified.worktree())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10356,7 +10350,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "conflict.rs": "conflicted content",
@@ -10370,7 +10364,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 (
                     "conflict.rs",
@@ -10401,7 +10395,7 @@ mod tests {
                 ("unstaged.rs", StatusCode::Modified.worktree()),
             ],
         );
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.head_contents.insert(
                 repo_path("partial.rs"),
                 "head one\nhead two\nhead three\nhead four".into(),
@@ -10412,7 +10406,7 @@ mod tests {
         })
         .expect("fake repository should exist");
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10587,7 +10581,7 @@ mod tests {
         });
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 (
                     "conflict.rs",
@@ -10634,7 +10628,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "conflict.rs": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n",
@@ -10647,11 +10641,11 @@ mod tests {
             second_head: UnmergedStatusCode::Updated,
         });
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("conflict.rs", unresolved_status)],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10743,7 +10737,7 @@ mod tests {
         });
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("conflict.rs", FileStatus::index(StatusCode::Modified))],
         );
         cx.run_until_parked();
@@ -10777,7 +10771,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "conflict.rs": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n",
@@ -10792,7 +10786,7 @@ mod tests {
             second_head: UnmergedStatusCode::Updated,
         });
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("conflict.rs", unresolved_status),
                 ("staged.rs", FileStatus::index(StatusCode::Modified)),
@@ -10801,12 +10795,12 @@ mod tests {
         );
         // With MERGE_HEAD present (an in-progress merge), a resolved conflict
         // keeps rendering under the Conflict section instead of moving to Staged.
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.refs.insert("MERGE_HEAD".into(), "merge-sha".into());
         })
         .unwrap();
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -10905,7 +10899,7 @@ mod tests {
             );
         });
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("conflict.rs", FileStatus::index(StatusCode::Modified)),
                 ("staged.rs", FileStatus::index(StatusCode::Modified)),
@@ -11007,7 +11001,7 @@ mod tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "partial.rs": "partial content",
@@ -11017,7 +11011,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 (
                     "partial.rs",
@@ -11031,7 +11025,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -11108,7 +11102,7 @@ mod tests {
         // "Staged" and "Unstaged" sections) while `src/staged.rs` to be
         // staged.
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 (
                     "src/partial.rs",
@@ -11167,7 +11161,7 @@ mod tests {
         cx.update(search::buffer_search::init);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "partial.rs": "partial content",
@@ -11176,7 +11170,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[(
                 "partial.rs",
                 TrackedStatus {
@@ -11187,7 +11181,7 @@ mod tests {
             )],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -11196,7 +11190,7 @@ mod tests {
         let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
         let project_path = project.read_with(&cx, |project, cx| {
             project
-                .find_project_path(path!("/project/partial.rs"), cx)
+                .find_project_path("/project/partial.rs", cx)
                 .expect("partial.rs should have a project path")
         });
 
@@ -11345,7 +11339,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[
                 ("src/main.rs", StatusCode::Modified.worktree()),
                 ("src/lib.rs", StatusCode::Modified.worktree()),
@@ -11364,7 +11358,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -11545,7 +11539,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[
                 ("src/main.rs", StatusCode::Modified.worktree()),
                 ("src/lib.rs", StatusCode::Modified.worktree()),
@@ -11564,7 +11558,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -11775,11 +11769,11 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -11853,20 +11847,17 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project-a/.git")),
+            Path::new("/root/project-a/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
         fs.set_status_for_repo(
-            Path::new(path!("/root/project-b/.git")),
+            Path::new("/root/project-b/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
 
         let project = Project::test(
             fs.clone(),
-            [
-                Path::new(path!("/root/project-a")),
-                Path::new(path!("/root/project-b")),
-            ],
+            [Path::new("/root/project-a"), Path::new("/root/project-b")],
             cx,
         )
         .await;
@@ -11876,9 +11867,9 @@ mod tests {
             let mut repository_b = None;
             for repository in git_store.read(cx).repositories().values() {
                 let work_directory_abs_path = &repository.read(cx).work_directory_abs_path;
-                if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-a")) {
+                if work_directory_abs_path.as_ref() == Path::new("/root/project-a") {
                     repository_a = Some(repository.clone());
-                } else if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-b")) {
+                } else if work_directory_abs_path.as_ref() == Path::new("/root/project-b") {
                     repository_b = Some(repository.clone());
                 }
             }
@@ -11969,7 +11960,7 @@ mod tests {
             signoff_enabled: false,
             commit_editor_collapsed: None,
             commit_messages: BTreeMap::from_iter([(
-                path!("/root/other-project").to_string(),
+                "/root/other-project".to_string(),
                 SerializedCommitMessage {
                     message: Some(message_a.to_string()),
                     original_message: None,
@@ -12012,17 +12003,17 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
-        fs.with_git_state(Path::new(path!("/root/project/.git")), false, |state| {
+        fs.with_git_state(Path::new("/root/project/.git"), false, |state| {
             state.commit_template = Some(GitCommitTemplate {
                 template: "Template1\n".to_string(),
             })
         })
         .unwrap();
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let repository = project.read_with(cx, |project, cx| {
             project
                 .git_store()
@@ -12057,7 +12048,7 @@ mod tests {
         // Update the commit template returned by the fake git repository and
         // simulate restart: empty the active commit buffer and reload the panel
         // from the same serialized state the previous session would have written.
-        fs.with_git_state(Path::new(path!("/root/project/.git")), false, |state| {
+        fs.with_git_state(Path::new("/root/project/.git"), false, |state| {
             state.commit_template = Some(GitCommitTemplate {
                 template: "Template2\n".to_string(),
             })
@@ -12106,17 +12097,17 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
-        fs.with_git_state(Path::new(path!("/root/project/.git")), false, |state| {
+        fs.with_git_state(Path::new("/root/project/.git"), false, |state| {
             state.commit_template = Some(GitCommitTemplate {
                 template: "Template1\n".to_string(),
             })
         })
         .unwrap();
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let repository = project.read_with(cx, |project, cx| {
             project
                 .git_store()
@@ -12153,7 +12144,7 @@ mod tests {
         // The commit template returned by the fake git repository changes
         // after the user has already started typing. We must not clobber the
         // user's draft.
-        fs.with_git_state(Path::new(path!("/root/project/.git")), false, |state| {
+        fs.with_git_state(Path::new("/root/project/.git"), false, |state| {
             state.commit_template = Some(GitCommitTemplate {
                 template: "Template2\n".to_string(),
             })
@@ -12213,20 +12204,17 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project-a/.git")),
+            Path::new("/root/project-a/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
         fs.set_status_for_repo(
-            Path::new(path!("/root/project-b/.git")),
+            Path::new("/root/project-b/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
 
         let project = Project::test(
             fs.clone(),
-            [
-                Path::new(path!("/root/project-a")),
-                Path::new(path!("/root/project-b")),
-            ],
+            [Path::new("/root/project-a"), Path::new("/root/project-b")],
             cx,
         )
         .await;
@@ -12236,9 +12224,9 @@ mod tests {
             let mut repository_b = None;
             for repository in git_store.read(cx).repositories().values() {
                 let work_directory_abs_path = &repository.read(cx).work_directory_abs_path;
-                if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-a")) {
+                if work_directory_abs_path.as_ref() == Path::new("/root/project-a") {
                     repository_a = Some(repository.clone());
-                } else if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-b")) {
+                } else if work_directory_abs_path.as_ref() == Path::new("/root/project-b") {
                     repository_b = Some(repository.clone());
                 }
             }
@@ -12323,11 +12311,11 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[("src/main.rs", StatusCode::Modified.worktree())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12402,7 +12390,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "tracked": "tracked\n",
@@ -12412,11 +12400,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("tracked", "old tracked\n".into())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12468,14 +12456,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
             }),
         )
         .await;
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12510,7 +12498,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -12525,7 +12513,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("src/main.rs", StatusCode::Modified.worktree()),
                 ("src/utils.rs", FileStatus::Untracked),
@@ -12533,7 +12521,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12622,7 +12610,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -12638,14 +12626,14 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("src/a/foo.rs", StatusCode::Modified.worktree()),
                 ("src/b/bar.rs", StatusCode::Modified.worktree()),
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12747,7 +12735,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "bar": {
@@ -12764,7 +12752,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("bar/bar1.py", StatusCode::Modified.worktree()),
                 ("bar/bar2.py", StatusCode::Modified.worktree()),
@@ -12774,7 +12762,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -12941,7 +12929,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "tracked": "tracked\n",
@@ -12951,11 +12939,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("tracked", "old tracked\n".into())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13187,7 +13175,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "tracked": "tracked\n",
@@ -13196,11 +13184,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("tracked", "old tracked\n".into())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13486,7 +13474,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13530,7 +13518,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13735,7 +13723,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[
                 ("staged_a.rs", FileStatus::index(StatusCode::Modified)),
                 ("staged_b.rs", FileStatus::index(StatusCode::Modified)),
@@ -13743,7 +13731,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13803,7 +13791,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "files": {
@@ -13818,7 +13806,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("files/docs/README.md", StatusCode::Modified.worktree()),
                 ("files/notes.txt", StatusCode::Modified.worktree()),
@@ -13826,7 +13814,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -13969,7 +13957,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/project/.git")),
+            Path::new("/root/project/.git"),
             &[
                 ("src/main.rs", StatusCode::Modified.worktree()),
                 ("src/lib.rs", StatusCode::Modified.worktree()),
@@ -13978,7 +13966,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -14209,7 +14197,7 @@ mod tests {
         // selecting the directory still allows us to add its path to
         // `.gitignore`.
         fs.insert_tree(
-            path!("/project/src"),
+            "/project/src",
             json!({
                 "untracked.rs": ""
             }),
@@ -14217,7 +14205,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/untracked.rs", FileStatus::Untracked)],
         );
 
@@ -14234,7 +14222,7 @@ mod tests {
         cx.run_until_parked();
 
         assert_eq!(
-            fs.load(Path::new(path!("/project/.gitignore")))
+            fs.load(Path::new("/project/.gitignore"))
                 .await
                 .expect(".gitignore should be readable"),
             "src/\n"
@@ -14243,7 +14231,7 @@ mod tests {
         // Create a new directory with a tracked and untracked file, so we can
         // later confirm that its path is not added to `.gitignore`.
         fs.insert_tree(
-            path!("/project/docs"),
+            "/project/docs",
             json!({
                 "tracked.txt": "",
                 "untracked.txt": ""
@@ -14252,7 +14240,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[
                 ("docs/tracked.txt", StatusCode::Modified.worktree()),
                 ("docs/untracked.txt", FileStatus::Untracked),
@@ -14272,7 +14260,7 @@ mod tests {
         cx.run_until_parked();
 
         assert_eq!(
-            fs.load(Path::new(path!("/project/.gitignore")))
+            fs.load(Path::new("/project/.gitignore"))
                 .await
                 .expect(".gitignore should be readable"),
             "src/\n"
@@ -14300,7 +14288,7 @@ mod tests {
         // selecting the directory still allows us to add its path to
         // `.git/info/exclude`.
         fs.insert_tree(
-            path!("/project/src"),
+            "/project/src",
             json!({
                 "untracked.rs": ""
             }),
@@ -14308,7 +14296,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/untracked.rs", FileStatus::Untracked)],
         );
 
@@ -14325,7 +14313,7 @@ mod tests {
         cx.run_until_parked();
 
         assert_eq!(
-            fs.load(Path::new(path!("/project/.git/info/exclude")))
+            fs.load(Path::new("/project/.git/info/exclude"))
                 .await
                 .expect(".git/info/exclude should be readable"),
             "src/\n"
@@ -14334,7 +14322,7 @@ mod tests {
         // Create a new directory with a tracked and untracked file, so we can
         // later confirm that its path is not added to `.git/info/exclude`.
         fs.insert_tree(
-            path!("/project/docs"),
+            "/project/docs",
             json!({
                 "tracked.txt": "",
                 "untracked.txt": ""
@@ -14343,7 +14331,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[
                 ("docs/tracked.txt", StatusCode::Modified.worktree()),
                 ("docs/untracked.txt", FileStatus::Untracked),
@@ -14363,7 +14351,7 @@ mod tests {
         cx.run_until_parked();
 
         assert_eq!(
-            fs.load(Path::new(path!("/project/.git/info/exclude")))
+            fs.load(Path::new("/project/.git/info/exclude"))
                 .await
                 .expect(".git/info/exclude should be readable"),
             "src/\n"
@@ -14400,7 +14388,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[
                 ("changes/untracked.txt", FileStatus::Untracked),
                 ("changes/nested/untracked.txt", FileStatus::Untracked),
@@ -14447,8 +14435,8 @@ mod tests {
         worktree: serde_json::Value,
     ) -> (Arc<FakeFs>, Entity<GitPanel>, VisualTestContext) {
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/project"), worktree).await;
-        let dot_git = Path::new(path!("/project/.git"));
+        fs.insert_tree("/project", worktree).await;
+        let dot_git = Path::new("/project/.git");
         fs.set_head_for_repo(
             dot_git,
             &head
@@ -14474,7 +14462,7 @@ mod tests {
             });
         });
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -14508,12 +14496,9 @@ mod tests {
 
     /// Returns the working tree and index contents of `path`.
     async fn worktree_and_index(fs: &FakeFs, path: &str) -> (String, Option<String>) {
-        let worktree = fs
-            .load(&Path::new(path!("/project")).join(path))
-            .await
-            .unwrap();
+        let worktree = fs.load(&Path::new("/project").join(path)).await.unwrap();
         let index = fs
-            .with_git_state(Path::new(path!("/project/.git")), false, |state| {
+            .with_git_state(Path::new("/project/.git"), false, |state| {
                 state
                     .index_contents
                     .get(&repo_path(path))
@@ -14576,7 +14561,7 @@ mod tests {
 
         discard_row(&panel, "untracked.txt", Section::Unstaged, &mut cx);
 
-        assert!(!fs.is_file(path!("/project/untracked.txt").as_ref()).await);
+        assert!(!fs.is_file("/project/untracked.txt".as_ref()).await);
     }
 
     #[gpui::test]
@@ -14689,7 +14674,7 @@ mod tests {
     ) {
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "a",
@@ -14701,7 +14686,7 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("a.txt", StatusCode::Modified.worktree()),
                 ("b.txt", StatusCode::Modified.worktree()),
@@ -14711,7 +14696,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -15223,7 +15208,7 @@ mod tests {
         });
 
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("b.txt", StatusCode::Modified.worktree()),
                 ("c.txt", StatusCode::Modified.worktree()),
@@ -15307,8 +15292,8 @@ mod tests {
         cx.simulate_prompt_answer("Cancel");
         cx.executor().run_until_parked();
 
-        assert!(fs.is_file(path!("/project/a.txt").as_ref()).await);
-        assert!(fs.is_file(path!("/project/new1.txt").as_ref()).await);
+        assert!(fs.is_file("/project/a.txt".as_ref()).await);
+        assert!(fs.is_file("/project/new1.txt".as_ref()).await);
         panel.read_with(&cx, |panel, _| {
             assert_eq!(
                 staging_for(panel, &repo_path("a.txt")),
@@ -15323,7 +15308,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "new1.txt": "1",
@@ -15332,14 +15317,14 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("new1.txt", FileStatus::Untracked),
                 ("new2.txt", StatusCode::Added.index()),
             ],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -15376,10 +15361,10 @@ mod tests {
         cx.executor().run_until_parked();
 
         assert!(
-            !fs.is_file(path!("/project/new1.txt").as_ref()).await,
+            !fs.is_file("/project/new1.txt".as_ref()).await,
             "created files should be trashed by bulk revert",
         );
-        assert!(!fs.is_file(path!("/project/new2.txt").as_ref()).await);
+        assert!(!fs.is_file("/project/new2.txt".as_ref()).await);
     }
 
     #[gpui::test]
@@ -15404,7 +15389,7 @@ mod tests {
         cx.simulate_prompt_answer("Trash");
         cx.executor().run_until_parked();
 
-        assert!(!fs.is_file(path!("/project/untracked.txt").as_ref()).await);
+        assert!(!fs.is_file("/project/untracked.txt".as_ref()).await);
         assert_eq!(
             worktree_and_index(&fs, "added.txt").await,
             ("unstaged\n".into(), Some("staged\n".into()))
@@ -15481,7 +15466,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "project-a": {
                     ".git": {},
@@ -15495,20 +15480,17 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            path!("/root/project-a/.git").as_ref(),
+            "/root/project-a/.git".as_ref(),
             &[("x.txt", StatusCode::Modified.worktree())],
         );
         fs.set_status_for_repo(
-            path!("/root/project-b/.git").as_ref(),
+            "/root/project-b/.git".as_ref(),
             &[("x.txt", StatusCode::Modified.worktree())],
         );
 
         let project = Project::test(
             fs.clone(),
-            [
-                Path::new(path!("/root/project-a")),
-                Path::new(path!("/root/project-b")),
-            ],
+            [Path::new("/root/project-a"), Path::new("/root/project-b")],
             cx,
         )
         .await;
@@ -15518,9 +15500,9 @@ mod tests {
             let mut repository_b = None;
             for repository in git_store.read(cx).repositories().values() {
                 let work_directory_abs_path = &repository.read(cx).work_directory_abs_path;
-                if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-a")) {
+                if work_directory_abs_path.as_ref() == Path::new("/root/project-a") {
                     repository_a = Some(repository.clone());
-                } else if work_directory_abs_path.as_ref() == Path::new(path!("/root/project-b")) {
+                } else if work_directory_abs_path.as_ref() == Path::new("/root/project-b") {
                     repository_b = Some(repository.clone());
                 }
             }

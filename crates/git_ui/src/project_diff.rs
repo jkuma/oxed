@@ -954,7 +954,7 @@ mod tests {
     use settings::{DiffViewStyle, GitPanelGroupBy, GitPanelSortBy, SettingsStore};
     use std::path::Path;
     use unindent::Unindent as _;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
 
     use workspace::MultiWorkspace;
 
@@ -1048,7 +1048,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "committed.txt": "head\n",
@@ -1056,15 +1056,15 @@ mod tests {
         )
         .await;
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("committed.txt", "head\n".into())],
         );
         fs.set_merge_base_content_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("committed.txt", "base\n".into())],
         );
 
-        let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/project")], cx).await;
         project
             .update(cx, |project, cx| project.git_scans_complete(cx))
             .await;
@@ -1171,7 +1171,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "README.md": "# My cool project\n".to_owned()
@@ -1179,10 +1179,10 @@ mod tests {
         )
         .await;
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("README.md", "# My cool project\n".to_owned())],
         );
-        let project = Project::test(fs.clone(), [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         let worktree_id = project.read_with(cx, |project, cx| {
             project.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -1212,7 +1212,7 @@ mod tests {
         let editor = item.read_with(cx, |item, cx| item.editor(cx).read(cx).rhs_editor().clone());
 
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[(
                 "README.md",
                 "# My cool project\nDetails to come.\n".to_owned(),
@@ -1231,7 +1231,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project_a"),
+            "/project_a",
             json!({
                 ".git": {},
                 "a.txt": "CHANGED_A\n",
@@ -1239,7 +1239,7 @@ mod tests {
         )
         .await;
         fs.insert_tree(
-            path!("/project_b"),
+            "/project_b",
             json!({
                 ".git": {},
                 "b.txt": "CHANGED_B\n",
@@ -1248,20 +1248,17 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project_a/.git")),
+            Path::new("/project_a/.git"),
             &[("a.txt", "original_a\n".to_string())],
         );
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project_b/.git")),
+            Path::new("/project_b/.git"),
             &[("b.txt", "original_b\n".to_string())],
         );
 
         let project = Project::test(
             fs.clone(),
-            [
-                Path::new(path!("/project_a")),
-                Path::new(path!("/project_b")),
-            ],
+            [Path::new("/project_a"), Path::new("/project_b")],
             cx,
         )
         .await;
@@ -1327,7 +1324,7 @@ mod tests {
 
         assert_eq!(
             active_repository_path.as_deref(),
-            Some(Path::new(path!("/project_b"))),
+            Some(Path::new("/project_b")),
             "Project B should remain the active repository"
         );
     }
@@ -1360,7 +1357,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -1371,16 +1368,16 @@ mod tests {
         .await;
 
         fs.set_head_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", committed_contents)],
             "deadbeef",
         );
         fs.set_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", staged_contents)],
         );
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1521,7 +1518,7 @@ mod tests {
         for (index, name) in names.iter().enumerate() {
             tree.insert(name.clone(), json!(format!("new-{index:02}\n")));
         }
-        fs.insert_tree(path!("/project"), serde_json::Value::Object(tree))
+        fs.insert_tree("/project", serde_json::Value::Object(tree))
             .await;
 
         let head = names
@@ -1529,9 +1526,9 @@ mod tests {
             .enumerate()
             .map(|(index, name)| (name.as_str(), format!("old-{index:02}\n")))
             .collect::<Vec<_>>();
-        fs.set_head_and_index_for_repo(Path::new(path!("/project/.git")), &head);
+        fs.set_head_and_index_for_repo(Path::new("/project/.git"), &head);
 
-        let project = Project::test(fs, [Path::new(path!("/project"))], cx).await;
+        let project = Project::test(fs, [Path::new("/project")], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1572,7 +1569,7 @@ mod tests {
             .map(|index| format!("f{index:02}.txt"))
             .collect::<Vec<_>>();
 
-        let project_root = Path::new(path!("/project"));
+        let project_root = Path::new("/project");
         let dot_git = project_root.join(".git");
 
         let fs = FakeFs::new(cx.executor());
@@ -1643,7 +1640,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 ".git": {},
                 "a.txt": "created\n",
@@ -1654,7 +1651,7 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/a/.git")),
+            Path::new("/a/.git"),
             &[
                 ("b.txt", "before\n".to_string()),
                 ("c.txt", "unchanged\n".to_string()),
@@ -1662,7 +1659,7 @@ mod tests {
             ],
         );
 
-        let project = Project::test(fs, [Path::new(path!("/a"))], cx).await;
+        let project = Project::test(fs, [Path::new("/a")], cx).await;
         let (created_entry_id, changed_entry_id) = project.read_with(cx, |project, cx| {
             let entry_id = |path| {
                 let project_path = project
@@ -1673,7 +1670,7 @@ mod tests {
                     .expect("diff path should have a project entry")
                     .id
             };
-            (entry_id(path!("/a/a.txt")), entry_id(path!("/a/b.txt")))
+            (entry_id("/a/a.txt"), entry_id("/a/b.txt"))
         });
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
@@ -1786,24 +1783,21 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "foo.txt": "FOO\n",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
 
         fs.set_head_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("foo.txt", "foo\n".into())],
             "deadbeef",
         );
-        fs.set_index_for_repo(
-            path!("/project/.git").as_ref(),
-            &[("foo.txt", "foo\n".into())],
-        );
+        fs.set_index_for_repo("/project/.git".as_ref(), &[("foo.txt", "foo\n".into())]);
 
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
@@ -1845,7 +1839,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "bar": "BAR\n",
@@ -1853,7 +1847,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -1863,7 +1857,7 @@ mod tests {
         cx.run_until_parked();
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("bar", "bar\n".into()), ("foo", "foo\n".into())],
         );
         cx.run_until_parked();
@@ -1921,26 +1915,26 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "foo": "modified\n",
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
         fs.set_head_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[("foo", "original\n".into())],
             "deadbeef",
         );
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/foo"), cx)
+                project.open_local_buffer("/project/foo", cx)
             })
             .await
             .unwrap();
@@ -2037,7 +2031,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "foo.txt": "
@@ -2057,7 +2051,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -2067,7 +2061,7 @@ mod tests {
         cx.run_until_parked();
 
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[(
                 "foo.txt",
                 "
@@ -2107,7 +2101,7 @@ mod tests {
         // The project diff updates its excerpts when a new hunk appears in a buffer that already has a diff.
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/foo.txt"), cx)
+                project.open_local_buffer("/project/foo.txt", cx)
             })
             .await
             .unwrap();
@@ -2174,7 +2168,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "lib": { "foo.rs": "LIB FOO\n" },
@@ -2183,7 +2177,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -2193,7 +2187,7 @@ mod tests {
         cx.run_until_parked();
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("lib/foo.rs", "lib foo\n".into()),
                 ("src/foo.rs", "src foo\n".into()),
@@ -2226,7 +2220,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -2237,7 +2231,7 @@ mod tests {
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -2247,7 +2241,7 @@ mod tests {
         cx.run_until_parked();
 
         fs.set_head_and_index_for_repo(
-            path!("/project/.git").as_ref(),
+            "/project/.git".as_ref(),
             &[
                 ("src/a.rs", "a\n".into()),
                 ("src/m.rs", "m\n".into()),
@@ -2302,7 +2296,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 ".git": {},
                 "main.rs": buffer_contents,
@@ -2311,11 +2305,11 @@ mod tests {
         .await;
 
         fs.set_head_and_index_for_repo(
-            Path::new(path!("/a/.git")),
+            Path::new("/a/.git"),
             &[("main.rs", git_contents.to_owned())],
         );
 
-        let project = Project::test(fs, [Path::new(path!("/a"))], cx).await;
+        let project = Project::test(fs, [Path::new("/a")], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());

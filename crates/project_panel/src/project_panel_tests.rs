@@ -22,7 +22,7 @@ use serde_json::json;
 use settings::{FolderIndicator, ProjectPanelAutoOpenSettings, SettingsStore, SplicingVec};
 use smallvec::smallvec;
 use std::path::{Path, PathBuf};
-use util::{path, paths::PathStyle, rel_path::rel_path};
+use util::{paths::PathStyle, rel_path::rel_path};
 use workspace::{
     AppState, ItemHandle, MultiWorkspace, Pane, Workspace,
     item::{Item, ProjectItem, test::TestItem},
@@ -128,7 +128,7 @@ async fn test_opening_file(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/src"),
+        "/src",
         json!({
             "test": {
                 "first.rs": "// First Rust file",
@@ -139,7 +139,7 @@ async fn test_opening_file(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/src").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/src".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -207,7 +207,7 @@ async fn test_opening_file_with_project_panel_previews_disabled(cx: &mut gpui::T
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/src"),
+        "/src",
         json!({
             "test": {
                 "first.rs": "// First Rust file",
@@ -217,7 +217,7 @@ async fn test_opening_file_with_project_panel_previews_disabled(cx: &mut gpui::T
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/src").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/src".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
@@ -616,7 +616,7 @@ async fn test_auto_collapse_dir_paths(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root1"),
+        "/root1",
         json!({
             "dir_1": {
                 "nested_dir_1": {
@@ -638,7 +638,7 @@ async fn test_auto_collapse_dir_paths(cx: &mut gpui::TestAppContext) {
     )
     .await;
     fs.insert_tree(
-        path!("/root2"),
+        "/root2",
         json!({
             "dir_2": {
                 "file_1.java": "// File contents",
@@ -648,12 +648,7 @@ async fn test_auto_collapse_dir_paths(cx: &mut gpui::TestAppContext) {
     .await;
 
     // Test 1: Multiple worktrees with auto_fold_dirs = true
-    let project = Project::test(
-        fs.clone(),
-        [path!("/root1").as_ref(), path!("/root2").as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -738,7 +733,7 @@ async fn test_auto_collapse_dir_paths(cx: &mut gpui::TestAppContext) {
     );
 
     // Test 2: Single worktree with auto_fold_dirs = true and hide_root = true
-    let project = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root1".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -1441,7 +1436,7 @@ async fn test_adding_directory_via_file(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root1"),
+        "/root1",
         json!({
             ".dockerignore": "",
             ".git": {
@@ -1451,7 +1446,7 @@ async fn test_adding_directory_via_file(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root1".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2366,7 +2361,7 @@ async fn test_paste_external_paths(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "subdir": {}
         }),
@@ -2374,14 +2369,14 @@ async fn test_paste_external_paths(cx: &mut gpui::TestAppContext) {
     .await;
 
     fs.insert_tree(
-        path!("/external"),
+        "/external",
         json!({
             "new_file.rs": "fn main() {}"
         }),
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2392,7 +2387,7 @@ async fn test_paste_external_paths(cx: &mut gpui::TestAppContext) {
 
     cx.write_to_clipboard(ClipboardItem {
         entries: vec![GpuiClipboardEntry::ExternalPaths(ExternalPaths(
-            smallvec::smallvec![PathBuf::from(path!("/external/new_file.rs"))],
+            smallvec::smallvec![PathBuf::from("/external/new_file.rs")],
         ))],
     });
 
@@ -2418,7 +2413,7 @@ async fn test_copy_and_cut_write_to_system_clipboard(cx: &mut gpui::TestAppConte
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "file_a.txt": "",
             "file_b.txt": ""
@@ -2426,7 +2421,7 @@ async fn test_copy_and_cut_write_to_system_clipboard(cx: &mut gpui::TestAppConte
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2470,14 +2465,14 @@ async fn test_open_svg_preview_for_single_file_worktree(cx: &mut gpui::TestAppCo
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "icon.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
         }),
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root/icon.svg").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root/icon.svg".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2506,7 +2501,7 @@ async fn test_remove_opened_file(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/src"),
+        "/src",
         json!({
             "test": {
                 "first.rs": "// First Rust file",
@@ -2517,7 +2512,7 @@ async fn test_remove_opened_file(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/src").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/src".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2606,9 +2601,9 @@ async fn test_auto_open_new_file_when_enabled(cx: &mut gpui::TestAppContext) {
     );
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({})).await;
+    fs.insert_tree("/root", json!({})).await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2645,9 +2640,9 @@ async fn test_auto_open_new_file_when_disabled(cx: &mut gpui::TestAppContext) {
     );
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({})).await;
+    fs.insert_tree("/root", json!({})).await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2685,7 +2680,7 @@ async fn test_auto_open_on_paste_when_enabled(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "original.rs": ""
@@ -2695,7 +2690,7 @@ async fn test_auto_open_on_paste_when_enabled(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2734,7 +2729,7 @@ async fn test_auto_open_on_paste_when_disabled(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "src": {
                 "original.rs": ""
@@ -2744,7 +2739,7 @@ async fn test_auto_open_on_paste_when_disabled(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2786,7 +2781,7 @@ async fn test_auto_open_on_drop_when_enabled(cx: &mut gpui::TestAppContext) {
     );
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({})).await;
+    fs.insert_tree("/root", json!({})).await;
 
     let temp_dir = tempfile::tempdir().unwrap();
     let external_path = temp_dir.path().join("dropped.rs");
@@ -2794,7 +2789,7 @@ async fn test_auto_open_on_drop_when_enabled(cx: &mut gpui::TestAppContext) {
     fs.insert_tree_from_real_fs(temp_dir.path(), temp_dir.path())
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -2824,7 +2819,7 @@ async fn test_auto_open_on_drop_when_disabled(cx: &mut gpui::TestAppContext) {
     );
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({})).await;
+    fs.insert_tree("/root", json!({})).await;
 
     let temp_dir = tempfile::tempdir().unwrap();
     let external_path = temp_dir.path().join("manual.rs");
@@ -2832,7 +2827,7 @@ async fn test_auto_open_on_drop_when_disabled(cx: &mut gpui::TestAppContext) {
     fs.insert_tree_from_real_fs(temp_dir.path(), temp_dir.path())
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -3312,7 +3307,7 @@ async fn test_create_duplicate_items_and_check_history(cx: &mut gpui::TestAppCon
             this.recent_navigation_history_iter(cx)
                 .any(|(project_path, abs_path)| {
                     project_path.path == Arc::from(rel_path("test/fourth.txt"))
-                        && abs_path == Some(PathBuf::from(path!("/src/test/fourth.txt")))
+                        && abs_path == Some(PathBuf::from("/src/test/fourth.txt"))
                 })
         );
     });
@@ -3430,7 +3425,7 @@ async fn test_rename_item_and_check_history(cx: &mut gpui::TestAppContext) {
             this.recent_navigation_history_iter(cx)
                 .any(|(project_path, abs_path)| {
                     project_path.path == Arc::from(rel_path("test/fourth.txt"))
-                        && abs_path == Some(PathBuf::from(path!("/src/test/fourth.txt")))
+                        && abs_path == Some(PathBuf::from("/src/test/fourth.txt"))
                 })
         );
     });
@@ -3442,7 +3437,7 @@ async fn test_select_git_entry(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "tree1": {
                 ".git": {},
@@ -3473,7 +3468,7 @@ async fn test_select_git_entry(cx: &mut gpui::TestAppContext) {
 
     // Mark files as git modified
     fs.set_head_and_index_for_repo(
-        path!("/root/tree1/.git").as_ref(),
+        "/root/tree1/.git".as_ref(),
         &[
             ("dir1/modified1.txt", "modified".into()),
             ("dir1/modified2.txt", "modified".into()),
@@ -3482,7 +3477,7 @@ async fn test_select_git_entry(cx: &mut gpui::TestAppContext) {
         ],
     );
     fs.set_head_and_index_for_repo(
-        path!("/root/tree2/.git").as_ref(),
+        "/root/tree2/.git".as_ref(),
         &[
             ("dir3/modified5.txt", "modified".into()),
             ("modified6.txt", "modified".into()),
@@ -3491,7 +3486,7 @@ async fn test_select_git_entry(cx: &mut gpui::TestAppContext) {
 
     let project = Project::test(
         fs.clone(),
-        [path!("/root/tree1").as_ref(), path!("/root/tree2").as_ref()],
+        ["/root/tree1".as_ref(), "/root/tree2".as_ref()],
         cx,
     )
     .await;
@@ -4619,8 +4614,8 @@ async fn test_new_file_move(cx: &mut gpui::TestAppContext) {
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.as_fake().insert_tree(path!("/root"), json!({})).await;
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    fs.as_fake().insert_tree("/root", json!({})).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -4642,7 +4637,7 @@ async fn test_new_file_move(cx: &mut gpui::TestAppContext) {
     });
 
     cx.executor().run_until_parked();
-    cx.simulate_new_path_selection(|_| Some(PathBuf::from(path!("/root/new"))));
+    cx.simulate_new_path_selection(|_| Some(PathBuf::from("/root/new")));
     save_task.await.unwrap();
 
     // Rename the file
@@ -5764,7 +5759,7 @@ async fn test_range_selection_drag_moves_entire_folded_directories(cx: &mut Test
     ) {
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "root": {
                     "a": { "sample.txt": "sample" },
@@ -5776,7 +5771,7 @@ async fn test_range_selection_drag_moves_entire_folded_directories(cx: &mut Test
         )
         .await;
         let original_paths = fs.paths(false);
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (window, panel) = create_drag_test_panel(&project, cx);
         let cx = &mut VisualTestContext::from_window(window, cx);
         toggle_expand_dir(&panel, "project/root", cx);
@@ -5805,17 +5800,17 @@ async fn test_range_selection_drag_moves_entire_folded_directories(cx: &mut Test
         drag_selection_to(&panel, "project", false, cx);
 
         let mut expected_paths = [
-            path!("/"),
-            path!("/project"),
-            path!("/project/a"),
-            path!("/project/a/sample.txt"),
-            path!("/project/c"),
-            path!("/project/c/d"),
-            path!("/project/c/d/sample2.txt"),
-            path!("/project/e"),
-            path!("/project/e/f"),
-            path!("/project/other"),
-            path!("/project/root"),
+            "/",
+            "/project",
+            "/project/a",
+            "/project/a/sample.txt",
+            "/project/c",
+            "/project/c/d",
+            "/project/c/d/sample2.txt",
+            "/project/e",
+            "/project/e/f",
+            "/project/other",
+            "/project/root",
         ]
         .into_iter()
         .map(PathBuf::from)
@@ -5858,7 +5853,7 @@ async fn test_range_selection_folded_endpoints(cx: &mut TestAppContext) {
     ) {
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "a": { "b": { "c": {} } },
                 "d": { "e": { "f": {} } },
@@ -5866,7 +5861,7 @@ async fn test_range_selection_folded_endpoints(cx: &mut TestAppContext) {
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         let (window, panel) = create_drag_test_panel(&project, cx);
         let cx = &mut VisualTestContext::from_window(window, cx);
 
@@ -5970,11 +5965,11 @@ async fn test_dragging_same_named_files_preserves_one_source_on_conflict(
     cx.executor().run_until_parked();
 
     let files = fs.files();
-    assert!(files.contains(&PathBuf::from(path!("/root/shared.txt"))));
+    assert!(files.contains(&PathBuf::from("/root/shared.txt")));
 
     let remaining_sources = [
-        PathBuf::from(path!("/root/dir_a/shared.txt")),
-        PathBuf::from(path!("/root/dir_b/shared.txt")),
+        PathBuf::from("/root/dir_a/shared.txt"),
+        PathBuf::from("/root/dir_b/shared.txt"),
     ]
     .into_iter()
     .filter(|path| files.contains(path))
@@ -6905,7 +6900,7 @@ async fn test_autoreveal_follows_multibuffer_selection(cx: &mut gpui::TestAppCon
 
     let fs = FakeFs::new(cx.background_executor.clone());
     fs.insert_tree(
-        path!("/project_root"),
+        "/project_root",
         json!({
             "dir_1": { "file_1.py": "alpha 1\nalpha 2\nalpha 3\n" },
             "dir_2": { "file_2.py": "beta 1\nbeta 2\nbeta 3\n" },
@@ -6913,7 +6908,7 @@ async fn test_autoreveal_follows_multibuffer_selection(cx: &mut gpui::TestAppCon
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/project_root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/project_root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -7647,7 +7642,7 @@ async fn test_deletion_gitignored(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "aa": "// Testing 1",
             "bb": "// Testing 2",
@@ -7663,7 +7658,7 @@ async fn test_deletion_gitignored(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -7752,7 +7747,7 @@ async fn test_nested_deletion_gitignore(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "file1": "// Testing",
@@ -7765,7 +7760,7 @@ async fn test_nested_deletion_gitignore(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -8434,7 +8429,7 @@ async fn test_expand_all_for_entry(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             ".gitignore": "**/ignored_dir\n**/ignored_nested",
             "dir1": {
@@ -8462,7 +8457,7 @@ async fn test_expand_all_for_entry(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -8629,7 +8624,7 @@ async fn test_collapse_all_for_entry(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "subdir1": {
@@ -8651,7 +8646,7 @@ async fn test_collapse_all_for_entry(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -8818,7 +8813,7 @@ async fn test_collapse_selected_entry_and_children_action(cx: &mut gpui::TestApp
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "subdir1": {
@@ -8838,7 +8833,7 @@ async fn test_collapse_selected_entry_and_children_action(cx: &mut gpui::TestApp
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -8913,7 +8908,7 @@ async fn test_collapse_root_single_worktree(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "subdir1": {
@@ -8928,7 +8923,7 @@ async fn test_collapse_root_single_worktree(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -8996,7 +8991,7 @@ async fn test_collapse_root_multi_worktree(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root1"),
+        "/root1",
         json!({
             "dir1": {
                 "subdir1": {
@@ -9008,7 +9003,7 @@ async fn test_collapse_root_multi_worktree(cx: &mut gpui::TestAppContext) {
     )
     .await;
     fs.insert_tree(
-        path!("/root2"),
+        "/root2",
         json!({
             "dir2": {
                 "file3.txt": ""
@@ -9018,12 +9013,7 @@ async fn test_collapse_root_multi_worktree(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(
-        fs.clone(),
-        [path!("/root1").as_ref(), path!("/root2").as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -9099,7 +9089,7 @@ async fn test_collapse_non_root_multi_worktree(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root1"),
+        "/root1",
         json!({
             "dir1": {
                 "subdir1": {
@@ -9111,7 +9101,7 @@ async fn test_collapse_non_root_multi_worktree(cx: &mut gpui::TestAppContext) {
     )
     .await;
     fs.insert_tree(
-        path!("/root2"),
+        "/root2",
         json!({
             "dir2": {
                 "subdir2": {
@@ -9123,12 +9113,7 @@ async fn test_collapse_non_root_multi_worktree(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(
-        fs.clone(),
-        [path!("/root1").as_ref(), path!("/root2").as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -9486,7 +9471,7 @@ async fn test_expand_all_entries_with_auto_fold(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "empty1": {
@@ -9501,7 +9486,7 @@ async fn test_expand_all_entries_with_auto_fold(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -9552,7 +9537,7 @@ async fn test_create_entries_without_selection(cx: &mut gpui::TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir1": {
                 "file1.txt": "",
@@ -9561,7 +9546,7 @@ async fn test_create_entries_without_selection(cx: &mut gpui::TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -9620,7 +9605,7 @@ async fn test_create_entries_without_selection_hide_root(cx: &mut gpui::TestAppC
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "existing_dir": {
                 "existing_file.txt": "",
@@ -9630,7 +9615,7 @@ async fn test_create_entries_without_selection_hide_root(cx: &mut gpui::TestAppC
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -9775,9 +9760,9 @@ async fn test_context_menu_new_file_in_empty_hidden_root(cx: &mut gpui::TestAppC
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({})).await;
+    fs.insert_tree("/root", json!({})).await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -12147,10 +12132,10 @@ async fn open_panel_with_files(
     let files = (0..file_count)
         .map(|index| (format!("file_{index}.txt"), json!("")))
         .collect::<serde_json::Map<_, _>>();
-    fs.insert_tree(path!("/root"), serde_json::Value::Object(files))
+    fs.insert_tree("/root", serde_json::Value::Object(files))
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -12318,9 +12303,9 @@ async fn test_focus_follows_mouse_into_blank_area(cx: &mut gpui::TestAppContext)
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "a.txt": "" })).await;
+    fs.insert_tree("/root", json!({ "a.txt": "" })).await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -12639,7 +12624,7 @@ async fn test_restore_file_prompt_escapes_markdown_in_file_name(cx: &mut gpui::T
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             ".git": {},
             "__init__.py": "modified contents",
@@ -12647,11 +12632,11 @@ async fn test_restore_file_prompt_escapes_markdown_in_file_name(cx: &mut gpui::T
     )
     .await;
     fs.set_head_and_index_for_repo(
-        path!("/root/.git").as_ref(),
+        "/root/.git".as_ref(),
         &[("__init__.py", "original contents".into())],
     );
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -12770,14 +12755,14 @@ async fn test_diagnostic_mark_decorates_the_row_glyph(cx: &mut gpui::TestAppCont
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir": { "nested.rs": "" },
         }),
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
@@ -12791,7 +12776,7 @@ async fn test_diagnostic_mark_decorates_the_row_glyph(cx: &mut gpui::TestAppCont
         lsp_store
             .update_diagnostic_entries(
                 LanguageServerId(0),
-                PathBuf::from(path!("/root/dir/nested.rs")),
+                PathBuf::from("/root/dir/nested.rs"),
                 None,
                 None,
                 vec![DiagnosticEntry::new(
@@ -12883,7 +12868,7 @@ async fn test_file_rows_reserve_the_chevron_slot(cx: &mut gpui::TestAppContext) 
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "dir": { "nested.rs": "" },
             "file.rs": "",
@@ -12891,7 +12876,7 @@ async fn test_file_rows_reserve_the_chevron_slot(cx: &mut gpui::TestAppContext) 
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
     let workspace = window
         .read_with(cx, |mw, _| mw.workspace().clone())
@@ -12933,10 +12918,9 @@ async fn test_file_rows_reserve_the_chevron_slot(cx: &mut gpui::TestAppContext) 
 async fn test_file_drag_state_clears_before_window_handoff(cx: &mut TestAppContext) {
     init_test_with_editor(cx);
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "file.txt": "" }))
-        .await;
-    let first_project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
-    let second_project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    fs.insert_tree("/root", json!({ "file.txt": "" })).await;
+    let first_project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
+    let second_project = Project::test(fs, ["/root".as_ref()], cx).await;
     let (first_window, first_panel) = create_drag_test_panel(&first_project, cx);
     let (second_window, second_panel) = create_drag_test_panel(&second_project, cx);
 
@@ -12984,9 +12968,8 @@ async fn test_file_drag_state_clears_before_window_handoff(cx: &mut TestAppConte
 async fn test_file_drag_state_clears_on_render_after_drag_stops(cx: &mut TestAppContext) {
     init_test_with_editor(cx);
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "file.txt": "" }))
-        .await;
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    fs.insert_tree("/root", json!({ "file.txt": "" })).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let (window, panel) = create_drag_test_panel(&project, cx);
 
     cx.update_window(window, |_, window, cx| {
@@ -13016,7 +12999,7 @@ async fn test_drop_external_files_on_folded_directory_components(cx: &mut TestAp
     });
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "a": { "b": { "c": {} } } }))
+    fs.insert_tree("/root", json!({ "a": { "b": { "c": {} } } }))
         .await;
 
     let temp_dir = tempfile::tempdir().expect("temporary directory is created");
@@ -13029,7 +13012,7 @@ async fn test_drop_external_files_on_folded_directory_components(cx: &mut TestAp
     fs.insert_tree_from_real_fs(temp_dir.path(), temp_dir.path())
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let (window, panel) = create_drag_test_panel(&project, cx);
     let cx = &mut VisualTestContext::from_window(window, cx);
 
@@ -13133,11 +13116,7 @@ fn enter_file_drag_over_root(panel: &Entity<ProjectPanel>, window: &mut Window, 
     window.dispatch_event(
         FileDropEvent::Entered {
             position,
-            paths: ExternalPaths(
-                [PathBuf::from(path!("/outside/file.txt"))]
-                    .into_iter()
-                    .collect(),
-            ),
+            paths: ExternalPaths([PathBuf::from("/outside/file.txt")].into_iter().collect()),
         }
         .to_platform_input(),
         cx,
@@ -13172,8 +13151,8 @@ async fn open_panel_with_tree(
     cx: &mut TestAppContext,
 ) -> (Entity<ProjectPanel>, VisualTestContext) {
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), tree).await;
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    fs.insert_tree("/root", tree).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let window = cx.open_window(window_size, |window, cx| {
         MultiWorkspace::test_new(project.clone(), window, cx)
     });

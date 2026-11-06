@@ -36,9 +36,6 @@ pub use gpui_util::*;
 pub use path::PathExt;
 pub use path::rel_path;
 
-#[cfg(any(test, feature = "test-support"))]
-pub use util_macros::{line_endings, path, uri};
-
 pub use self::shell::{get_default_system_shell, get_system_shell};
 
 pub fn truncate(s: &str, max_chars: usize) -> &str {

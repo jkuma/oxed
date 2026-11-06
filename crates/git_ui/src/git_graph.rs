@@ -6192,7 +6192,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            Path::new(util::path!("/project")),
+            Path::new("/project"),
             json!({
                 ".git": {},
                 "tracked1.txt": "tracked 1",
@@ -6201,7 +6201,7 @@ mod tests {
         )
         .await;
         fs.set_status_for_repo(
-            Path::new(util::path!("/project/.git")),
+            Path::new("/project/.git"),
             &[
                 ("tracked1.txt", StatusCode::Modified.worktree()),
                 ("tracked2.txt", StatusCode::Modified.worktree()),
@@ -6213,9 +6213,9 @@ mod tests {
             parents: smallvec![],
             ref_names: vec!["HEAD".into(), "refs/heads/main".into()],
         })];
-        fs.set_graph_commits(Path::new(util::path!("/project/.git")), commits);
+        fs.set_graph_commits(Path::new("/project/.git"), commits);
 
-        let project = Project::test(fs.clone(), [Path::new(util::path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         cx.run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
@@ -6411,7 +6411,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            Path::new(util::path!("/project")),
+            Path::new("/project"),
             json!({
                 ".git": {},
                 "file.txt": "content",
@@ -6419,11 +6419,11 @@ mod tests {
         )
         .await;
         fs.set_head_and_index_for_repo(
-            Path::new(util::path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("file.txt", "tracked".to_owned())],
         );
 
-        let project = Project::test(fs.clone(), [Path::new(util::path!("/project"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
         cx.run_until_parked();
 
         let tracked_repo_path = RepoPath::new(&"file.txt").unwrap();

@@ -1626,7 +1626,6 @@ mod tests {
 
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use workspace::{AppState, PathList, open_paths};
 
     use super::*;
@@ -1848,20 +1847,17 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(
-                path!("/initial-project"),
-                json!({ "src": { "main.rs": "" } }),
-            )
+            .insert_tree("/initial-project", json!({ "src": { "main.rs": "" } }))
             .await;
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/new-project"), json!({ "lib": { "mod.rs": "" } }))
+            .insert_tree("/new-project", json!({ "lib": { "mod.rs": "" } }))
             .await;
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/initial-project"))],
+                &[PathBuf::from("/initial-project")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -1884,8 +1880,7 @@ mod tests {
         workspace.update(cx, |workspace, _cx| {
             workspace.set_prompt_for_open_path(Box::new(|_, _, _, _| {
                 let (tx, rx) = futures::channel::oneshot::channel();
-                tx.send(Some(vec![PathBuf::from(path!("/new-project"))]))
-                    .ok();
+                tx.send(Some(vec![PathBuf::from("/new-project")])).ok();
                 rx
             }));
         });
@@ -1924,20 +1919,17 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(
-                path!("/initial-project"),
-                json!({ "src": { "main.rs": "" } }),
-            )
+            .insert_tree("/initial-project", json!({ "src": { "main.rs": "" } }))
             .await;
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/new-project"), json!({ "lib": { "mod.rs": "" } }))
+            .insert_tree("/new-project", json!({ "lib": { "mod.rs": "" } }))
             .await;
 
         cx.update(|cx| {
             open_paths(
-                &[PathBuf::from(path!("/initial-project"))],
+                &[PathBuf::from("/initial-project")],
                 app_state.clone(),
                 workspace::OpenOptions::default(),
                 cx,
@@ -1960,8 +1952,7 @@ mod tests {
         workspace.update(cx, |workspace, _cx| {
             workspace.set_prompt_for_open_path(Box::new(|_, _, _, _| {
                 let (tx, rx) = futures::channel::oneshot::channel();
-                tx.send(Some(vec![PathBuf::from(path!("/new-project"))]))
-                    .ok();
+                tx.send(Some(vec![PathBuf::from("/new-project")])).ok();
                 rx
             }));
         });

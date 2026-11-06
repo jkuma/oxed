@@ -903,7 +903,6 @@ mod tests {
     use serde_json::json;
     use session::Session;
     use std::{path::Path, sync::Arc, task::Poll};
-    use util::path;
     use workspace::{AppState, MultiWorkspace};
 
     struct DiscardResponseSink;
@@ -934,7 +933,7 @@ mod tests {
         // A folder whose name ends in `(N)` or `(row,col)` would otherwise be parsed as a
         // path with a row/column suffix (e.g. the MSVC-style `file.c(22)`), truncating the name.
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "TEST (1)": {},
                 "Project (2,3)": {},
@@ -944,9 +943,9 @@ mod tests {
         .await;
 
         let inputs = vec![
-            path!("/root/TEST (1)").to_string(),
-            path!("/root/Project (2,3)").to_string(),
-            path!("/root/test 123").to_string(),
+            "/root/TEST (1)".to_string(),
+            "/root/Project (2,3)".to_string(),
+            "/root/test 123".to_string(),
         ];
         let result = derive_paths_with_position(fs.as_ref(), inputs).await;
 
@@ -957,9 +956,9 @@ mod tests {
         assert_eq!(
             paths,
             vec![
-                (path!("/root/TEST (1)").to_string(), None, None),
-                (path!("/root/Project (2,3)").to_string(), None, None),
-                (path!("/root/test 123").to_string(), None, None),
+                ("/root/TEST (1)".to_string(), None, None),
+                ("/root/Project (2,3)".to_string(), None, None),
+                ("/root/test 123".to_string(), None, None),
             ]
         );
     }
@@ -973,21 +972,16 @@ mod tests {
         let app_state = init_test(cx);
         let fs = app_state.fs.as_fake();
 
-        fs.insert_tree(path!("/root"), json!({ "test.txt:10": "" }))
-            .await;
+        fs.insert_tree("/root", json!({ "test.txt:10": "" })).await;
 
         let result =
-            derive_paths_with_position(fs.as_ref(), vec![path!("/root/test.txt:10").to_string()])
-                .await;
+            derive_paths_with_position(fs.as_ref(), vec!["/root/test.txt:10".to_string()]).await;
 
         let paths: Vec<_> = result
             .iter()
             .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
             .collect();
-        assert_eq!(
-            paths,
-            vec![(path!("/root/test.txt:10").to_string(), None, None)]
-        );
+        assert_eq!(paths, vec![("/root/test.txt:10".to_string(), None, None)]);
     }
 
     #[gpui::test]
@@ -1129,7 +1123,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/root"),
+                "/root",
                 json!({
                     "dir1": {
                         "file1.txt": "content1",
@@ -1142,7 +1136,7 @@ mod tests {
         assert_eq!(cx.windows().len(), 0);
 
         // First open the workspace directory
-        open_workspace_file(path!("/root/dir1"), <_>::default(), app_state.clone(), cx).await;
+        open_workspace_file("/root/dir1", <_>::default(), app_state.clone(), cx).await;
 
         assert_eq!(cx.windows().len(), 1);
         let multi_workspace = cx.windows()[0].downcast::<MultiWorkspace>().unwrap();
@@ -1156,7 +1150,7 @@ mod tests {
 
         // Now open a file inside that workspace
         open_workspace_file(
-            path!("/root/dir1/file1.txt"),
+            "/root/dir1/file1.txt",
             <_>::default(),
             app_state.clone(),
             cx,
@@ -1174,7 +1168,7 @@ mod tests {
 
         // Opening a file inside the existing worktree with -n creates a new window.
         open_workspace_file(
-            path!("/root/dir1/file1.txt"),
+            "/root/dir1/file1.txt",
             workspace::OpenOptions {
                 workspace_matching: workspace::WorkspaceMatching::None,
                 ..Default::default()
@@ -1195,7 +1189,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/root"),
+                "/root",
                 json!({
                     "dir1": {
                         "file1.txt": "content1",
@@ -1205,7 +1199,7 @@ mod tests {
             .await;
 
         let response_sink = DiscardResponseSink;
-        let workspace_paths = vec![path!("/root/dir1").to_owned()];
+        let workspace_paths = vec!["/root/dir1".to_owned()];
 
         let (done_tx, mut done_rx) = futures::channel::oneshot::channel();
         cx.spawn({
@@ -1247,22 +1241,12 @@ mod tests {
     async fn test_open_workspace_with_nonexistent_files(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
 
-        app_state
-            .fs
-            .as_fake()
-            .insert_tree(path!("/root"), json!({}))
-            .await;
+        app_state.fs.as_fake().insert_tree("/root", json!({})).await;
 
         assert_eq!(cx.windows().len(), 0);
 
         // Test case 1: Open a single file that does not exist yet
-        open_workspace_file(
-            path!("/root/file5.txt"),
-            <_>::default(),
-            app_state.clone(),
-            cx,
-        )
-        .await;
+        open_workspace_file("/root/file5.txt", <_>::default(), app_state.clone(), cx).await;
 
         assert_eq!(cx.windows().len(), 1);
         let multi_workspace_1 = cx.windows()[0].downcast::<MultiWorkspace>().unwrap();
@@ -1277,7 +1261,7 @@ mod tests {
         // Test case 2: Open a single file that does not exist yet,
         // but tell Zed to add it to the current workspace
         open_workspace_file(
-            path!("/root/file6.txt"),
+            "/root/file6.txt",
             workspace::OpenOptions {
                 workspace_matching: workspace::WorkspaceMatching::MatchSubdirectory,
                 ..Default::default()
@@ -1300,7 +1284,7 @@ mod tests {
         // Test case 3: Open a single file that does not exist yet,
         // but tell Zed to NOT add it to the current workspace
         open_workspace_file(
-            path!("/root/file7.txt"),
+            "/root/file7.txt",
             workspace::OpenOptions {
                 workspace_matching: workspace::WorkspaceMatching::None,
                 ..Default::default()
@@ -1761,7 +1745,7 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
         assert_eq!(cx.windows().len(), 0);
@@ -1770,7 +1754,7 @@ mod tests {
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project/file.txt").to_string()],
+                vec!["/project/file.txt".to_string()],
                 cli::OpenBehavior::Default,
             ),
             None,
@@ -1791,31 +1775,22 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project_a"), json!({ "file.txt": "content" }))
+            .insert_tree("/project_a", json!({ "file.txt": "content" }))
             .await;
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project_b"), json!({ "file.txt": "content" }))
+            .insert_tree("/project_b", json!({ "file.txt": "content" }))
             .await;
 
         // Create an existing window with project_a
-        open_workspace_file(
-            path!("/project_a"),
-            Default::default(),
-            app_state.clone(),
-            cx,
-        )
-        .await;
+        open_workspace_file("/project_a", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state.clone(),
-            make_cli_open_request(
-                vec![path!("/project_b").to_string()],
-                cli::OpenBehavior::Default,
-            ),
+            make_cli_open_request(vec!["/project_b".to_string()], cli::OpenBehavior::Default),
             Some(cli::CliBehaviorSetting::NewWindow),
         );
 
@@ -1841,7 +1816,7 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
         // Pre-configure the setting in settings.json
@@ -1857,14 +1832,14 @@ mod tests {
             .await;
 
         // Create an existing window
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project/file.txt").to_string()],
+                vec!["/project/file.txt".to_string()],
                 cli::OpenBehavior::Default,
             ),
             None,
@@ -1884,7 +1859,7 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
         cx.update(|cx| {
@@ -1898,7 +1873,7 @@ mod tests {
 
         let session_id = cx.read(|cx| app_state.session.read(cx).id().to_owned());
 
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let multi_workspace = cx.windows()[0].downcast::<MultiWorkspace>().unwrap();
@@ -1942,7 +1917,7 @@ mod tests {
                 assert!(
                     root_paths
                         .iter()
-                        .any(|path| path.as_ref() == Path::new(path!("/project"))),
+                        .any(|path| path.as_ref() == Path::new("/project")),
                     "expected CLI launch with no paths to restore /project, got {root_paths:?}"
                 );
             })
@@ -1956,7 +1931,7 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
         app_state
@@ -1979,16 +1954,13 @@ mod tests {
             });
         });
 
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state,
-            make_cli_open_request(
-                vec![path!("/project").to_string()],
-                cli::OpenBehavior::Default,
-            ),
+            make_cli_open_request(vec!["/project".to_string()], cli::OpenBehavior::Default),
             None,
         );
 
@@ -2010,7 +1982,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/project"),
+                "/project",
                 json!({
                     "file.txt": "content",
                     "src": {
@@ -2040,16 +2012,13 @@ mod tests {
             });
         });
 
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state.clone(),
-            make_cli_open_request(
-                vec![path!("/project/src").to_string()],
-                cli::OpenBehavior::Default,
-            ),
+            make_cli_open_request(vec!["/project/src".to_string()], cli::OpenBehavior::Default),
             None,
         );
 
@@ -2064,7 +2033,7 @@ mod tests {
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project/file.txt").to_string()],
+                vec!["/project/file.txt".to_string()],
                 cli::OpenBehavior::Default,
             ),
             None,
@@ -2085,18 +2054,18 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
         // Create an existing window
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project/file.txt").to_string()],
+                vec!["/project/file.txt".to_string()],
                 cli::OpenBehavior::ExistingWindow, // -e flag: force existing window
             ),
             None,
@@ -2114,29 +2083,23 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project_a"), json!({ "file.txt": "content" }))
+            .insert_tree("/project_a", json!({ "file.txt": "content" }))
             .await;
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project_b"), json!({ "file.txt": "content" }))
+            .insert_tree("/project_b", json!({ "file.txt": "content" }))
             .await;
 
         // Create an existing window
-        open_workspace_file(
-            path!("/project_a"),
-            Default::default(),
-            app_state.clone(),
-            cx,
-        )
-        .await;
+        open_workspace_file("/project_a", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project_b/file.txt").to_string()],
+                vec!["/project_b/file.txt".to_string()],
                 cli::OpenBehavior::AlwaysNew, // -n flag: force new window
             ),
             None,
@@ -2154,15 +2117,15 @@ mod tests {
         app_state
             .fs
             .as_fake()
-            .insert_tree(path!("/project"), json!({ "file.txt": "content" }))
+            .insert_tree("/project", json!({ "file.txt": "content" }))
             .await;
 
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         let file_url = format!(
             "file://{}",
-            urlencoding::encode(path!("/project/file.txt")).into_owned()
+            urlencoding::encode("/project/file.txt").into_owned()
         );
         let (status, prompt_shown) = run_cli_with_zed_handler(
             cx,
@@ -2184,7 +2147,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/project"),
+                "/project",
                 json!({
                     "src": {
                         "main.rs": "fn main() {}",
@@ -2194,7 +2157,7 @@ mod tests {
             .await;
 
         // Open the project directory as a workspace
-        open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        open_workspace_file("/project", Default::default(), app_state.clone(), cx).await;
         assert_eq!(cx.windows().len(), 1);
 
         // Opening a file inside the already-open workspace should not prompt
@@ -2202,7 +2165,7 @@ mod tests {
             cx,
             app_state,
             make_cli_open_request(
-                vec![path!("/project/src/main.rs").to_string()],
+                vec!["/project/src/main.rs".to_string()],
                 cli::OpenBehavior::Default,
             ),
             None,

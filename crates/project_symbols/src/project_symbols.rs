@@ -348,7 +348,6 @@ mod tests {
     use serde_json::json;
     use settings::SettingsStore;
     use std::{path::Path, sync::Arc};
-    use util::path;
     use workspace::MultiWorkspace;
 
     #[gpui::test]
@@ -356,10 +355,9 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({ "test.rs": "" }))
-            .await;
+        fs.insert_tree("/dir", json!({ "test.rs": "" })).await;
 
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(Arc::new(Language::new(
@@ -387,7 +385,7 @@ mod tests {
 
         let _buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/dir/test.rs"), cx)
+                project.open_local_buffer_with_lsp("/dir/test.rs", cx)
             })
             .await
             .unwrap();
@@ -395,9 +393,9 @@ mod tests {
         // Set up fake language server to return fuzzy matches against
         // a fixed set of symbol names.
         let fake_symbols = [
-            symbol("one", path!("/external")),
-            symbol("ton", path!("/dir/test.rs")),
-            symbol("uno", path!("/dir/test.rs")),
+            symbol("one", "/external"),
+            symbol("ton", "/dir/test.rs"),
+            symbol("uno", "/dir/test.rs"),
         ];
         let fake_server = fake_servers.next().await.unwrap();
         fake_server.set_request_handler::<lsp::WorkspaceSymbolRequest, _, _>(
@@ -510,10 +508,9 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({ "test.rs": "" }))
-            .await;
+        fs.insert_tree("/dir", json!({ "test.rs": "" })).await;
 
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
 
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(Arc::new(Language::new(
@@ -541,12 +538,12 @@ mod tests {
 
         let _buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(path!("/dir/test.rs"), cx)
+                project.open_local_buffer_with_lsp("/dir/test.rs", cx)
             })
             .await
             .unwrap();
 
-        let fake_symbols = [symbol("안녕", path!("/dir/test.rs"))];
+        let fake_symbols = [symbol("안녕", "/dir/test.rs")];
         let fake_server = fake_servers.next().await.unwrap();
         fake_server.set_request_handler::<lsp::WorkspaceSymbolRequest, _, _>(
             move |params: lsp::WorkspaceSymbolParams, cx| {

@@ -1506,7 +1506,6 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use util::paths::PathMatcher;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -1521,9 +1520,9 @@ mod tests {
 
     async fn project_with_file(cx: &mut TestAppContext, contents: String) -> Entity<Project> {
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({ "sample.js": contents }))
+        fs.insert_tree("/dir", json!({ "sample.js": contents }))
             .await;
-        Project::test(fs, [path!("/dir").as_ref()], cx).await
+        Project::test(fs, ["/dir".as_ref()], cx).await
     }
 
     #[gpui::test]

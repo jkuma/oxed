@@ -1224,7 +1224,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Duration;
-    use util::{assert_set_eq, path};
+    use util::assert_set_eq;
     use workspace::item::Item;
 
     #[test]
@@ -1492,7 +1492,7 @@ mod tests {
         .await;
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
-            .insert_file(path!("/root/dir/file2.rs"), "".as_bytes().to_vec())
+            .insert_file("/root/dir/file2.rs", "".as_bytes().to_vec())
             .await;
 
         cx.set_state(indoc! {
@@ -3432,7 +3432,7 @@ mod tests {
             let fs =
                 cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
             fs.as_fake()
-                .insert_file(path!("/root/dir/file2.rs"), b"target".to_vec())
+                .insert_file("/root/dir/file2.rs", b"target".to_vec())
                 .await;
             cx.run_until_parked();
             let source = format!("{marked}\nfirst\nsecond\n");
@@ -3486,7 +3486,7 @@ mod tests {
         }
         assert_eq!(
             opened,
-            ["https://zed.dev/", path!("/root/dir/file2.rs")].map(|target| Some(target.to_owned()))
+            ["https://zed.dev/", "/root/dir/file2.rs"].map(|target| Some(target.to_owned()))
         );
     }
 
@@ -3789,10 +3789,7 @@ mod tests {
         // Insert a new file
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
-            .insert_file(
-                path!("/root/dir/file2.rs"),
-                "This is file2.rs".as_bytes().to_vec(),
-            )
+            .insert_file("/root/dir/file2.rs", "This is file2.rs".as_bytes().to_vec())
             .await;
         cx.run_until_parked();
 
@@ -3933,10 +3930,7 @@ Sentence ending file2.rs.
             let file = buffer.read(cx).file().unwrap();
             let file_path = file.as_local().unwrap().abs_path(cx);
 
-            assert_eq!(
-                file_path,
-                std::path::PathBuf::from(path!("/root/dir/file2.rs"))
-            );
+            assert_eq!(file_path, std::path::PathBuf::from("/root/dir/file2.rs"));
         });
     }
 
@@ -3955,7 +3949,7 @@ Sentence ending file2.rs.
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
             .insert_file(
-                path!("/root/dir/file2.rs"),
+                "/root/dir/file2.rs",
                 "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\n"
                     .as_bytes()
                     .to_vec(),
@@ -3990,10 +3984,7 @@ Sentence ending file2.rs.
                 let buffer = editor.buffer().read(cx).as_singleton().unwrap();
                 let file = buffer.read(cx).file().unwrap();
                 let file_path = file.as_local().unwrap().abs_path(cx);
-                assert_eq!(
-                    file_path,
-                    std::path::PathBuf::from(path!("/root/dir/file2.rs"))
-                );
+                assert_eq!(file_path, std::path::PathBuf::from("/root/dir/file2.rs"));
             }
 
             // Check that the cursor is at row 5, column 3 (0-indexed: row 4, col 2)
@@ -4032,7 +4023,7 @@ Sentence ending file2.rs.
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
             .insert_file(
-                path!("/root/dir/file2.rs"),
+                "/root/dir/file2.rs",
                 "line 1\nline 2\nline 3\nline 4\nline 5\n"
                     .as_bytes()
                     .to_vec(),
@@ -4092,7 +4083,7 @@ Sentence ending file2.rs.
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
             .insert_file(
-                path!("/root/dir/file2.rs"),
+                "/root/dir/file2.rs",
                 "line 1\nline 2\nline 3\n".as_bytes().to_vec(),
             )
             .await;
@@ -4149,7 +4140,7 @@ Sentence ending file2.rs.
         let fs = cx.update_workspace(|workspace, _, cx| workspace.project().read(cx).fs().clone());
         fs.as_fake()
             .insert_file(
-                path!("/root/dir/file2.rs"),
+                "/root/dir/file2.rs",
                 "line 1\nline 2\nline 3\nline 4\nline 5\n"
                     .as_bytes()
                     .to_vec(),
@@ -4184,10 +4175,7 @@ Sentence ending file2.rs.
                 let buffer = editor.buffer().read(cx).as_singleton().unwrap();
                 let file = buffer.read(cx).file().unwrap();
                 let file_path = file.as_local().unwrap().abs_path(cx);
-                assert_eq!(
-                    file_path,
-                    std::path::PathBuf::from(path!("/root/dir/file2.rs"))
-                );
+                assert_eq!(file_path, std::path::PathBuf::from("/root/dir/file2.rs"));
             }
 
             // Check cursor is at row 3, column 2 (0-indexed: row 2, col 1)

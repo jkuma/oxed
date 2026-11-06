@@ -5957,7 +5957,7 @@ mod tests {
         project_search::{self, perform_project_search},
     };
     use serde_json::json;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{MultiWorkspace, OpenOptions, OpenVisible, ToolbarItemView};
 
     use super::*;
@@ -6053,7 +6053,7 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        let root = path!("/rust-analyzer");
+        let root = "/rust-analyzer";
         populate_with_test_ra_project(&fs, root).await;
         let project = Project::test(fs.clone(), [Path::new(root)], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
@@ -6282,7 +6282,7 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        let root = path!("/rust-analyzer");
+        let root = "/rust-analyzer";
         populate_with_test_ra_project(&fs, root).await;
         let project = Project::test(fs.clone(), [Path::new(root)], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
@@ -6415,7 +6415,7 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        let root = path!("/rust-analyzer");
+        let root = "/rust-analyzer";
         populate_with_test_ra_project(&fs, root).await;
         let project = Project::test(fs.clone(), [Path::new(root)], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
@@ -6628,7 +6628,7 @@ outline: fn hints_lifetimes_named  <==== selected"
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "one": {
                     "a.txt": "aaa aaa"
@@ -6640,7 +6640,7 @@ outline: fn hints_lifetimes_named  <==== selected"
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root/one"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root/one")], cx).await;
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
         let outline_panel = outline_panel(&workspace, cx);
@@ -6651,7 +6651,7 @@ outline: fn hints_lifetimes_named  <==== selected"
         let items = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_paths(
-                    vec![PathBuf::from(path!("/root/two"))],
+                    vec![PathBuf::from("/root/two")],
                     OpenOptions {
                         visible: Some(OpenVisible::OnlyDirectories),
                         ..Default::default()
@@ -6799,7 +6799,7 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "crates": { "ide": {
                     "asdsads": "new file",
@@ -6811,18 +6811,18 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(true);
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let added = open_buffer(&project, path!("/root/crates/ide/asdsads"), cx).await;
-        let deleted = open_buffer(&project, path!("/root/crates/ide/src/join_lines.rs"), cx).await;
-        let modified = open_buffer(&project, path!("/root/crates/ide/src/interpret.rs"), cx).await;
+        let added = open_buffer(&project, "/root/crates/ide/asdsads", cx).await;
+        let deleted = open_buffer(&project, "/root/crates/ide/src/join_lines.rs", cx).await;
+        let modified = open_buffer(&project, "/root/crates/ide/src/interpret.rs", cx).await;
         fs.remove_file(
-            Path::new(path!("/root/crates/ide/src/join_lines.rs")),
+            Path::new("/root/crates/ide/src/join_lines.rs"),
             project::RemoveOptions::default(),
         )
         .await
@@ -6891,32 +6891,27 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/one"),
+            "/one",
             json!({ "é": { "子": { "first.txt": "first", "second.txt": "second" } } }),
         )
         .await;
-        fs.insert_tree(path!("/two"), json!({ "other.txt": "other" }))
+        fs.insert_tree("/two", json!({ "other.txt": "other" }))
             .await;
-        let project = Project::test(
-            fs.clone(),
-            [Path::new(path!("/one")), Path::new(path!("/two"))],
-            cx,
-        )
-        .await;
+        let project = Project::test(fs.clone(), [Path::new("/one"), Path::new("/two")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(true);
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let first = open_buffer(&project, path!("/one/é/子/first.txt"), cx).await;
-        let second = open_buffer(&project, path!("/one/é/子/second.txt"), cx).await;
-        let other = open_buffer(&project, path!("/two/other.txt"), cx).await;
+        let first = open_buffer(&project, "/one/é/子/first.txt", cx).await;
+        let second = open_buffer(&project, "/one/é/子/second.txt", cx).await;
+        let other = open_buffer(&project, "/two/other.txt", cx).await;
         let untitled = project.update(cx, |project, cx| {
             project.create_local_buffer("untitled", None, true, cx)
         });
         fs.remove_dir(
-            Path::new(path!("/one/é")),
+            Path::new("/one/é"),
             project::RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -6924,9 +6919,8 @@ two/  <==== selected
         )
         .await
         .expect("ancestor deletion should succeed");
-        fs.insert_file(path!("/one/é"), b"replacement".to_vec())
-            .await;
-        let replacement = open_buffer(&project, path!("/one/é"), cx).await;
+        fs.insert_file("/one/é", b"replacement".to_vec()).await;
+        let replacement = open_buffer(&project, "/one/é", cx).await;
         let editor = add_multi_buffer_editor(
             &workspace,
             &project,
@@ -7051,20 +7045,20 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({ "dir": { "sub": { "a.txt": "a", "b.txt": "b" } }, "z.txt": "z" }),
         )
         .await;
-        let project = Project::test(fs, [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs, [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(true);
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let buffer_a = open_buffer(&project, path!("/root/dir/sub/a.txt"), cx).await;
-        let buffer_b = open_buffer(&project, path!("/root/dir/sub/b.txt"), cx).await;
-        let buffer_z = open_buffer(&project, path!("/root/z.txt"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/dir/sub/a.txt", cx).await;
+        let buffer_b = open_buffer(&project, "/root/dir/sub/b.txt", cx).await;
+        let buffer_z = open_buffer(&project, "/root/z.txt", cx).await;
         let worktree_id = buffer_a.read_with(cx, |buffer, cx| {
             File::from_dyn(buffer.file())
                 .expect("buffer should have a file")
@@ -7175,16 +7169,16 @@ two/  <==== selected
     async fn test_selected_file_survives_rename_and_deletion(cx: &mut TestAppContext) {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/root"), json!({ "a.txt": "a", "z.txt": "z" }))
+        fs.insert_tree("/root", json!({ "a.txt": "a", "z.txt": "z" }))
             .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let buffer_a = open_buffer(&project, path!("/root/a.txt"), cx).await;
-        let buffer_z = open_buffer(&project, path!("/root/z.txt"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/a.txt", cx).await;
+        let buffer_z = open_buffer(&project, "/root/z.txt", cx).await;
         let buffer_id = buffer_a.read_with(cx, |buffer, _| buffer.remote_id());
         add_multi_buffer_editor(
             &workspace,
@@ -7212,8 +7206,8 @@ two/  <==== selected
         );
 
         fs.rename(
-            Path::new(path!("/root/a.txt")),
-            Path::new(path!("/root/b.txt")),
+            Path::new("/root/a.txt"),
+            Path::new("/root/b.txt"),
             project::RenameOptions::default(),
         )
         .await
@@ -7282,12 +7276,9 @@ two/  <==== selected
             ),
             cx,
         );
-        fs.remove_file(
-            Path::new(path!("/root/b.txt")),
-            project::RemoveOptions::default(),
-        )
-        .await
-        .expect("renamed file deletion should succeed");
+        fs.remove_file(Path::new("/root/b.txt"), project::RemoveOptions::default())
+            .await
+            .expect("renamed file deletion should succeed");
         flush_outline_tasks(cx);
         assert_tree(
             &outline_panel,
@@ -7317,19 +7308,19 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({ "d0": { "file.txt": "retained buffer" }, "z.txt": "z" }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(true);
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let buffer = open_buffer(&project, path!("/root/d0/file.txt"), cx).await;
-        let buffer_z = open_buffer(&project, path!("/root/z.txt"), cx).await;
+        let buffer = open_buffer(&project, "/root/d0/file.txt", cx).await;
+        let buffer_z = open_buffer(&project, "/root/z.txt", cx).await;
         let (buffer_id, worktree_id) = buffer.read_with(cx, |buffer, cx| {
             let file = File::from_dyn(buffer.file()).expect("buffer should have a file");
             (buffer.remote_id(), file.worktree.read(cx).id())
@@ -7386,7 +7377,7 @@ two/  <==== selected
                 cx,
             );
 
-            let next_directory = Path::new(path!("/root")).join(next);
+            let next_directory = Path::new("/root").join(next);
             fs.create_dir(&next_directory)
                 .await
                 .expect("destination directory should be created");
@@ -7442,7 +7433,7 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".gitignore": "ignored\n",
                 "ignored": {
@@ -7453,14 +7444,14 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let buffer_a = open_buffer(&project, path!("/root/ignored/a/deep/open.txt"), cx).await;
-        let buffer_b = open_buffer(&project, path!("/root/ignored/b/open.txt"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/ignored/a/deep/open.txt", cx).await;
+        let buffer_b = open_buffer(&project, "/root/ignored/b/open.txt", cx).await;
         let worktree = buffer_a.read_with(cx, |buffer, _| {
             File::from_dyn(buffer.file()).unwrap().worktree.clone()
         });
@@ -7619,7 +7610,7 @@ two/  <==== selected
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "a": { "b": { "file.txt": "modified\n" } },
@@ -7631,10 +7622,10 @@ two/  <==== selected
             ("a/b/file.txt", "base\n".to_string()),
             ("z.txt", "unchanged\n".to_string()),
         ];
-        let dot_git = Path::new(path!("/root/.git"));
+        let dot_git = Path::new("/root/.git");
         fs.set_head_for_repo(dot_git, &base_contents, "deadbeef");
         fs.set_index_for_repo(dot_git, &base_contents);
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project
             .update(cx, |project, cx| project.git_scans_complete(cx))
             .await;
@@ -7644,8 +7635,8 @@ two/  <==== selected
             settings.auto_fold_dirs = Some(true);
             settings.multi_buffer_hide_symbols = Some(true);
         });
-        let buffer = open_buffer(&project, path!("/root/a/b/file.txt"), cx).await;
-        let buffer_z = open_buffer(&project, path!("/root/z.txt"), cx).await;
+        let buffer = open_buffer(&project, "/root/a/b/file.txt", cx).await;
+        let buffer_z = open_buffer(&project, "/root/z.txt", cx).await;
         let worktree_id = buffer.read_with(cx, |buffer, cx| {
             File::from_dyn(buffer.file())
                 .expect("buffer should have a file")
@@ -7697,7 +7688,7 @@ two/  <==== selected
         });
 
         fs.remove_dir(
-            Path::new(path!("/root/a")),
+            Path::new("/root/a"),
             project::RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -7789,7 +7780,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "dir": {
                     "a.txt": "hello world",
@@ -7798,12 +7789,12 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
-        let buffer_a = open_buffer(&project, path!("/root/dir/a.txt"), cx).await;
-        let buffer_b = open_buffer(&project, path!("/root/dir/b.txt"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/dir/a.txt", cx).await;
+        let buffer_b = open_buffer(&project, "/root/dir/b.txt", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -7825,7 +7816,7 @@ two/  <==== selected
             cx,
         );
 
-        fs.remove_file(Path::new(path!("/root/dir/a.txt")), Default::default())
+        fs.remove_file(Path::new("/root/dir/a.txt"), Default::default())
             .await
             .unwrap();
         flush_outline_tasks(cx);
@@ -7850,22 +7841,22 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "keep.txt": "hello there",
                 "dir": { "sub": { "a.txt": "hello world" } }
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(false);
         });
 
-        let buffer_keep = open_buffer(&project, path!("/root/keep.txt"), cx).await;
-        let buffer_a = open_buffer(&project, path!("/root/dir/sub/a.txt"), cx).await;
+        let buffer_keep = open_buffer(&project, "/root/keep.txt", cx).await;
+        let buffer_a = open_buffer(&project, "/root/dir/sub/a.txt", cx).await;
         let worktree_id = buffer_a.read_with(cx, |buffer, cx| {
             File::from_dyn(buffer.file())
                 .expect("buffer should have a file")
@@ -7895,7 +7886,7 @@ two/  <==== selected
         );
 
         fs.remove_file(
-            Path::new(path!("/root/dir/sub/a.txt")),
+            Path::new("/root/dir/sub/a.txt"),
             project::RemoveOptions::default(),
         )
         .await
@@ -7933,7 +7924,7 @@ two/  <==== selected
         );
 
         fs.remove_dir(
-            Path::new(path!("/root/dir")),
+            Path::new("/root/dir"),
             project::RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -7965,7 +7956,7 @@ two/  <==== selected
             cx,
         );
 
-        fs.create_dir(Path::new(path!("/root/dir/sub")))
+        fs.create_dir(Path::new("/root/dir/sub"))
             .await
             .expect("ancestor recreation should succeed");
         flush_outline_tasks(cx);
@@ -7991,7 +7982,7 @@ two/  <==== selected
             cx,
         );
 
-        fs.insert_file(path!("/root/dir/sub/a.txt"), b"hello world".to_vec())
+        fs.insert_file("/root/dir/sub/a.txt", b"hello world".to_vec())
             .await;
         flush_outline_tasks(cx);
         buffer_a.read_with(cx, |buffer, _| {
@@ -8035,7 +8026,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "one": { "é": { "子": { "a.txt": "one" } } },
                 "two": { "é": { "子": { "a.txt": "two" } } }
@@ -8044,7 +8035,7 @@ two/  <==== selected
         .await;
         let project = Project::test(
             fs.clone(),
-            [Path::new(path!("/root/one")), Path::new(path!("/root/two"))],
+            [Path::new("/root/one"), Path::new("/root/two")],
             cx,
         )
         .await;
@@ -8054,8 +8045,8 @@ two/  <==== selected
             settings.auto_fold_dirs = Some(false);
         });
 
-        let buffer_one = open_buffer(&project, path!("/root/one/é/子/a.txt"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/root/two/é/子/a.txt"), cx).await;
+        let buffer_one = open_buffer(&project, "/root/one/é/子/a.txt", cx).await;
+        let buffer_two = open_buffer(&project, "/root/two/é/子/a.txt", cx).await;
         let worktree_one = buffer_one.read_with(cx, |buffer, cx| {
             File::from_dyn(buffer.file())
                 .expect("buffer should have a file")
@@ -8087,7 +8078,7 @@ two/  <==== selected
             cx,
         );
 
-        for path in [path!("/root/one/é"), path!("/root/two/é")] {
+        for path in ["/root/one/é", "/root/two/é"] {
             fs.remove_dir(
                 Path::new(path),
                 project::RemoveOptions {
@@ -8162,9 +8153,9 @@ two/  <==== selected
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/root"), json!({ "existing.txt": "hello" }))
+        fs.insert_tree("/root", json!({ "existing.txt": "hello" }))
             .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
@@ -8183,7 +8174,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "dir": {
                     "a.rs": indoc!(
@@ -8198,13 +8189,13 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
-        let buffer_a = open_buffer(&project, path!("/root/dir/a.rs"), cx).await;
-        let buffer_b = open_buffer(&project, path!("/root/dir/b.rs"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/dir/a.rs", cx).await;
+        let buffer_b = open_buffer(&project, "/root/dir/b.rs", cx).await;
         let editor = add_multi_buffer_editor(
             &workspace,
             &project,
@@ -8214,7 +8205,7 @@ two/  <==== selected
         flush_outline_tasks(cx);
 
         fs.remove_file(
-            Path::new(path!("/root/dir/a.rs")),
+            Path::new("/root/dir/a.rs"),
             project::RemoveOptions::default(),
         )
         .await
@@ -8301,7 +8292,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "dir": {
                     "a.txt": "hello world",
@@ -8310,12 +8301,12 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
-        let buffer_a = open_buffer(&project, path!("/root/dir/a.txt"), cx).await;
-        let buffer_b = open_buffer(&project, path!("/root/dir/b.txt"), cx).await;
+        let buffer_a = open_buffer(&project, "/root/dir/a.txt", cx).await;
+        let buffer_b = open_buffer(&project, "/root/dir/b.txt", cx).await;
         let editor = add_multi_buffer_editor(
             &workspace,
             &project,
@@ -8327,7 +8318,7 @@ two/  <==== selected
         let buffer_b_id = buffer_b.read_with(cx, |buffer, _cx| buffer.remote_id());
         select_in_buffer(&editor, buffer_b_id, cx);
 
-        fs.remove_file(Path::new(path!("/root/dir/a.txt")), Default::default())
+        fs.remove_file(Path::new("/root/dir/a.txt"), Default::default())
             .await
             .unwrap();
         flush_outline_tasks(cx);
@@ -8395,16 +8386,16 @@ two/  <==== selected
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/root"), json!({ "existing.txt": "hello" }))
+        fs.insert_tree("/root", json!({ "existing.txt": "hello" }))
             .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
         let new_buffer = project
             .update(cx, |project, cx| {
                 let path = project
-                    .find_project_path(path!("/root/missing_dir/new.txt"), cx)
+                    .find_project_path("/root/missing_dir/new.txt", cx)
                     .expect("path inside the worktree should resolve");
                 project.open_buffer(path, cx)
             })
@@ -8429,7 +8420,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "éx": "hello there",
                 "é": {
@@ -8444,7 +8435,7 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
@@ -8452,8 +8443,8 @@ two/  <==== selected
             settings.auto_fold_dirs = Some(false);
         });
 
-        let buffer_keep = open_buffer(&project, path!("/root/éx"), cx).await;
-        let buffer_a = open_buffer(&project, path!("/root/é/a.rs"), cx).await;
+        let buffer_keep = open_buffer(&project, "/root/éx", cx).await;
+        let buffer_a = open_buffer(&project, "/root/é/a.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -8463,7 +8454,7 @@ two/  <==== selected
         flush_outline_tasks(cx);
 
         fs.remove_dir(
-            Path::new(path!("/root/é")),
+            Path::new("/root/é"),
             project::RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -8471,7 +8462,7 @@ two/  <==== selected
         )
         .await
         .unwrap();
-        fs.insert_file(path!("/root/é"), b"not a directory anymore".to_vec())
+        fs.insert_file("/root/é", b"not a directory anymore".to_vec())
             .await;
         flush_outline_tasks(cx);
 
@@ -8489,7 +8480,7 @@ two/  <==== selected
             cx,
         );
 
-        let buffer_replacement = open_buffer(&project, path!("/root/é"), cx).await;
+        let buffer_replacement = open_buffer(&project, "/root/é", cx).await;
         let editor = add_multi_buffer_editor(
             &workspace,
             &project,
@@ -8567,7 +8558,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "keep.txt": "hello there",
                 "a": {
@@ -8582,15 +8573,15 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         update_outline_panel_settings(cx, |settings| {
             settings.auto_fold_dirs = Some(true);
         });
 
-        let buffer_keep = open_buffer(&project, path!("/root/keep.txt"), cx).await;
-        let buffer_gone = open_buffer(&project, path!("/root/a/b/c/d/gone.txt"), cx).await;
+        let buffer_keep = open_buffer(&project, "/root/keep.txt", cx).await;
+        let buffer_gone = open_buffer(&project, "/root/a/b/c/d/gone.txt", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -8612,7 +8603,7 @@ two/  <==== selected
         );
 
         fs.remove_dir(
-            Path::new(path!("/root/a/b/c")),
+            Path::new("/root/a/b/c"),
             project::RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -8634,7 +8625,7 @@ two/  <==== selected
             ),
             cx,
         );
-        fs.create_dir(Path::new(path!("/root/a/b/c/d")))
+        fs.create_dir(Path::new("/root/a/b/c/d"))
             .await
             .expect("ancestor recreation should succeed");
         flush_outline_tasks(cx);
@@ -8773,7 +8764,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "keep.txt": "hello there",
@@ -8781,7 +8772,7 @@ two/  <==== selected
             }),
         )
         .await;
-        let dot_git = Path::new(path!("/root/.git"));
+        let dot_git = Path::new("/root/.git");
         fs.set_head_for_repo(
             dot_git,
             &[
@@ -8791,15 +8782,15 @@ two/  <==== selected
             "deadbeef",
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project
             .update(cx, |project, cx| project.git_scans_complete(cx))
             .await;
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
-        let buffer_keep = open_buffer(&project, path!("/root/keep.txt"), cx).await;
-        let buffer_excluded = open_buffer(&project, path!("/root/excluded.txt"), cx).await;
+        let buffer_keep = open_buffer(&project, "/root/keep.txt", cx).await;
+        let buffer_excluded = open_buffer(&project, "/root/excluded.txt", cx).await;
         buffer_excluded.read_with(cx, |buffer, _cx| {
             let file = File::from_dyn(buffer.file()).expect("excluded buffer should have a file");
             assert_eq!(
@@ -8853,7 +8844,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "scanned": { "keep.txt": "still here" },
@@ -8861,7 +8852,7 @@ two/  <==== selected
             }),
         )
         .await;
-        let dot_git = Path::new(path!("/root/.git"));
+        let dot_git = Path::new("/root/.git");
         fs.set_branch_name(dot_git, Some("feature"));
         fs.insert_branches(dot_git, &["main"]);
         fs.set_head_for_repo(
@@ -8873,7 +8864,7 @@ two/  <==== selected
             "deadbeef",
         );
 
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project
             .update(cx, |project, cx| project.git_scans_complete(cx))
             .await;
@@ -8883,9 +8874,9 @@ two/  <==== selected
             settings.auto_fold_dirs = Some(false);
         });
 
-        let buffer_scanned = open_buffer(&project, path!("/root/scanned/gone.txt"), cx).await;
-        let buffer_excluded = open_buffer(&project, path!("/root/excluded/gone.txt"), cx).await;
-        let buffer_missing = open_buffer(&project, path!("/root/missing/gone.txt"), cx).await;
+        let buffer_scanned = open_buffer(&project, "/root/scanned/gone.txt", cx).await;
+        let buffer_excluded = open_buffer(&project, "/root/excluded/gone.txt", cx).await;
+        let buffer_missing = open_buffer(&project, "/root/missing/gone.txt", cx).await;
         for buffer in [&buffer_scanned, &buffer_excluded, &buffer_missing] {
             buffer.read_with(cx, |buffer, cx| {
                 let file = File::from_dyn(buffer.file()).expect("buffer should have a file");
@@ -8924,14 +8915,14 @@ two/  <==== selected
             );
         });
         assert_eq!(
-            fs.metadata(Path::new(path!("/root/excluded")))
+            fs.metadata(Path::new("/root/excluded"))
                 .await
                 .expect("metadata should be readable")
                 .map(|metadata| metadata.is_dir),
             Some(true),
         );
         assert_eq!(
-            fs.metadata(Path::new(path!("/root/missing")))
+            fs.metadata(Path::new("/root/missing"))
                 .await
                 .expect("metadata should be readable")
                 .map(|metadata| metadata.is_dir),
@@ -8970,7 +8961,7 @@ two/  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "dir": {
                     "real.rs": "pub fn real() {}\n",
@@ -8978,13 +8969,13 @@ two/  <==== selected
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let project = Project::test(fs.clone(), [Path::new("/root")], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (workspace, outline_panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
 
-        let buffer_real = open_buffer(&project, path!("/root/dir/real.rs"), cx).await;
-        let buffer_new = open_buffer(&project, path!("/root/dir/never_existed.rs"), cx).await;
+        let buffer_real = open_buffer(&project, "/root/dir/real.rs", cx).await;
+        let buffer_new = open_buffer(&project, "/root/dir/never_existed.rs", cx).await;
         buffer_new.update(cx, |buffer, cx| {
             buffer.edit(
                 [(
@@ -9071,7 +9062,7 @@ two/  <==== selected
     async fn test_navigating_in_singleton(cx: &mut TestAppContext) {
         init_test(cx);
 
-        let root = path!("/root");
+        let root = "/root";
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
             root,
@@ -9102,7 +9093,7 @@ struct OutlineEntryExcerpt {
         let _editor = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/root/src/lib.rs")),
+                    PathBuf::from("/root/src/lib.rs"),
                     OpenOptions {
                         visible: Some(OpenVisible::All),
                         ..Default::default()
@@ -9413,7 +9404,7 @@ outline: struct OutlineEntryExcerpt
     async fn test_frontend_repo_structure(cx: &mut TestAppContext) {
         init_test(cx);
 
-        let root = path!("/frontend-project");
+        let root = "/frontend-project";
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
             root,
@@ -10693,18 +10684,18 @@ outline: fn main"
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({"main.rs": "\nmod parent {\n    fn leaf() {}\n}\n"}),
         )
         .await;
-        let project = Project::test(fs, [Path::new(path!("/test"))], cx).await;
+        let project = Project::test(fs, [Path::new("/test")], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (workspace, panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
         workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/test/main.rs")),
+                    PathBuf::from("/test/main.rs"),
                     OpenOptions::default(),
                     window,
                     cx,
@@ -10759,7 +10750,7 @@ outline: fn main"
             });
         }
 
-        let buffer = open_buffer(&project, path!("/test/main.rs"), cx).await;
+        let buffer = open_buffer(&project, "/test/main.rs", cx).await;
         buffer.update(cx, |buffer, cx| {
             buffer.set_text("plain text", cx);
         });
@@ -10783,20 +10774,20 @@ outline: fn main"
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "dir": {"sub": {"a.rs": "fn alpha() {}\n", "c.rs": "fn charlie() {}\n"}},
                 "other": {"b.rs": "fn bravo() {}\n"}
             }),
         )
         .await;
-        let project = Project::test(fs, [Path::new(path!("/test"))], cx).await;
+        let project = Project::test(fs, [Path::new("/test")], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (workspace, panel, mut cx) = active_outline_panel(&project, cx).await;
         let cx = &mut cx;
-        let first = open_buffer(&project, path!("/test/dir/sub/a.rs"), cx).await;
-        let middle = open_buffer(&project, path!("/test/other/b.rs"), cx).await;
-        let last = open_buffer(&project, path!("/test/dir/sub/c.rs"), cx).await;
+        let first = open_buffer(&project, "/test/dir/sub/a.rs", cx).await;
+        let middle = open_buffer(&project, "/test/other/b.rs", cx).await;
+        let last = open_buffer(&project, "/test/dir/sub/c.rs", cx).await;
         let editor = add_multi_buffer_editor(
             &workspace,
             &project,
@@ -11612,7 +11603,7 @@ search: | Field          | Meaning              «  »|"
     async fn test_outline_panel_lsp_document_symbols(cx: &mut TestAppContext) {
         init_test(cx);
 
-        let root = path!("/root");
+        let root = "/root";
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
             root,
@@ -11719,7 +11710,7 @@ search: | Field          | Meaning              «  »|"
         let editor = workspace
             .update_in(cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/root/src/lib.rs")),
+                    PathBuf::from("/root/src/lib.rs"),
                     OpenOptions {
                         visible: Some(OpenVisible::All),
                         ..OpenOptions::default()
@@ -12028,7 +12019,7 @@ outline: struct Foo  <==== selected
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -12046,7 +12037,7 @@ outline: struct Foo  <==== selected
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -12055,8 +12046,8 @@ outline: struct Foo  <==== selected
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -12362,7 +12353,7 @@ outline: fn main"
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        let root = path!("/rust-analyzer");
+        let root = "/rust-analyzer";
         populate_with_test_ra_project(&fs, root).await;
         let project = Project::test(fs.clone(), [Path::new(root)], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
@@ -12537,7 +12528,7 @@ rust-analyzer/
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -12568,7 +12559,7 @@ rust-analyzer/
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -12577,9 +12568,9 @@ rust-analyzer/
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
-        let buffer_three = open_buffer(&project, path!("/test/src/three.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
+        let buffer_three = open_buffer(&project, "/test/src/three.rs", cx).await;
 
         add_multi_buffer_editor(
             &workspace,
@@ -12722,7 +12713,7 @@ test/
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -12740,7 +12731,7 @@ test/
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -12749,8 +12740,8 @@ test/
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -12844,7 +12835,7 @@ test/
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -12862,7 +12853,7 @@ test/
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -12871,8 +12862,8 @@ test/
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -12980,7 +12971,7 @@ test/
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -12998,7 +12989,7 @@ test/
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -13007,8 +12998,8 @@ test/
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,
@@ -13066,7 +13057,7 @@ test/
 
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             json!({
                 "src": {
                     "one.rs": indoc!("
@@ -13084,7 +13075,7 @@ test/
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         project.read_with(cx, |project, _| project.languages().add(rust_lang()));
         let (window, workspace) = add_outline_panel(&project, cx).await;
         let cx = &mut VisualTestContext::from_window(window.into(), cx);
@@ -13093,8 +13084,8 @@ test/
             outline_panel.set_active(true, window, cx)
         });
 
-        let buffer_one = open_buffer(&project, path!("/test/src/one.rs"), cx).await;
-        let buffer_two = open_buffer(&project, path!("/test/src/two.rs"), cx).await;
+        let buffer_one = open_buffer(&project, "/test/src/one.rs", cx).await;
+        let buffer_two = open_buffer(&project, "/test/src/two.rs", cx).await;
         add_multi_buffer_editor(
             &workspace,
             &project,

@@ -9428,7 +9428,6 @@ mod tests {
     use project::{Project, ProjectEntryId, WorktreeId};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use util::rel_path::rel_path;
 
     #[test]
@@ -9809,15 +9808,10 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/root1"), json!({ "src": { "one.txt": "" } }))
+        fs.insert_tree("/root1", json!({ "src": { "one.txt": "" } }))
             .await;
-        fs.insert_tree(path!("/root2"), json!({})).await;
-        let project = Project::test(
-            fs.clone(),
-            [path!("/root1").as_ref(), path!("/root2").as_ref()],
-            cx,
-        )
-        .await;
+        fs.insert_tree("/root2", json!({})).await;
+        let project = Project::test(fs.clone(), ["/root1".as_ref(), "/root2".as_ref()], cx).await;
         let worktree_id = project.read_with(cx, |project, cx| {
             project.worktrees(cx).next().unwrap().read(cx).id()
         });
@@ -9849,7 +9843,7 @@ mod tests {
             workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx)
         });
         cx.executor().run_until_parked();
-        let expected_file_path = path!("/root1/src/one.txt");
+        let expected_file_path = "/root1/src/one.txt";
         assert_eq!(
             cx.window_title().as_deref(),
             Some(format!("Oxed — root1, root2 — one — {expected_file_path}").as_str())
@@ -9881,10 +9875,10 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/root1"), json!({ ".git": {}, "a.txt": "" }))
+        fs.insert_tree("/root1", json!({ ".git": {}, "a.txt": "" }))
             .await;
-        fs.set_branch_name(Path::new(path!("/root1/.git")), Some("main"));
-        let project = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
+        fs.set_branch_name(Path::new("/root1/.git"), Some("main"));
+        let project = Project::test(fs.clone(), ["/root1".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
 
@@ -9909,7 +9903,7 @@ mod tests {
         cx.executor().run_until_parked();
         assert_eq!(cx.window_title().as_deref(), Some("root1 — main — a.txt"));
 
-        fs.set_branch_name(Path::new(path!("/root1/.git")), Some("feature"));
+        fs.set_branch_name(Path::new("/root1/.git"), Some("feature"));
         cx.executor().run_until_parked();
         assert_eq!(
             cx.window_title().as_deref(),
@@ -9927,7 +9921,7 @@ mod tests {
         cx.executor().run_until_parked();
         assert_eq!(cx.window_title().as_deref(), Some("root1 — a.txt"));
 
-        fs.set_branch_name(Path::new(path!("/root1/.git")), Some("other"));
+        fs.set_branch_name(Path::new("/root1/.git"), Some("other"));
         cx.executor().run_until_parked();
         assert_eq!(cx.window_title().as_deref(), Some("root1 — a.txt"));
     }
@@ -11018,15 +11012,15 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/src"), json!({ "a.txt": "" })).await;
-        let project = Project::test(fs, [path!("/src").as_ref()], cx).await;
+        fs.insert_tree("/src", json!({ "a.txt": "" })).await;
+        let project = Project::test(fs, ["/src".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project, window, cx));
 
         workspace.update(cx, |workspace, cx| {
             workspace
                 .persisted_recent_navigation_history
-                .push(PathBuf::from(path!("/src/a.txt")));
+                .push(PathBuf::from("/src/a.txt"));
             workspace.last_active_project_path = Some(ProjectPath {
                 worktree_id: WorktreeId::from_usize(1),
                 path: rel_path("a.txt").into(),
@@ -15557,13 +15551,11 @@ mod tests {
     async fn test_window_title_follows_active_workspace(cx: &mut TestAppContext) {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/root1"), json!({ "a.txt": "" }))
-            .await;
-        fs.insert_tree(path!("/root2"), json!({ "b.txt": "" }))
-            .await;
+        fs.insert_tree("/root1", json!({ "a.txt": "" })).await;
+        fs.insert_tree("/root2", json!({ "b.txt": "" })).await;
 
-        let project_a = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
-        let project_b = Project::test(fs, [path!("/root2").as_ref()], cx).await;
+        let project_a = Project::test(fs.clone(), ["/root1".as_ref()], cx).await;
+        let project_b = Project::test(fs, ["/root2".as_ref()], cx).await;
 
         let multi_workspace_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project_a.clone(), window, cx));
@@ -15601,15 +15593,12 @@ mod tests {
     async fn test_background_workspace_does_not_clobber_window_title(cx: &mut TestAppContext) {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/root1"), json!({ "a.txt": "" }))
-            .await;
-        fs.insert_tree(path!("/root2"), json!({ "b.txt": "" }))
-            .await;
-        fs.insert_tree(path!("/root3"), json!({ "c.txt": "" }))
-            .await;
+        fs.insert_tree("/root1", json!({ "a.txt": "" })).await;
+        fs.insert_tree("/root2", json!({ "b.txt": "" })).await;
+        fs.insert_tree("/root3", json!({ "c.txt": "" })).await;
 
-        let project_a = Project::test(fs.clone(), [path!("/root1").as_ref()], cx).await;
-        let project_b = Project::test(fs.clone(), [path!("/root2").as_ref()], cx).await;
+        let project_a = Project::test(fs.clone(), ["/root1".as_ref()], cx).await;
+        let project_b = Project::test(fs.clone(), ["/root2".as_ref()], cx).await;
 
         let multi_workspace_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project_a.clone(), window, cx));
@@ -15632,7 +15621,7 @@ mod tests {
         // the shared window's title, which belongs to the active workspace B.
         project_a
             .update(cx, |project, cx| {
-                project.find_or_create_worktree(path!("/root3"), true, cx)
+                project.find_or_create_worktree("/root3", true, cx)
             })
             .await
             .unwrap();
@@ -15671,12 +15660,12 @@ mod tests {
         let fs = FakeFs::new(cx.executor());
         let settings_fs: Arc<dyn fs::Fs> = fs.clone();
 
-        fs.insert_tree(path!("/root"), json!({ "file.rs": "fn main() {}\n" }))
+        fs.insert_tree("/root", json!({ "file.rs": "fn main() {}\n" }))
             .await;
 
         // Build a test project and workspace view so the test can invoke
         // the workspace action handler the same way the UI would.
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
 
@@ -15873,7 +15862,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "src": { "main.py": "" },
                 ".venv": { "lib": { "dep.py": "" } },
@@ -15881,7 +15870,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
         let worktree_id = project.update(cx, |project, cx| {
@@ -15922,7 +15911,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "a.rs": "",
                 "b.rs": "",
@@ -15930,7 +15919,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
         let worktree_id = project.update(cx, |project, cx| {
@@ -15953,14 +15942,14 @@ mod tests {
             workspace.read_with(cx, |workspace, _| {
                 workspace.persisted_recent_navigation_history.clone()
             }),
-            vec![PathBuf::from(path!("/project/a.rs"))]
+            vec![PathBuf::from("/project/a.rs")]
         );
 
         workspace.update(cx, |workspace, _| {
             workspace.persisted_recent_navigation_history = vec![
-                PathBuf::from(path!("/project/b.rs")),
-                PathBuf::from(path!("/project/a.rs")),
-                PathBuf::from(path!("/outside/z.rs")),
+                PathBuf::from("/project/b.rs"),
+                PathBuf::from("/project/a.rs"),
+                PathBuf::from("/outside/z.rs"),
             ];
         });
 
@@ -15983,14 +15972,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "a.rs": "",
                 "b.rs": "",
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
         let worktree_id = project.update(cx, |project, cx| {
@@ -16020,7 +16009,7 @@ mod tests {
                 .workspace_for_id(workspace_id)
                 .unwrap()
                 .recent_navigation_history,
-            vec![PathBuf::from(path!("/project/a.rs"))]
+            vec![PathBuf::from("/project/a.rs")]
         );
         assert!(workspace.read_with(cx, |workspace, _| {
             workspace.last_active_project_path.is_some()
@@ -16038,7 +16027,7 @@ mod tests {
             workspace.read_with(cx, |workspace, _| {
                 workspace.persisted_recent_navigation_history.clone()
             }),
-            vec![PathBuf::from(path!("/project/a.rs"))]
+            vec![PathBuf::from("/project/a.rs")]
         );
 
         project_item.update(cx, |project_item, _| {
@@ -16052,8 +16041,8 @@ mod tests {
                 workspace.persisted_recent_navigation_history.clone()
             }),
             vec![
-                PathBuf::from(path!("/project/b.rs")),
-                PathBuf::from(path!("/project/a.rs")),
+                PathBuf::from("/project/b.rs"),
+                PathBuf::from("/project/a.rs"),
             ]
         );
 
@@ -16063,8 +16052,8 @@ mod tests {
         assert_eq!(
             serialized_workspace.recent_navigation_history,
             vec![
-                PathBuf::from(path!("/project/b.rs")),
-                PathBuf::from(path!("/project/a.rs")),
+                PathBuf::from("/project/b.rs"),
+                PathBuf::from("/project/a.rs"),
             ]
         );
 
@@ -16092,8 +16081,8 @@ mod tests {
                 workspace.persisted_recent_navigation_history.clone()
             }),
             vec![
-                PathBuf::from(path!("/project/b.rs")),
-                PathBuf::from(path!("/project/a.rs")),
+                PathBuf::from("/project/b.rs"),
+                PathBuf::from("/project/a.rs"),
             ]
         );
     }
@@ -16105,8 +16094,8 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), json!({})).await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        fs.insert_tree("/project", json!({})).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
         let worktree_id = project.update(cx, |project, cx| {
@@ -16126,7 +16115,7 @@ mod tests {
 
         let expected = (1..=MAX_RECENT_SELECTIONS)
             .rev()
-            .map(|index| PathBuf::from(path!("/project")).join(format!("{index}.rs")))
+            .map(|index| PathBuf::from("/project").join(format!("{index}.rs")))
             .collect::<Vec<_>>();
         assert_eq!(
             workspace.read_with(cx, |workspace, _| {
@@ -16148,14 +16137,11 @@ mod tests {
             workspace.persisted_recent_navigation_history.clone()
         });
         assert_eq!(history.len(), MAX_RECENT_SELECTIONS);
-        assert_eq!(
-            history.first(),
-            Some(&PathBuf::from(path!("/project/10.rs")))
-        );
+        assert_eq!(history.first(), Some(&PathBuf::from("/project/10.rs")));
         assert_eq!(
             history
                 .iter()
-                .filter(|path| *path == path!("/project/10.rs"))
+                .filter(|path| *path == "/project/10.rs")
                 .count(),
             1
         );
@@ -16169,14 +16155,14 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "dir": { "a.rs": "" },
                 "other.rs": "",
             }),
         )
         .await;
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
         let (worktree_id, directory_entry_id) = project.update(cx, |project, cx| {
@@ -16191,9 +16177,9 @@ mod tests {
 
         workspace.update(cx, |workspace, _| {
             workspace.persisted_recent_navigation_history = vec![
-                PathBuf::from(path!("/project/other.rs")),
-                PathBuf::from(path!("/project/dir/a.rs")),
-                PathBuf::from(path!("/project/renamed/a.rs")),
+                PathBuf::from("/project/other.rs"),
+                PathBuf::from("/project/dir/a.rs"),
+                PathBuf::from("/project/renamed/a.rs"),
             ];
         });
 
@@ -16217,8 +16203,8 @@ mod tests {
                 workspace.persisted_recent_navigation_history.clone()
             }),
             vec![
-                PathBuf::from(path!("/project/other.rs")),
-                PathBuf::from(path!("/project/renamed/a.rs")),
+                PathBuf::from("/project/other.rs"),
+                PathBuf::from("/project/renamed/a.rs"),
             ]
         );
     }
@@ -16239,7 +16225,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         let (workspace, cx) =
             cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
 

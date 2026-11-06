@@ -336,7 +336,7 @@ mod tests {
             native_sink(Ok(Event::new(EventKind::Other).set_flag(Flag::Rescan)));
         }
         poll_sink(Err(
-            notify::Error::generic("read failed").add_path(util::path!("/root/file").into())
+            notify::Error::generic("read failed").add_path("/root/file".into())
         ));
 
         let snapshot = recording.snapshot();
@@ -352,16 +352,16 @@ mod tests {
         assert_eq!(snapshot.events[3].operation, "error");
         assert_eq!(snapshot.events[3].event_kind, None);
         assert!(snapshot.events[3].detail.contains("read failed"));
-        assert_eq!(snapshot.events[3].paths, [util::path!("/root/file")]);
+        assert_eq!(snapshot.events[3].paths, ["/root/file"]);
         let json = serde_json::to_value(snapshot).unwrap();
         assert_eq!(json["events"][2]["rescan"], true);
-        assert_eq!(json["events"][3]["paths"][0], util::path!("/root/file"));
+        assert_eq!(json["events"][3]["paths"][0], "/root/file");
     }
 
     #[gpui::test]
     fn recording_snapshots_existing_roots_and_registration_errors(cx: &TestAppContext) {
         let watcher = watcher(OsWatcherKind::Native, cx);
-        let root = util::path!("/root");
+        let root = "/root";
         let registration = watcher
             .add(Path::new(root).into(), false, |_| {})
             .unwrap()
@@ -379,7 +379,7 @@ mod tests {
 
         assert!(
             watcher
-                .add(Path::new(util::path!("/fail")).into(), false, |_| {})
+                .add(Path::new("/fail").into(), false, |_| {})
                 .is_err()
         );
         watcher.remove(duplicate);

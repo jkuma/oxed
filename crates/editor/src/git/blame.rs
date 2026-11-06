@@ -869,7 +869,7 @@ mod tests {
     use std::{cmp, env, ops::Range, path::Path, sync::Mutex};
     use text::BufferId;
     use unindent::Unindent as _;
-    use util::{RandomCharIter, path};
+    use util::RandomCharIter;
 
     // macro_rules! assert_blame_rows {
     //     ($blame:expr, $rows:expr, $expected:expr, $cx:expr) => {
@@ -1175,7 +1175,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/my-repo"),
+            "/my-repo",
             json!({
                 ".git": {},
                 "file_one.txt": "Line 1\nLine 2\nLine 3\n",
@@ -1184,16 +1184,16 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/my-repo").as_ref()], cx).await;
+        let project = Project::test(fs, ["/my-repo".as_ref()], cx).await;
         let buffer_one = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/my-repo/file_one.txt"), cx)
+                project.open_local_buffer("/my-repo/file_one.txt", cx)
             })
             .await
             .unwrap();
         let buffer_two = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/my-repo/file_two.txt"), cx)
+                project.open_local_buffer("/my-repo/file_two.txt", cx)
             })
             .await
             .unwrap();
@@ -1326,7 +1326,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/my-repo"),
+            "/my-repo",
             json!({
                 ".git": {},
                 "file.txt": r#"
@@ -1340,7 +1340,7 @@ mod tests {
         .await;
 
         fs.set_blame_for_repo(
-            Path::new(path!("/my-repo/.git")),
+            Path::new("/my-repo/.git"),
             vec![(
                 repo_path("file.txt"),
                 Blame {
@@ -1350,10 +1350,10 @@ mod tests {
             )],
         );
 
-        let project = Project::test(fs, [path!("/my-repo").as_ref()], cx).await;
+        let project = Project::test(fs, ["/my-repo".as_ref()], cx).await;
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/my-repo/file.txt"), cx)
+                project.open_local_buffer("/my-repo/file.txt", cx)
             })
             .await
             .unwrap();
@@ -1497,7 +1497,7 @@ mod tests {
         log::info!("initial buffer text: {:?}", buffer_initial_text);
 
         fs.insert_tree(
-            path!("/my-repo"),
+            "/my-repo",
             json!({
                 ".git": {},
                 "file.txt": buffer_initial_text.to_string()
@@ -1508,7 +1508,7 @@ mod tests {
         let blame_entries = gen_blame_entries(buffer_initial_text.max_point().row, &mut rng);
         log::info!("initial blame entries: {:?}", blame_entries);
         fs.set_blame_for_repo(
-            Path::new(path!("/my-repo/.git")),
+            Path::new("/my-repo/.git"),
             vec![(
                 repo_path("file.txt"),
                 Blame {
@@ -1518,10 +1518,10 @@ mod tests {
             )],
         );
 
-        let project = Project::test(fs.clone(), [path!("/my-repo").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/my-repo".as_ref()], cx).await;
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/my-repo/file.txt"), cx)
+                project.open_local_buffer("/my-repo/file.txt", cx)
             })
             .await
             .unwrap();
@@ -1551,7 +1551,7 @@ mod tests {
                     log::info!("regenerating blame entries: {:?}", blame_entries);
 
                     fs.set_blame_for_repo(
-                        Path::new(path!("/my-repo/.git")),
+                        Path::new("/my-repo/.git"),
                         vec![(
                             repo_path("file.txt"),
                             Blame {

@@ -5,7 +5,6 @@ use gpui::{Entity, TestAppContext};
 use language::Buffer;
 use project::{Project, bookmark_store::SerializedBookmark};
 use serde_json::json;
-use util::path;
 
 mod integration {
     use super::*;
@@ -164,10 +163,10 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), json!({"file1.rs": "line1\nline2\n"}))
+        fs.insert_tree("/project", json!({"file1.rs": "line1\nline2\n"}))
             .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         assert!(get_all_bookmarks(&project, cx).is_empty());
     }
 
@@ -178,19 +177,19 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({"file1.rs": "line1\nline2\nline3\nline4\nline5\n"}),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[0, 2], cx);
 
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_eq!(bookmarks.len(), 1);
-        assert_bookmark_rows(&bookmarks, path!("/project/file1.rs"), &[0, 2]);
+        assert_bookmark_rows(&bookmarks, "/project/file1.rs", &[0, 2]);
     }
 
     #[gpui::test]
@@ -199,14 +198,11 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(
-            path!("/project"),
-            json!({"file1.rs": "line1\nline2\nline3\n"}),
-        )
-        .await;
+        fs.insert_tree("/project", json!({"file1.rs": "line1\nline2\nline3\n"}))
+            .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
 
         add_labeled_bookmark(&project, &buffer, 0, "first", cx);
         add_labeled_bookmark(&project, &buffer, 2, "  keeps inner spaces  ", cx);
@@ -214,7 +210,7 @@ mod integration {
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_bookmark_labels(
             &bookmarks,
-            path!("/project/file1.rs"),
+            "/project/file1.rs",
             &[(0, "first"), (2, "  keeps inner spaces  ")],
         );
     }
@@ -226,7 +222,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "file1.rs": "line1\nline2\nline3\n",
                 "file2.rs": "lineA\nlineB\nlineC\nlineD\n",
@@ -235,20 +231,20 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer1 = open_buffer(&project, path!("/project/file1.rs"), cx).await;
-        let buffer2 = open_buffer(&project, path!("/project/file2.rs"), cx).await;
-        let _buffer3 = open_buffer(&project, path!("/project/file3.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer1 = open_buffer(&project, "/project/file1.rs", cx).await;
+        let buffer2 = open_buffer(&project, "/project/file2.rs", cx).await;
+        let _buffer3 = open_buffer(&project, "/project/file3.rs", cx).await;
 
         add_bookmarks(&project, &buffer1, &[1], cx);
         add_bookmarks(&project, &buffer2, &[0, 3], cx);
 
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_eq!(bookmarks.len(), 2);
-        assert_bookmark_rows(&bookmarks, path!("/project/file1.rs"), &[1]);
-        assert_bookmark_rows(&bookmarks, path!("/project/file2.rs"), &[0, 3]);
+        assert_bookmark_rows(&bookmarks, "/project/file1.rs", &[1]);
+        assert_bookmark_rows(&bookmarks, "/project/file2.rs", &[0, 3]);
         assert!(
-            !bookmarks.contains_key(&project_path(path!("/project/file3.rs"))),
+            !bookmarks.contains_key(&project_path("/project/file3.rs")),
             "file3.rs should have no bookmarks"
         );
     }
@@ -259,14 +255,11 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(
-            path!("/project"),
-            json!({"file1.rs": "line1\nline2\nline3\n"}),
-        )
-        .await;
+        fs.insert_tree("/project", json!({"file1.rs": "line1\nline2\nline3\n"}))
+            .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[1], cx);
         assert_eq!(get_all_bookmarks(&project, cx).len(), 1);
@@ -283,7 +276,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "file1.rs": "line1\nline2\nline3\n",
                 "file2.rs": "lineA\nlineB\n"
@@ -291,9 +284,9 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer1 = open_buffer(&project, path!("/project/file1.rs"), cx).await;
-        let buffer2 = open_buffer(&project, path!("/project/file2.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer1 = open_buffer(&project, "/project/file1.rs", cx).await;
+        let buffer2 = open_buffer(&project, "/project/file2.rs", cx).await;
 
         add_bookmarks(&project, &buffer1, &[0], cx);
         add_bookmarks(&project, &buffer2, &[1], cx);
@@ -310,15 +303,15 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({"b.rs": "line1\n", "a.rs": "line1\n", "c.rs": "line1\n"}),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer_b = open_buffer(&project, path!("/project/b.rs"), cx).await;
-        let buffer_a = open_buffer(&project, path!("/project/a.rs"), cx).await;
-        let buffer_c = open_buffer(&project, path!("/project/c.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer_b = open_buffer(&project, "/project/b.rs", cx).await;
+        let buffer_a = open_buffer(&project, "/project/a.rs", cx).await;
+        let buffer_c = open_buffer(&project, "/project/c.rs", cx).await;
 
         add_bookmarks(&project, &buffer_b, &[0], cx);
         add_bookmarks(&project, &buffer_a, &[0], cx);
@@ -328,9 +321,9 @@ mod integration {
         assert_eq!(
             paths,
             [
-                project_path(path!("/project/a.rs")),
-                project_path(path!("/project/b.rs")),
-                project_path(path!("/project/c.rs")),
+                project_path("/project/a.rs"),
+                project_path("/project/b.rs"),
+                project_path("/project/c.rs"),
             ]
         );
     }
@@ -342,22 +335,22 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({"file1.rs": "line1\nline2\nline3\nline4\n"}),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[1, 2], cx);
 
         let bookmarks = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&bookmarks, path!("/project/file1.rs"), &[1, 2]);
+        assert_bookmark_rows(&bookmarks, "/project/file1.rs", &[1, 2]);
 
         // Verify no duplicates
         let rows: Vec<u32> = bookmarks
-            .get(&project_path(path!("/project/file1.rs")))
+            .get(&project_path("/project/file1.rs"))
             .unwrap()
             .iter()
             .map(|b| b.row)
@@ -374,7 +367,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "file1.rs": "line1\nline2\nline3\nline4\nline5\n",
                 "file2.rs": "aaa\nbbb\nccc\n"
@@ -382,19 +375,17 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
-        let serialized = build_serialized(&[
-            (path!("/project/file1.rs"), &[0, 3]),
-            (path!("/project/file2.rs"), &[1]),
-        ]);
+        let serialized =
+            build_serialized(&[("/project/file1.rs", &[0, 3]), ("/project/file2.rs", &[1])]);
 
         restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 2);
-        assert_bookmark_rows(&restored, path!("/project/file1.rs"), &[0, 3]);
-        assert_bookmark_rows(&restored, path!("/project/file2.rs"), &[1]);
+        assert_bookmark_rows(&restored, "/project/file1.rs", &[0, 3]);
+        assert_bookmark_rows(&restored, "/project/file2.rs", &[1]);
     }
 
     #[gpui::test]
@@ -404,23 +395,20 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         // 3 lines: rows 0, 1, 2
-        fs.insert_tree(
-            path!("/project"),
-            json!({"file1.rs": "line1\nline2\nline3"}),
-        )
-        .await;
+        fs.insert_tree("/project", json!({"file1.rs": "line1\nline2\nline3"}))
+            .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
-        let serialized = build_serialized(&[(path!("/project/file1.rs"), &[1, 100, 2])]);
+        let serialized = build_serialized(&[("/project/file1.rs", &[1, 100, 2])]);
         restore_bookmarks(&project, serialized, cx).await;
 
         // Before resolution, unloaded bookmarks are stored as-is
         let unresolved = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&unresolved, path!("/project/file1.rs"), &[1, 2, 100]);
+        assert_bookmark_rows(&unresolved, "/project/file1.rs", &[1, 2, 100]);
 
         // Open the buffer to trigger lazy resolution
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
         project.update(cx, |project, cx| {
             let buffer_snapshot = buffer.read(cx).snapshot();
             project.bookmark_store().update(cx, |store, cx| {
@@ -436,7 +424,7 @@ mod integration {
 
         // After resolution, out-of-range rows are filtered
         let restored = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&restored, path!("/project/file1.rs"), &[1, 2]);
+        assert_bookmark_rows(&restored, "/project/file1.rs", &[1, 2]);
     }
 
     #[gpui::test]
@@ -446,22 +434,22 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({"file1.rs": "line1\nline2\n", "file2.rs": "aaa\nbbb\n"}),
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
-        let mut serialized = build_serialized(&[(path!("/project/file1.rs"), &[0])]);
-        serialized.insert(project_path(path!("/project/file2.rs")), vec![]);
+        let mut serialized = build_serialized(&[("/project/file1.rs", &[0])]);
+        serialized.insert(project_path("/project/file2.rs"), vec![]);
 
         restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 1);
-        assert!(restored.contains_key(&project_path(path!("/project/file1.rs"))));
-        assert!(!restored.contains_key(&project_path(path!("/project/file2.rs"))));
+        assert!(restored.contains_key(&project_path("/project/file1.rs")));
+        assert!(!restored.contains_key(&project_path("/project/file2.rs")));
     }
 
     #[gpui::test]
@@ -472,12 +460,11 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), json!({"tiny.rs": "x"}))
-            .await;
+        fs.insert_tree("/project", json!({"tiny.rs": "x"})).await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
-        let serialized = build_serialized(&[(path!("/project/tiny.rs"), &[5, 10])]);
+        let serialized = build_serialized(&[("/project/tiny.rs", &[5, 10])]);
         restore_bookmarks(&project, serialized, cx).await;
 
         // Before resolution, unloaded bookmarks are stored as-is
@@ -485,7 +472,7 @@ mod integration {
         assert_eq!(unresolved.len(), 1);
 
         // Open the buffer to trigger lazy resolution
-        let buffer = open_buffer(&project, path!("/project/tiny.rs"), cx).await;
+        let buffer = open_buffer(&project, "/project/tiny.rs", cx).await;
         project.update(cx, |project, cx| {
             let buffer_snapshot = buffer.read(cx).snapshot();
             project.bookmark_store().update(cx, |store, cx| {
@@ -509,29 +496,22 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(
-            path!("/project"),
-            json!({"file1.rs": "aaa\nbbb\nccc\nddd\n"}),
-        )
-        .await;
+        fs.insert_tree("/project", json!({"file1.rs": "aaa\nbbb\nccc\nddd\n"}))
+            .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file1.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file1.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[0], cx);
-        assert_bookmark_rows(
-            &get_all_bookmarks(&project, cx),
-            path!("/project/file1.rs"),
-            &[0],
-        );
+        assert_bookmark_rows(&get_all_bookmarks(&project, cx), "/project/file1.rs", &[0]);
 
         // Restoring different bookmarks should replace, not merge
-        let serialized = build_serialized(&[(path!("/project/file1.rs"), &[2, 3])]);
+        let serialized = build_serialized(&[("/project/file1.rs", &[2, 3])]);
         restore_bookmarks(&project, serialized, cx).await;
 
         let after = get_all_bookmarks(&project, cx);
         assert_eq!(after.len(), 1);
-        assert_bookmark_rows(&after, path!("/project/file1.rs"), &[2, 3]);
+        assert_bookmark_rows(&after, "/project/file1.rs", &[2, 3]);
     }
 
     #[gpui::test]
@@ -541,7 +521,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "alpha.rs": "fn main() {\n    println!(\"hello\");\n    return;\n}\n",
                 "beta.rs": "use std::io;\nfn read() {}\nfn write() {}\n"
@@ -549,9 +529,9 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer_alpha = open_buffer(&project, path!("/project/alpha.rs"), cx).await;
-        let buffer_beta = open_buffer(&project, path!("/project/beta.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer_alpha = open_buffer(&project, "/project/alpha.rs", cx).await;
+        let buffer_beta = open_buffer(&project, "/project/beta.rs", cx).await;
 
         add_bookmarks(&project, &buffer_alpha, &[0, 2, 3], cx);
         add_bookmarks(&project, &buffer_beta, &[1], cx);
@@ -559,8 +539,8 @@ mod integration {
         // Serialize
         let serialized = get_all_bookmarks(&project, cx);
         assert_eq!(serialized.len(), 2);
-        assert_bookmark_rows(&serialized, path!("/project/alpha.rs"), &[0, 2, 3]);
-        assert_bookmark_rows(&serialized, path!("/project/beta.rs"), &[1]);
+        assert_bookmark_rows(&serialized, "/project/alpha.rs", &[0, 2, 3]);
+        assert_bookmark_rows(&serialized, "/project/beta.rs", &[1]);
 
         // Clear and restore
         clear_bookmarks(&project, cx);
@@ -570,8 +550,8 @@ mod integration {
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 2);
-        assert_bookmark_rows(&restored, path!("/project/alpha.rs"), &[0, 2, 3]);
-        assert_bookmark_rows(&restored, path!("/project/beta.rs"), &[1]);
+        assert_bookmark_rows(&restored, "/project/alpha.rs", &[0, 2, 3]);
+        assert_bookmark_rows(&restored, "/project/beta.rs", &[1]);
     }
 
     #[gpui::test]
@@ -580,14 +560,11 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(
-            path!("/project"),
-            json!({"file.rs": "aaa\nbbb\nccc\nddd\neee\n"}),
-        )
-        .await;
+        fs.insert_tree("/project", json!({"file.rs": "aaa\nbbb\nccc\nddd\neee\n"}))
+            .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/file.rs"), cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/file.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[1, 3], cx);
 
@@ -597,14 +574,14 @@ mod integration {
         });
 
         let serialized = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&serialized, path!("/project/file.rs"), &[2, 4]);
+        assert_bookmark_rows(&serialized, "/project/file.rs", &[2, 4]);
 
         // Clear and restore
         clear_bookmarks(&project, cx);
         restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&restored, path!("/project/file.rs"), &[2, 4]);
+        assert_bookmark_rows(&restored, "/project/file.rs", &[2, 4]);
     }
 
     #[gpui::test]
@@ -614,7 +591,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "file1.rs": "aaa\nbbb\nccc\n",
                 "file2.rs": "ddd\neee\nfff\n"
@@ -622,16 +599,16 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
-        let buffer1 = open_buffer(&project, path!("/project/file1.rs"), cx).await;
-        let buffer2 = open_buffer(&project, path!("/project/file2.rs"), cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
+        let buffer1 = open_buffer(&project, "/project/file1.rs", cx).await;
+        let buffer2 = open_buffer(&project, "/project/file2.rs", cx).await;
 
         add_bookmarks(&project, &buffer1, &[0, 2], cx);
         add_bookmarks(&project, &buffer2, &[1], cx);
         assert_eq!(get_all_bookmarks(&project, cx).len(), 2);
 
         // Delete file1.rs
-        fs.remove_file(path!("/project/file1.rs").as_ref(), Default::default())
+        fs.remove_file("/project/file1.rs".as_ref(), Default::default())
             .await
             .unwrap();
         cx.executor().run_until_parked();
@@ -639,8 +616,8 @@ mod integration {
         // file1.rs bookmarks should be gone, file2.rs bookmarks preserved
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_eq!(bookmarks.len(), 1);
-        assert!(!bookmarks.contains_key(&project_path(path!("/project/file1.rs"))));
-        assert_bookmark_rows(&bookmarks, path!("/project/file2.rs"), &[1]);
+        assert!(!bookmarks.contains_key(&project_path("/project/file1.rs")));
+        assert_bookmark_rows(&bookmarks, "/project/file2.rs", &[1]);
     }
 
     #[gpui::test]
@@ -650,7 +627,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "file1.rs": "aaa\nbbb\n",
                 "file2.rs": "ccc\nddd\n"
@@ -658,19 +635,19 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
-        let buffer1 = open_buffer(&project, path!("/project/file1.rs"), cx).await;
-        let buffer2 = open_buffer(&project, path!("/project/file2.rs"), cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
+        let buffer1 = open_buffer(&project, "/project/file1.rs", cx).await;
+        let buffer2 = open_buffer(&project, "/project/file2.rs", cx).await;
 
         add_bookmarks(&project, &buffer1, &[0], cx);
         add_bookmarks(&project, &buffer2, &[1], cx);
         assert_eq!(get_all_bookmarks(&project, cx).len(), 2);
 
         // Delete both files
-        fs.remove_file(path!("/project/file1.rs").as_ref(), Default::default())
+        fs.remove_file("/project/file1.rs".as_ref(), Default::default())
             .await
             .unwrap();
-        fs.remove_file(path!("/project/file2.rs").as_ref(), Default::default())
+        fs.remove_file("/project/file2.rs".as_ref(), Default::default())
             .await
             .unwrap();
         cx.executor().run_until_parked();
@@ -684,23 +661,23 @@ mod integration {
         cx.executor().allow_parking();
 
         let fs = fs::FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/project"), json!({"old_name.rs": "aaa\nbbb\nccc\n"}))
+        fs.insert_tree("/project", json!({"old_name.rs": "aaa\nbbb\nccc\n"}))
             .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
-        let buffer = open_buffer(&project, path!("/project/old_name.rs"), cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
+        let buffer = open_buffer(&project, "/project/old_name.rs", cx).await;
 
         add_bookmarks(&project, &buffer, &[0, 2], cx);
         assert_bookmark_rows(
             &get_all_bookmarks(&project, cx),
-            path!("/project/old_name.rs"),
+            "/project/old_name.rs",
             &[0, 2],
         );
 
         // Rename the file
         fs.rename(
-            path!("/project/old_name.rs").as_ref(),
-            path!("/project/new_name.rs").as_ref(),
+            "/project/old_name.rs".as_ref(),
+            "/project/new_name.rs".as_ref(),
             Default::default(),
         )
         .await
@@ -709,8 +686,8 @@ mod integration {
 
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_eq!(bookmarks.len(), 1);
-        assert!(!bookmarks.contains_key(&project_path(path!("/project/old_name.rs"))));
-        assert_bookmark_rows(&bookmarks, path!("/project/new_name.rs"), &[0, 2]);
+        assert!(!bookmarks.contains_key(&project_path("/project/old_name.rs")));
+        assert_bookmark_rows(&bookmarks, "/project/new_name.rs", &[0, 2]);
     }
 
     #[gpui::test]
@@ -720,7 +697,7 @@ mod integration {
 
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "rename_me.rs": "aaa\nbbb\n",
                 "untouched.rs": "ccc\nddd\neee\n"
@@ -728,16 +705,16 @@ mod integration {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
-        let buffer_rename = open_buffer(&project, path!("/project/rename_me.rs"), cx).await;
-        let buffer_other = open_buffer(&project, path!("/project/untouched.rs"), cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
+        let buffer_rename = open_buffer(&project, "/project/rename_me.rs", cx).await;
+        let buffer_other = open_buffer(&project, "/project/untouched.rs", cx).await;
 
         add_bookmarks(&project, &buffer_rename, &[1], cx);
         add_bookmarks(&project, &buffer_other, &[0, 2], cx);
 
         fs.rename(
-            path!("/project/rename_me.rs").as_ref(),
-            path!("/project/renamed.rs").as_ref(),
+            "/project/rename_me.rs".as_ref(),
+            "/project/renamed.rs".as_ref(),
             Default::default(),
         )
         .await
@@ -746,7 +723,7 @@ mod integration {
 
         let bookmarks = get_all_bookmarks(&project, cx);
         assert_eq!(bookmarks.len(), 2);
-        assert_bookmark_rows(&bookmarks, path!("/project/renamed.rs"), &[1]);
-        assert_bookmark_rows(&bookmarks, path!("/project/untouched.rs"), &[0, 2]);
+        assert_bookmark_rows(&bookmarks, "/project/renamed.rs", &[1]);
+        assert_bookmark_rows(&bookmarks, "/project/untouched.rs", &[0, 2]);
     }
 }

@@ -558,7 +558,6 @@ mod tests {
     use multi_buffer::{MultiBuffer, PathKey};
     use project::lsp_store::emmet_ext::{EmmetOutputOptions, LspExpandAbbreviation};
     use project::{FakeFs, Project};
-    use util::path;
 
     use crate::editor_tests::init_test;
     use crate::test::build_editor_with_project;
@@ -1287,10 +1286,10 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_file(path!("/file.css"), ".a { color: red; }".into())
+        fs.insert_file("/file.css", ".a { color: red; }".into())
             .await;
 
-        let project = Project::test(fs, [path!("/file.css").as_ref()], cx).await;
+        let project = Project::test(fs, ["/file.css".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(Arc::new(Language::new(
             LanguageConfig {
@@ -1313,9 +1312,7 @@ mod tests {
         );
 
         let buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/file.css"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/file.css", cx))
             .await
             .unwrap();
         let multi_buffer = cx.new(|cx| MultiBuffer::singleton(buffer, cx));
@@ -1433,7 +1430,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             serde_json::json!({
                 "a.html": "<p>one</p>",
                 "b.html": "<p>two</p>",
@@ -1441,18 +1438,18 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         let mut fake_servers = register_html_with_emmet(&project, cx);
 
         let buffer_a = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/a.html"), cx)
+                project.open_local_buffer("/root/a.html", cx)
             })
             .await
             .unwrap();
         let buffer_b = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/b.html"), cx)
+                project.open_local_buffer("/root/b.html", cx)
             })
             .await
             .unwrap();
@@ -1582,14 +1579,14 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_file(path!("/file.html"), text.into()).await;
+        fs.insert_file("/file.html", text.into()).await;
 
-        let project = Project::test(fs, [path!("/file.html").as_ref()], cx).await;
+        let project = Project::test(fs, ["/file.html".as_ref()], cx).await;
         let fake_servers = register_html_with_emmet(&project, cx);
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/file.html"), cx)
+                project.open_local_buffer("/file.html", cx)
             })
             .await
             .unwrap();

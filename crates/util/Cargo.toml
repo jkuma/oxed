@@ -14,7 +14,7 @@ path = "src/util.rs"
 doctest = true
 
 [features]
-test-support = ["rand", "util_macros", "path/test-support"]
+test-support = ["rand", "path/test-support"]
 # Embed `fs_embed!` assets at compile time even in debug builds.
 debug-embed = ["rust-embed/debug-embed"]
 
@@ -33,7 +33,6 @@ serde_json_lenient.workspace = true
 unicase.workspace = true
 url.workspace = true
 percent-encoding.workspace = true
-util_macros = { workspace = true, optional = true }
 gpui_util.workspace = true
 path = { workspace = true, features = ["serde"] }
 async_zip.workspace = true

@@ -9226,10 +9226,7 @@ mod tests {
         use proptest::prelude::*;
         use serde_json::json;
         use std::{collections::HashSet, sync::Arc};
-        use util::{
-            path,
-            rel_path::{RelPath, rel_path},
-        };
+        use util::rel_path::{RelPath, rel_path};
 
         struct TestFileItem {
             project_path: ProjectPath,
@@ -9420,7 +9417,7 @@ mod tests {
 
                 let fs = FakeFs::new(cx.executor());
                 fs.insert_tree(
-                    path!("/root"),
+                    "/root",
                     json!({
                         "1.txt": "one",
                         "2.js": "two",
@@ -9428,7 +9425,7 @@ mod tests {
                     }),
                 )
                 .await;
-                let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+                let project = Project::test(fs, ["/root".as_ref()], cx).await;
                 let worktree_id = project.update(cx, |project, cx| {
                     project.worktrees(cx).next().unwrap().read(cx).id()
                 });

@@ -13,7 +13,7 @@ mod conflict_set_tests {
     use serde_json::json;
     use text::{Buffer, BufferId, OffsetRangeExt, Point, ReplicaId, ToOffset as _};
     use unindent::Unindent as _;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
 
     #[test]
     fn test_parse_conflicts_in_buffer() {
@@ -322,18 +322,18 @@ mod conflict_set_tests {
         .unindent();
         let fs = FakeFs::new(executor);
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": initial_text,
             }),
         )
         .await;
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (git_store, buffer) = project.update(cx, |project, cx| {
             (
                 project.git_store().clone(),
-                project.open_local_buffer(path!("/project/a.txt"), cx),
+                project.open_local_buffer("/project/a.txt", cx),
             )
         });
         let buffer = buffer.await.unwrap();
@@ -368,7 +368,7 @@ mod conflict_set_tests {
             "no conflicts should be registered as long as the file's status is unchanged",
         );
 
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.insert(
                 repo_path("a.txt"),
                 UnmergedStatus {
@@ -426,7 +426,7 @@ mod conflict_set_tests {
 
         let fs = FakeFs::new(executor);
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": initial_text,
@@ -434,16 +434,16 @@ mod conflict_set_tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (git_store, buffer) = project.update(cx, |project, cx| {
             (
                 project.git_store().clone(),
-                project.open_local_buffer(path!("/project/a.txt"), cx),
+                project.open_local_buffer("/project/a.txt", cx),
             )
         });
 
         cx.run_until_parked();
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.insert(
                 RepoPath::from_rel_path(rel_path("a.txt")),
                 UnmergedStatus {
@@ -472,7 +472,7 @@ mod conflict_set_tests {
         });
 
         // Simulate the conflict being removed by e.g. staging the file.
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.remove(&repo_path("a.txt"))
         })
         .unwrap();
@@ -484,7 +484,7 @@ mod conflict_set_tests {
         });
 
         // Simulate the conflict being re-added.
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.insert(
                 repo_path("a.txt"),
                 UnmergedStatus {
@@ -544,7 +544,7 @@ mod conflict_set_tests {
 
         let fs = FakeFs::new(executor);
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": initial_text,
@@ -552,11 +552,11 @@ mod conflict_set_tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (git_store, buffer) = project.update(cx, |project, cx| {
             (
                 project.git_store().clone(),
-                project.open_local_buffer(path!("/project/a.txt"), cx),
+                project.open_local_buffer("/project/a.txt", cx),
             )
         });
         let buffer = buffer.await.unwrap();
@@ -578,7 +578,7 @@ mod conflict_set_tests {
             .try_recv()
             .expect_err("conflict set should start empty");
 
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.refs.insert("MERGE_HEAD".into(), "123".into())
         })
         .unwrap();
@@ -595,7 +595,7 @@ mod conflict_set_tests {
         buffer.update(cx, |buffer, cx| {
             buffer.set_text(conflicted_text.clone(), cx);
         });
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.insert(
                 repo_path("a.txt"),
                 UnmergedStatus {
@@ -635,7 +635,7 @@ mod conflict_set_tests {
             assert_eq!(conflict_set.snapshot.conflicts.len(), 0);
         });
 
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.refs.insert("MERGE_HEAD".into(), "456".into());
         })
         .unwrap();
@@ -649,7 +649,7 @@ mod conflict_set_tests {
             assert_eq!(conflict_set.snapshot.conflicts.len(), 0);
         });
 
-        fs.with_git_state(path!("/project/.git").as_ref(), true, |state| {
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
             state.unmerged_paths.remove(&repo_path("a.txt"));
             state.refs.remove("MERGE_HEAD");
         })
@@ -687,10 +687,7 @@ mod git_traversal {
 
     use serde_json::json;
     use settings::SettingsStore;
-    use util::{
-        path,
-        rel_path::{RelPath, rel_path},
-    };
+    use util::rel_path::{RelPath, rel_path};
 
     const CONFLICT: FileStatus = FileStatus::Unmerged(UnmergedStatus {
         first_head: UnmergedStatusCode::Updated,
@@ -712,7 +709,7 @@ mod git_traversal {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "x": {
                     ".git": {},
@@ -735,19 +732,19 @@ mod git_traversal {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/x/.git")),
+            Path::new("/root/x/.git"),
             &[
                 ("x2.txt", StatusCode::Modified.index()),
                 ("z.txt", StatusCode::Added.index()),
             ],
         );
-        fs.set_status_for_repo(Path::new(path!("/root/x/y/.git")), &[("y1.txt", CONFLICT)]);
+        fs.set_status_for_repo(Path::new("/root/x/y/.git"), &[("y1.txt", CONFLICT)]);
         fs.set_status_for_repo(
-            Path::new(path!("/root/z/.git")),
+            Path::new("/root/z/.git"),
             &[("z2.txt", StatusCode::Added.index())],
         );
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let (repo_snapshots, worktree_snapshot) = project.read_with(cx, |project, cx| {
@@ -788,7 +785,7 @@ mod git_traversal {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "x": {
                     ".git": {},
@@ -811,20 +808,20 @@ mod git_traversal {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/x/.git")),
+            Path::new("/root/x/.git"),
             &[
                 ("x2.txt", StatusCode::Modified.index()),
                 ("z.txt", StatusCode::Added.index()),
             ],
         );
-        fs.set_status_for_repo(Path::new(path!("/root/x/y/.git")), &[("y1.txt", CONFLICT)]);
+        fs.set_status_for_repo(Path::new("/root/x/y/.git"), &[("y1.txt", CONFLICT)]);
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/z/.git")),
+            Path::new("/root/z/.git"),
             &[("z2.txt", StatusCode::Added.index())],
         );
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let (repo_snapshots, worktree_snapshot) = project.read_with(cx, |project, cx| {
@@ -916,7 +913,7 @@ mod git_traversal {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "a": {
@@ -942,7 +939,7 @@ mod git_traversal {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/.git")),
+            Path::new("/root/.git"),
             &[
                 ("a/b/c1.txt", StatusCode::Added.index()),
                 ("a/d/e2.txt", StatusCode::Modified.index()),
@@ -950,7 +947,7 @@ mod git_traversal {
             ],
         );
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let (repo_snapshots, worktree_snapshot) = project.read_with(cx, |project, cx| {
@@ -1022,7 +1019,7 @@ mod git_traversal {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "x": {
                     ".git": {},
@@ -1044,22 +1041,22 @@ mod git_traversal {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/x/.git")),
+            Path::new("/root/x/.git"),
             &[("x1.txt", StatusCode::Added.index())],
         );
         fs.set_status_for_repo(
-            Path::new(path!("/root/y/.git")),
+            Path::new("/root/y/.git"),
             &[
                 ("y1.txt", CONFLICT),
                 ("y2.txt", StatusCode::Modified.index()),
             ],
         );
         fs.set_status_for_repo(
-            Path::new(path!("/root/z/.git")),
+            Path::new("/root/z/.git"),
             &[("z2.txt", StatusCode::Modified.index())],
         );
 
-        let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let (repo_snapshots, worktree_snapshot) = project.read_with(cx, |project, cx| {
@@ -1130,7 +1127,7 @@ mod git_traversal {
         // Create a worktree with a git directory.
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "a.txt": "",
@@ -1141,12 +1138,12 @@ mod git_traversal {
         )
         .await;
         fs.set_head_and_index_for_repo(
-            path!("/root/.git").as_ref(),
+            "/root/.git".as_ref(),
             &[("a.txt", "".into()), ("b/c.txt", "".into())],
         );
         cx.run_until_parked();
 
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let (old_entry_ids, old_mtimes) = project.read_with(cx, |project, cx| {
@@ -1160,7 +1157,7 @@ mod git_traversal {
         // Regression test: after the directory is scanned, touch the git repo's
         // working directory, bumping its mtime. That directory keeps its project
         // entry id after the directories are re-scanned.
-        fs.touch_path(path!("/root")).await;
+        fs.touch_path("/root").await;
         cx.executor().run_until_parked();
 
         let (new_entry_ids, new_mtimes) = project.read_with(cx, |project, cx| {
@@ -1176,7 +1173,7 @@ mod git_traversal {
         // Regression test: changes to the git repository should still be
         // detected.
         fs.set_head_for_repo(
-            path!("/root/.git").as_ref(),
+            "/root/.git".as_ref(),
             &[("a.txt", "".into()), ("b/c.txt", "something-else".into())],
             "deadbeef",
         );
@@ -1231,7 +1228,7 @@ mod git_worktrees {
     use serde_json::json;
     use settings::SettingsStore;
     use std::path::{Path, PathBuf};
-    use util::{path, paths::PathStyle};
+    use util::paths::PathStyle;
 
     fn init_test(cx: &mut gpui::TestAppContext) {
         zlog::init_test();
@@ -1318,7 +1315,7 @@ mod git_worktrees {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/zed"),
+            "/zed",
             json!({
                 ".bare": {
                     "worktrees": {
@@ -1335,7 +1332,7 @@ mod git_worktrees {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/zed/main").as_ref()], cx).await;
+        let project = Project::test(fs, ["/zed/main".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
@@ -1354,11 +1351,11 @@ mod git_worktrees {
 
         assert_eq!(
             default_path,
-            PathBuf::from(path!("/worktrees/zed/plum-warbler/zed"))
+            PathBuf::from("/worktrees/zed/plum-warbler/zed")
         );
         assert_eq!(
             repository_relative_path,
-            PathBuf::from(path!("/zed/worktrees/plum-warbler/zed"))
+            PathBuf::from("/zed/worktrees/plum-warbler/zed")
         );
     }
 
@@ -1367,7 +1364,7 @@ mod git_worktrees {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "file.txt": "content",
@@ -1375,7 +1372,7 @@ mod git_worktrees {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
@@ -1388,9 +1385,9 @@ mod git_worktrees {
             .unwrap()
             .unwrap();
         assert_eq!(worktrees.len(), 1);
-        assert_eq!(worktrees[0].path, PathBuf::from(path!("/root")));
+        assert_eq!(worktrees[0].path, PathBuf::from("/root"));
 
-        let worktrees_directory = PathBuf::from(path!("/root"));
+        let worktrees_directory = PathBuf::from("/root");
         let worktree_1_directory = worktrees_directory.join("feature-branch");
         cx.update(|cx| {
             repository.update(cx, |repository, _| {
@@ -1415,7 +1412,7 @@ mod git_worktrees {
             .unwrap()
             .unwrap();
         assert_eq!(worktrees.len(), 2);
-        assert_eq!(worktrees[0].path, PathBuf::from(path!("/root")));
+        assert_eq!(worktrees[0].path, PathBuf::from("/root"));
         assert_eq!(worktrees[1].path, worktree_1_directory);
         assert_eq!(
             worktrees[1].ref_name,
@@ -1468,7 +1465,7 @@ mod git_worktrees {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 ".git": {},
                 "file.txt": "content",
@@ -1476,17 +1473,17 @@ mod git_worktrees {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
             project.repositories(cx).values().next().unwrap().clone()
         });
 
-        let worktree_path = PathBuf::from(path!("/worktrees/root/feature/nested/root"));
-        let worktree_parent = PathBuf::from(path!("/worktrees/root/feature/nested"));
-        let worktree_intermediate_parent = PathBuf::from(path!("/worktrees/root/feature"));
-        let worktree_base = PathBuf::from(path!("/worktrees/root"));
+        let worktree_path = PathBuf::from("/worktrees/root/feature/nested/root");
+        let worktree_parent = PathBuf::from("/worktrees/root/feature/nested");
+        let worktree_intermediate_parent = PathBuf::from("/worktrees/root/feature");
+        let worktree_base = PathBuf::from("/worktrees/root");
 
         cx.update(|cx| {
             repository.update(cx, |repository, _| {
@@ -1532,7 +1529,7 @@ mod git_worktrees {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/zed"),
+            "/zed",
             json!({
                 ".bare": {
                     "worktrees": {
@@ -1549,7 +1546,7 @@ mod git_worktrees {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/zed/main").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/zed/main".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
@@ -1560,13 +1557,13 @@ mod git_worktrees {
                 .path_for_new_linked_worktree("feature/nested", "../worktrees")
                 .unwrap()
         });
-        let worktree_parent = PathBuf::from(path!("/worktrees/zed/feature/nested"));
-        let worktree_intermediate_parent = PathBuf::from(path!("/worktrees/zed/feature"));
-        let worktree_base = PathBuf::from(path!("/worktrees/zed"));
+        let worktree_parent = PathBuf::from("/worktrees/zed/feature/nested");
+        let worktree_intermediate_parent = PathBuf::from("/worktrees/zed/feature");
+        let worktree_base = PathBuf::from("/worktrees/zed");
 
         assert_eq!(
             worktree_path,
-            PathBuf::from(path!("/worktrees/zed/feature/nested/zed"))
+            PathBuf::from("/worktrees/zed/feature/nested/zed")
         );
 
         cx.update(|cx| {
@@ -1617,7 +1614,6 @@ mod trust_tests {
 
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
 
     use crate::Project;
 
@@ -1635,7 +1631,7 @@ mod trust_tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "hello",
@@ -1644,7 +1640,7 @@ mod trust_tests {
         .await;
 
         // Create project without trust system — repos should default to untrusted.
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let repository = project.read_with(cx, |project, cx| {
@@ -1664,7 +1660,7 @@ mod trust_tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "hello",
@@ -1681,7 +1677,7 @@ mod trust_tests {
         });
 
         let project =
-            Project::test_with_worktree_trust(fs.clone(), [path!("/project").as_ref()], cx).await;
+            Project::test_with_worktree_trust(fs.clone(), ["/project".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
@@ -1732,7 +1728,7 @@ mod trust_tests {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "a.txt": "hello",
@@ -1745,7 +1741,7 @@ mod trust_tests {
         });
 
         let project =
-            Project::test_with_worktree_trust(fs.clone(), [path!("/project").as_ref()], cx).await;
+            Project::test_with_worktree_trust(fs.clone(), ["/project".as_ref()], cx).await;
         cx.executor().run_until_parked();
 
         let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
@@ -2025,10 +2021,7 @@ mod repository_activation_tests {
     use gpui::{BorrowAppContext, Entity, TestAppContext};
     use serde_json::json;
     use settings::{LocalSettingsKind, LocalSettingsPath, SettingsStore};
-    use util::{
-        path,
-        rel_path::{RelPath, rel_path},
-    };
+    use util::rel_path::{RelPath, rel_path};
 
     use crate::{Project, ProjectPath};
 
@@ -2056,12 +2049,7 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(
-            &project,
-            cx,
-            &[path!("/root/repo1")],
-            &[path!("/root/nested/deep/repo2")],
-        );
+        assert_repositories(&project, cx, &["/root/repo1"], &["/root/nested/deep/repo2"]);
         project.read_with(cx, |project, cx| {
             let worktree = project.worktrees(cx).next().unwrap().read(cx);
             assert_eq!(
@@ -2090,12 +2078,7 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(
-            &project,
-            cx,
-            &[path!("/root"), path!("/root/vendor/x")],
-            &[],
-        );
+        assert_repositories(&project, cx, &["/root", "/root/vendor/x"], &[]);
     }
 
     #[gpui::test]
@@ -2122,15 +2105,12 @@ mod repository_activation_tests {
             &project,
             cx,
             &[],
-            &[
-                path!("/root/nested/outer"),
-                path!("/root/nested/outer/inner"),
-            ],
+            &["/root/nested/outer", "/root/nested/outer/inner"],
         );
 
         let _buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/nested/outer/inner/a.txt"), cx)
+                project.open_local_buffer("/root/nested/outer/inner/a.txt", cx)
             })
             .await
             .unwrap();
@@ -2139,10 +2119,7 @@ mod repository_activation_tests {
         assert_repositories(
             &project,
             cx,
-            &[
-                path!("/root/nested/outer"),
-                path!("/root/nested/outer/inner"),
-            ],
+            &["/root/nested/outer", "/root/nested/outer/inner"],
             &[],
         );
     }
@@ -2163,7 +2140,7 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[], &[path!("/root/a/repo")]);
+        assert_repositories(&project, cx, &[], &["/root/a/repo"]);
 
         let buffer = project
             .update(cx, |project, cx| project.create_buffer(None, false, cx))
@@ -2187,7 +2164,7 @@ mod repository_activation_tests {
             .unwrap();
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/a/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/a/repo"], &[]);
     }
 
     #[gpui::test]
@@ -2225,13 +2202,13 @@ mod repository_activation_tests {
 
         let _buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/a/b/repo/src/deep/f.txt"), cx)
+                project.open_local_buffer("/root/a/b/repo/src/deep/f.txt", cx)
             })
             .await
             .unwrap();
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/a/b/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/a/b/repo"], &[]);
         project.read_with(cx, |project, cx| {
             let worktree = project.worktrees(cx).next().unwrap().read(cx);
             for path in [
@@ -2265,7 +2242,7 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[], &[path!("/root/a/repo")]);
+        assert_repositories(&project, cx, &[], &["/root/a/repo"]);
 
         let worktree_id = project.read_with(cx, |project, cx| {
             project.worktrees(cx).next().unwrap().read(cx).id()
@@ -2285,7 +2262,7 @@ mod repository_activation_tests {
         });
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/a/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/a/repo"], &[]);
     }
 
     #[gpui::test]
@@ -2305,18 +2282,18 @@ mod repository_activation_tests {
 
         let _buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/nested/repo/a.txt"), cx)
+                project.open_local_buffer("/root/nested/repo/a.txt", cx)
             })
             .await
             .unwrap();
         cx.executor().run_until_parked();
 
-        fs.create_dir(Path::new(path!("/root/nested/repo/.git")))
+        fs.create_dir(Path::new("/root/nested/repo/.git"))
             .await
             .unwrap();
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/nested/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/nested/repo"], &[]);
     }
 
     #[gpui::test]
@@ -2335,10 +2312,10 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[], &[path!("/root/nested/repo")]);
+        assert_repositories(&project, cx, &[], &["/root/nested/repo"]);
 
         fs.remove_dir(
-            Path::new(path!("/root/nested/repo/.git")),
+            Path::new("/root/nested/repo/.git"),
             RemoveOptions {
                 recursive: true,
                 ignore_if_not_exists: false,
@@ -2367,12 +2344,12 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[], &[path!("/root/nested/repo")]);
+        assert_repositories(&project, cx, &[], &["/root/nested/repo"]);
 
         let worktree = project
             .update(cx, |project, cx| {
                 project.worktree_store().update(cx, |worktree_store, cx| {
-                    worktree_store.create_worktree(path!("/root/nested/repo"), true, cx)
+                    worktree_store.create_worktree("/root/nested/repo", true, cx)
                 })
             })
             .await
@@ -2384,7 +2361,7 @@ mod repository_activation_tests {
             .await;
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/nested/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/nested/repo"], &[]);
 
         project.update(cx, |project, cx| {
             project.git_store().update(cx, |git_store, cx| {
@@ -2393,7 +2370,7 @@ mod repository_activation_tests {
         });
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/nested/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/nested/repo"], &[]);
 
         let second_worktree_id = worktree.read_with(cx, |worktree, _| worktree.id());
         project.update(cx, |project, cx| {
@@ -2404,7 +2381,7 @@ mod repository_activation_tests {
         drop(worktree);
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/nested/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/nested/repo"], &[]);
     }
 
     #[gpui::test]
@@ -2426,12 +2403,7 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(
-            &project,
-            cx,
-            &[path!("/root/x"), path!("/root/x/vendor/sub")],
-            &[],
-        );
+        assert_repositories(&project, cx, &["/root/x", "/root/x/vendor/sub"], &[]);
     }
 
     #[gpui::test]
@@ -2451,12 +2423,12 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[path!("/root/a/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/a/repo"], &[]);
 
         set_file_scan_depth(cx, 1);
         cx.executor().run_until_parked();
 
-        assert_repositories(&project, cx, &[path!("/root/a/repo")], &[]);
+        assert_repositories(&project, cx, &["/root/a/repo"], &[]);
         project.read_with(cx, |project, cx| {
             let worktree = project.worktrees(cx).next().unwrap().read(cx);
             assert_eq!(worktree.entry_for_path(rel_path("a/repo/x.txt")), None);
@@ -2483,7 +2455,7 @@ mod repository_activation_tests {
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/junk/a/b/deep.txt"), cx)
+                project.open_local_buffer("/root/junk/a/b/deep.txt", cx)
             })
             .await
             .unwrap();
@@ -2525,17 +2497,12 @@ mod repository_activation_tests {
         )
         .await;
 
-        assert_repositories(&project, cx, &[], &[path!("/root/nested/repo")]);
+        assert_repositories(&project, cx, &[], &["/root/nested/repo"]);
 
-        fs.create_dir(Path::new(path!("/root/.git"))).await.unwrap();
+        fs.create_dir(Path::new("/root/.git")).await.unwrap();
         cx.executor().run_until_parked();
 
-        assert_repositories(
-            &project,
-            cx,
-            &[path!("/root"), path!("/root/nested/repo")],
-            &[],
-        );
+        assert_repositories(&project, cx, &["/root", "/root/nested/repo"], &[]);
     }
 
     fn init_test(cx: &mut TestAppContext) {
@@ -2552,8 +2519,8 @@ mod repository_activation_tests {
         tree: serde_json::Value,
     ) -> (Arc<FakeFs>, Entity<Project>) {
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/root"), tree).await;
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        fs.insert_tree("/root", tree).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         cx.executor().run_until_parked();
         (fs, project)
     }

@@ -1996,7 +1996,7 @@ mod tests {
     use project::FakeFs;
     use serde_json::json;
     use std::path::{Path, PathBuf};
-    use util::{path, paths::PathWithPosition, rel_path::RelPath};
+    use util::{paths::PathWithPosition, rel_path::RelPath};
     use workspace::path_link::{OpenTarget, OpenTargetFoundBy};
 
     #[gpui::test]
@@ -2237,11 +2237,11 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_file(path!("/file.rs"), Default::default()).await;
+        fs.insert_file("/file.rs", Default::default()).await;
 
         // Test case 1: Deserialize with path and contents
         {
-            let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+            let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
             let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
                 MultiWorkspace::test_new(project.clone(), window, cx)
             });
@@ -2251,14 +2251,14 @@ mod tests {
             let editor_db = cx.update(|_, cx| EditorDb::global(cx));
             let item_id = 1234 as ItemId;
             let mtime = fs
-                .metadata(Path::new(path!("/file.rs")))
+                .metadata(Path::new("/file.rs"))
                 .await
                 .unwrap()
                 .unwrap()
                 .mtime;
 
             let serialized_editor = SerializedEditor {
-                abs_path: Some(PathBuf::from(path!("/file.rs"))),
+                abs_path: Some(PathBuf::from("/file.rs")),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
                 mtime: Some(mtime),
@@ -2283,7 +2283,7 @@ mod tests {
 
         // Test case 2: Deserialize with only path
         {
-            let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+            let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
             let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
                 MultiWorkspace::test_new(project.clone(), window, cx)
             });
@@ -2295,7 +2295,7 @@ mod tests {
 
             let item_id = 5678 as ItemId;
             let serialized_editor = SerializedEditor {
-                abs_path: Some(PathBuf::from(path!("/file.rs"))),
+                abs_path: Some(PathBuf::from("/file.rs")),
                 contents: None,
                 language: None,
                 mtime: None,
@@ -2321,7 +2321,7 @@ mod tests {
 
         // Test case 3: Deserialize with no path (untitled buffer, with content and language)
         {
-            let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+            let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
             // Add Rust to the language, so that we can restore the language of the buffer
             project.read_with(cx, |project, _| {
                 project.languages().add(languages::rust_lang())
@@ -2368,7 +2368,7 @@ mod tests {
 
         // Test case 4: Deserialize with path, content, and old mtime
         {
-            let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+            let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
             let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
                 MultiWorkspace::test_new(project.clone(), window, cx)
             });
@@ -2381,7 +2381,7 @@ mod tests {
             let item_id = 9345 as ItemId;
             let old_mtime = MTime::from_seconds_and_nanos(0, 50);
             let serialized_editor = SerializedEditor {
-                abs_path: Some(PathBuf::from(path!("/file.rs"))),
+                abs_path: Some(PathBuf::from("/file.rs")),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
                 mtime: Some(old_mtime),
@@ -2403,7 +2403,7 @@ mod tests {
 
         // Test case 5: Deserialize with no path, no content, no language, and no old mtime (new, empty, unsaved buffer)
         {
-            let project = Project::test(fs.clone(), [path!("/file.rs").as_ref()], cx).await;
+            let project = Project::test(fs.clone(), ["/file.rs".as_ref()], cx).await;
             let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
                 MultiWorkspace::test_new(project.clone(), window, cx)
             });
@@ -2445,7 +2445,7 @@ mod tests {
         // and has unsaved changes that should be restored.
         {
             let fs = FakeFs::new(cx.executor());
-            fs.insert_file(path!("/standalone.rs"), "original content".into())
+            fs.insert_file("/standalone.rs", "original content".into())
                 .await;
 
             // Create an empty project with no worktrees
@@ -2461,7 +2461,7 @@ mod tests {
             let item_id = 11000 as ItemId;
 
             let mtime = fs
-                .metadata(Path::new(path!("/standalone.rs")))
+                .metadata(Path::new("/standalone.rs"))
                 .await
                 .unwrap()
                 .unwrap()
@@ -2469,7 +2469,7 @@ mod tests {
 
             // Simulate serialized state: file with unsaved changes
             let serialized_editor = SerializedEditor {
-                abs_path: Some(PathBuf::from(path!("/standalone.rs"))),
+                abs_path: Some(PathBuf::from("/standalone.rs")),
                 contents: Some("modified content".to_string()),
                 language: Some("Rust".to_string()),
                 mtime: Some(mtime),
@@ -2507,14 +2507,14 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/root"), json!({ "file.rs": "fn main() {}" }))
+        fs.insert_tree("/root", json!({ "file.rs": "fn main() {}" }))
             .await;
 
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
 
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/root/file.rs"), cx)
+                project.open_local_buffer("/root/file.rs", cx)
             })
             .await
             .unwrap();
@@ -2580,7 +2580,7 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/outside"), json!({ "settings.json": "{}" }))
+        fs.insert_tree("/outside", json!({ "settings.json": "{}" }))
             .await;
 
         // Project with a different root — settings.json is NOT in any worktree
@@ -2595,7 +2595,7 @@ mod tests {
         let item_id = 99999 as ItemId;
 
         let serialized_editor = SerializedEditor {
-            abs_path: Some(PathBuf::from(path!("/outside/settings.json"))),
+            abs_path: Some(PathBuf::from("/outside/settings.json")),
             contents: None,
             language: None,
             mtime: None,
@@ -2647,7 +2647,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/root"),
+            "/root",
             json!({
                 "src": {
                     "main.rs": "first\naéøbc\n",
@@ -2656,14 +2656,14 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
 
         let open_target = OpenTarget::Path(
             PathWithPosition {
-                path: PathBuf::from(path!("/root/src/main.rs")),
+                path: PathBuf::from("/root/src/main.rs"),
                 row: Some(2),
                 column: Some(4),
             },
@@ -2827,16 +2827,16 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({ "file.txt": "the cat sat" }))
+        fs.insert_tree("/dir", json!({ "file.txt": "the cat sat" }))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let cx = &mut VisualTestContext::from_window(*window, cx);
 
         let file_buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/file.txt"), cx)
+                project.open_local_buffer("/dir/file.txt", cx)
             })
             .await
             .unwrap();

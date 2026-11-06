@@ -1231,7 +1231,6 @@ mod tests {
     use settings::SettingsStore;
     use std::path::PathBuf;
     use theme::LoadThemes;
-    use util::path;
     use workspace::WorkspaceSettings;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -1270,7 +1269,7 @@ mod tests {
         )
         .await;
 
-        let main_project_root = PathBuf::from(path!("/root/project"));
+        let main_project_root = PathBuf::from("/root/project");
         let project =
             Project::test_with_worktree_trust(fs.clone(), [main_project_root.as_path()], cx).await;
         project

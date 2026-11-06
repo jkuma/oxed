@@ -6316,7 +6316,7 @@ mod tests {
     use smallvec::SmallVec;
     use std::{path::Path, sync::Arc};
     use text::LineEnding;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
 
     /// Streams `bytes` the way `decode_file_text_to_rope` would, returning the
     /// decoded text and detected line ending, or `None` if the fast path bailed.
@@ -6391,7 +6391,7 @@ mod tests {
         for initially_ignored in [false, true] {
             let fs = FakeFs::new(cx.background_executor.clone());
             fs.insert_tree(
-                path!("/root"),
+                "/root",
                 json!({
                     ".gitignore": if initially_ignored { "*.txt\n" } else { "" },
                     "gone.txt": "gone",
@@ -6405,7 +6405,7 @@ mod tests {
             )
             .await;
             let tree = Worktree::local(
-                Path::new(path!("/root")),
+                Path::new("/root"),
                 true,
                 fs.clone(),
                 Arc::default(),
@@ -6450,7 +6450,7 @@ mod tests {
                 }
             });
             fs.insert_file(
-                path!("/root/.gitignore"),
+                "/root/.gitignore",
                 if initially_ignored {
                     Vec::new()
                 } else {
@@ -6468,20 +6468,20 @@ mod tests {
                 )
                 .await;
             let old_snapshot = scanner.state.lock().await.snapshot.clone();
-            fs.remove_file(Path::new(path!("/root/gone.txt")), RemoveOptions::default())
+            fs.remove_file(Path::new("/root/gone.txt"), RemoveOptions::default())
                 .await
                 .unwrap();
             fs.rename(
-                Path::new(path!("/root/renamed.txt")),
-                Path::new(path!("/root/moved.txt")),
+                Path::new("/root/renamed.txt"),
+                Path::new("/root/moved.txt"),
                 RenameOptions::default(),
             )
             .await
             .unwrap();
-            fs.insert_file(path!("/root/modified.txt"), b"new content".to_vec())
+            fs.insert_file("/root/modified.txt", b"new content".to_vec())
                 .await;
             fs.remove_dir(
-                Path::new(path!("/root/removed")),
+                Path::new("/root/removed"),
                 RemoveOptions {
                     recursive: true,
                     ..RemoveOptions::default()
@@ -6489,11 +6489,10 @@ mod tests {
             )
             .await
             .unwrap();
-            fs.remove_dir(Path::new(path!("/root/replaced")), RemoveOptions::default())
+            fs.remove_dir(Path::new("/root/replaced"), RemoveOptions::default())
                 .await
                 .unwrap();
-            fs.insert_file(path!("/root/replaced"), b"file".to_vec())
-                .await;
+            fs.insert_file("/root/replaced", b"file".to_vec()).await;
             scanner
                 .process_scan_request(
                     ScanRequest {
@@ -6548,7 +6547,7 @@ mod tests {
             scanner
                 .update_ignore_status(
                     UpdateIgnoreStatusJob {
-                        abs_path: Arc::from(Path::new(path!("/root"))),
+                        abs_path: Arc::from(Path::new("/root")),
                         ignore_stack: IgnoreStack::none(),
                         ignore_queue,
                         scan_queue,
@@ -6557,10 +6556,7 @@ mod tests {
                 )
                 .await;
             let child_job = ignore_jobs.try_recv().unwrap();
-            assert_eq!(
-                child_job.abs_path.as_ref(),
-                Path::new(path!("/root/directory"))
-            );
+            assert_eq!(child_job.abs_path.as_ref(), Path::new("/root/directory"));
             scanner.update_ignore_status(child_job, &old_snapshot).await;
             let state = scanner.state.lock().await;
             assert_eq!(

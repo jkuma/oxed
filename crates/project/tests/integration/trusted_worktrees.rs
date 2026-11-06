@@ -4,7 +4,6 @@ use collections::HashSet;
 use gpui::{Entity, TestAppContext};
 use serde_json::json;
 use settings::SettingsStore;
-use util::path;
 
 use crate::{FakeFs, Project};
 
@@ -38,10 +37,10 @@ async fn test_single_worktree_trust(cx: &mut TestAppContext) {
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "main.rs": "fn main() {}" }))
+    fs.insert_tree("/root", json!({ "main.rs": "fn main() {}" }))
         .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let worktree_id = worktree_store.read_with(cx, |store, cx| {
         store.worktrees().next().unwrap().read(cx).id()
@@ -152,10 +151,10 @@ async fn test_single_file_worktree_trust(cx: &mut TestAppContext) {
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "foo.rs": "fn foo() {}" }))
+    fs.insert_tree("/root", json!({ "foo.rs": "fn foo() {}" }))
         .await;
 
-    let project = Project::test(fs, [path!("/root/foo.rs").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root/foo.rs".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let worktree_id = worktree_store.read_with(cx, |store, cx| {
         let worktree = store.worktrees().next().unwrap();
@@ -241,7 +240,7 @@ async fn test_multiple_single_file_worktrees_trust_one(cx: &mut TestAppContext) 
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "a.rs": "fn a() {}",
             "b.rs": "fn b() {}",
@@ -253,9 +252,9 @@ async fn test_multiple_single_file_worktrees_trust_one(cx: &mut TestAppContext) 
     let project = Project::test(
         fs,
         [
-            path!("/root/a.rs").as_ref(),
-            path!("/root/b.rs").as_ref(),
-            path!("/root/c.rs").as_ref(),
+            "/root/a.rs".as_ref(),
+            "/root/b.rs".as_ref(),
+            "/root/c.rs".as_ref(),
         ],
         cx,
     )
@@ -314,7 +313,7 @@ async fn test_two_directory_worktrees_separate_trust(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/projects"),
+        "/projects",
         json!({
             "project_a": { "main.rs": "fn main() {}" },
             "project_b": { "lib.rs": "pub fn lib() {}" }
@@ -325,8 +324,8 @@ async fn test_two_directory_worktrees_separate_trust(cx: &mut TestAppContext) {
     let project = Project::test(
         fs,
         [
-            path!("/projects/project_a").as_ref(),
-            path!("/projects/project_b").as_ref(),
+            "/projects/project_a".as_ref(),
+            "/projects/project_b".as_ref(),
         ],
         cx,
     )
@@ -396,7 +395,7 @@ async fn test_directory_worktree_trust_enables_single_file(cx: &mut TestAppConte
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "project": { "main.rs": "fn main() {}" },
             "standalone.rs": "fn standalone() {}"
@@ -404,12 +403,7 @@ async fn test_directory_worktree_trust_enables_single_file(cx: &mut TestAppConte
     )
     .await;
 
-    let project = Project::test(
-        fs,
-        [path!("/project").as_ref(), path!("/standalone.rs").as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(fs, ["/project".as_ref(), "/standalone.rs".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let (dir_worktree_id, file_worktree_id) = worktree_store.read_with(cx, |store, cx| {
         let worktrees: Vec<_> = store.worktrees().collect();
@@ -469,7 +463,7 @@ async fn test_parent_path_trust_enables_single_file(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "project": { "main.rs": "fn main() {}" },
             "standalone.rs": "fn standalone() {}"
@@ -477,12 +471,7 @@ async fn test_parent_path_trust_enables_single_file(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(
-        fs,
-        [path!("/project").as_ref(), path!("/standalone.rs").as_ref()],
-        cx,
-    )
-    .await;
+    let project = Project::test(fs, ["/project".as_ref(), "/standalone.rs".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let (dir_worktree_id, file_worktree_id) = worktree_store.read_with(cx, |store, cx| {
         let worktrees: Vec<_> = store.worktrees().collect();
@@ -518,7 +507,7 @@ async fn test_parent_path_trust_enables_single_file(cx: &mut TestAppContext) {
     trusted_worktrees.update(cx, |store, cx| {
         store.trust(
             &worktree_store,
-            HashSet::from_iter([PathTrust::AbsPath(PathBuf::from(path!("/project")))]),
+            HashSet::from_iter([PathTrust::AbsPath(PathBuf::from("/project"))]),
             cx,
         );
     });
@@ -545,7 +534,7 @@ async fn test_abs_path_trust_covers_multiple_worktrees(cx: &mut TestAppContext) 
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             "project_a": { "main.rs": "fn main() {}" },
             "project_b": { "lib.rs": "pub fn lib() {}" }
@@ -555,10 +544,7 @@ async fn test_abs_path_trust_covers_multiple_worktrees(cx: &mut TestAppContext) 
 
     let project = Project::test(
         fs,
-        [
-            path!("/root/project_a").as_ref(),
-            path!("/root/project_b").as_ref(),
-        ],
+        ["/root/project_a".as_ref(), "/root/project_b".as_ref()],
         cx,
     )
     .await;
@@ -583,7 +569,7 @@ async fn test_abs_path_trust_covers_multiple_worktrees(cx: &mut TestAppContext) 
     trusted_worktrees.update(cx, |store, cx| {
         store.trust(
             &worktree_store,
-            HashSet::from_iter([PathTrust::AbsPath(PathBuf::from(path!("/root")))]),
+            HashSet::from_iter([PathTrust::AbsPath(PathBuf::from("/root"))]),
             cx,
         );
     });
@@ -605,7 +591,7 @@ async fn test_auto_trust_all(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "project_a": { "main.rs": "fn main() {}" },
             "project_b": { "lib.rs": "pub fn lib() {}" },
@@ -617,9 +603,9 @@ async fn test_auto_trust_all(cx: &mut TestAppContext) {
     let project = Project::test(
         fs,
         [
-            path!("/project_a").as_ref(),
-            path!("/project_b").as_ref(),
-            path!("/single.rs").as_ref(),
+            "/project_a".as_ref(),
+            "/project_b".as_ref(),
+            "/single.rs".as_ref(),
         ],
         cx,
     )
@@ -705,10 +691,10 @@ async fn test_trust_restrict_trust_cycle(cx: &mut TestAppContext) {
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/root"), json!({ "main.rs": "fn main() {}" }))
+    fs.insert_tree("/root", json!({ "main.rs": "fn main() {}" }))
         .await;
 
-    let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/root".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let worktree_id = worktree_store.read_with(cx, |store, cx| {
         store.worktrees().next().unwrap().read(cx).id()
@@ -811,7 +797,7 @@ async fn test_multi_host_trust_isolation(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "local_project": { "main.rs": "fn main() {}" },
             "remote_project": { "lib.rs": "pub fn lib() {}" }
@@ -821,10 +807,7 @@ async fn test_multi_host_trust_isolation(cx: &mut TestAppContext) {
 
     let project = Project::test(
         fs,
-        [
-            path!("/local_project").as_ref(),
-            path!("/remote_project").as_ref(),
-        ],
+        ["/local_project".as_ref(), "/remote_project".as_ref()],
         cx,
     )
     .await;
@@ -869,7 +852,7 @@ async fn test_invisible_worktree_stores_do_not_affect_trust(cx: &mut TestAppCont
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/"),
+        "/",
         json!({
             "visible": { "main.rs": "fn main() {}" },
             "other": { "a.rs": "fn other() {}" },
@@ -878,7 +861,7 @@ async fn test_invisible_worktree_stores_do_not_affect_trust(cx: &mut TestAppCont
     )
     .await;
 
-    let project = Project::test(fs, [path!("/visible").as_ref()], cx).await;
+    let project = Project::test(fs, ["/visible".as_ref()], cx).await;
     let worktree_store = project.read_with(cx, |project, _| project.worktree_store());
     let visible_worktree_id = worktree_store.read_with(cx, |store, cx| {
         store

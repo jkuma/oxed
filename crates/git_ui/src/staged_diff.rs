@@ -686,7 +686,7 @@ mod tests {
     use settings::{DiffViewStyle, SettingsStore};
     use std::path::Path;
     use unindent::Unindent as _;
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::MultiWorkspace;
 
     use super::*;
@@ -732,7 +732,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -743,16 +743,16 @@ mod tests {
         .await;
 
         fs.set_head_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", committed_contents)],
             "deadbeef",
         );
         fs.set_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", staged_contents.clone())],
         );
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -831,7 +831,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -841,19 +841,19 @@ mod tests {
         )
         .await;
         fs.set_head_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", committed_contents.clone())],
             "deadbeef",
         );
         fs.set_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", staged_contents)],
         );
         let repo = fs
-            .open_repo(path!("/project/.git").as_ref(), Some("git".as_ref()))
+            .open_repo("/project/.git".as_ref(), Some("git".as_ref()))
             .unwrap();
 
-        let project = Project::test(fs.clone(), [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -959,7 +959,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 ".git": {},
                 "src": {
@@ -970,16 +970,16 @@ mod tests {
         .await;
 
         fs.set_head_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", committed_contents)],
             "deadbeef",
         );
         fs.set_index_for_repo(
-            Path::new(path!("/project/.git")),
+            Path::new("/project/.git"),
             &[("src/main.rs", staged_contents)],
         );
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());

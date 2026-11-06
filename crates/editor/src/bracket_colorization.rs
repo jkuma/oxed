@@ -417,7 +417,7 @@ mod tests {
     use theme_settings::ThemeStyleContent;
     use ui::ActiveTheme;
 
-    use util::{path, post_inc};
+    use util::post_inc;
 
     fn light_editor_background() -> Hsla {
         hsla(0.0, 0.0, 0.98, 1.0)
@@ -1688,7 +1688,7 @@ mod foo «1{
         });
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "main.rs": "fn main() {{()}}",
                 "lib.rs": separate_with_comment_lines(
@@ -1713,19 +1713,17 @@ mod foo «1{
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
 
         let buffer_1 = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/lib.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/a/lib.rs", cx))
             .await
             .unwrap();
         let buffer_2 = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/main.rs"), cx)
+                project.open_local_buffer("/a/main.rs", cx)
             })
             .await
             .unwrap();
@@ -1913,7 +1911,7 @@ mod foo «1{
         });
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
-            path!("/a"),
+            "/a",
             json!({
                 "lib.rs": separate_with_comment_lines(
                     indoc! {r#"
@@ -1932,14 +1930,12 @@ mod foo «1{
         )
         .await;
 
-        let project = Project::test(fs, [path!("/a").as_ref()], cx).await;
+        let project = Project::test(fs, ["/a".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
 
         let buffer_1 = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/a/lib.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/a/lib.rs", cx))
             .await
             .unwrap();
 

@@ -481,7 +481,7 @@ mod tests {
         path::PathBuf,
         sync::{Arc, Mutex},
     };
-    use util::{path, rel_path::rel_path};
+    use util::rel_path::rel_path;
     use workspace::{AppState, MultiWorkspace, OpenOptions, OpenVisible};
 
     #[gpui::test]
@@ -715,12 +715,12 @@ mod tests {
             workspace.project().read(cx).fs().clone()
         });
         fs.as_fake()
-            .insert_tree(path!("/other"), json!({ "other.md": "# other\n" }))
+            .insert_tree("/other", json!({ "other.md": "# other\n" }))
             .await;
         let (other_worktree, _) = workspace
             .update(&mut cx, |workspace, cx| {
                 workspace.project().update(cx, |project, cx| {
-                    project.find_or_create_worktree(path!("/other"), true, cx)
+                    project.find_or_create_worktree("/other", true, cx)
                 })
             })
             .await
@@ -814,12 +814,12 @@ mod tests {
             workspace.project().read(cx).fs().clone()
         });
         fs.as_fake()
-            .insert_tree(path!("/outside"), json!({ "readme.md": "# outside\n" }))
+            .insert_tree("/outside", json!({ "readme.md": "# outside\n" }))
             .await;
         workspace
             .update_in(&mut cx, |workspace, window, cx| {
                 workspace.open_abs_path(
-                    PathBuf::from(path!("/outside/readme.md")),
+                    PathBuf::from("/outside/readme.md"),
                     OpenOptions {
                         visible: Some(OpenVisible::None),
                         ..OpenOptions::default()
@@ -1038,7 +1038,7 @@ mod tests {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/test"),
+                "/test",
                 json!({
                     "main.md": "# hi\n",
                     "notes.txt": "plain text\n",
@@ -1046,7 +1046,7 @@ mod tests {
             )
             .await;
 
-        let project = Project::test(app_state.fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(app_state.fs.clone(), ["/test".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(Arc::new(Language::new(
             LanguageConfig {

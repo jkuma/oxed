@@ -542,7 +542,6 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use settings::SettingsStore;
-    use util::path;
     use workspace::MultiWorkspace;
 
     use super::delegate::toggle_search_option;
@@ -572,9 +571,9 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({"one.rs": "const ONE: usize = 1;"}))
+        fs.insert_tree("/dir", json!({"one.rs": "const ONE: usize = 1;"}))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
@@ -609,9 +608,9 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({"one.rs": "const ONE: usize = 1;"}))
+        fs.insert_tree("/dir", json!({"one.rs": "const ONE: usize = 1;"}))
             .await;
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let window = cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = window
             .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
@@ -679,9 +678,9 @@ mod tests {
         init_test(cx);
 
         let fs = FakeFs::new(cx.background_executor.clone());
-        fs.insert_tree(path!("/dir"), json!({"one.rs": "const ONE: usize = 1;"}))
+        fs.insert_tree("/dir", json!({"one.rs": "const ONE: usize = 1;"}))
             .await;
-        let project = Project::test(fs.clone(), [path!("/dir").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/dir".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(Arc::new(language::Language::new(
             language::LanguageConfig {

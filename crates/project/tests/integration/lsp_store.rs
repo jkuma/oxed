@@ -24,7 +24,7 @@ use project::{
 use serde_json::json;
 use settings::{ScanSymlinksSetting, SettingsStore};
 use unindent::Unindent;
-use util::{path, rel_path::rel_path};
+use util::rel_path::rel_path;
 
 use crate::init_test;
 
@@ -34,14 +34,12 @@ async fn test_diagnostic_batches_skip_paths_without_worktrees(cx: &mut TestAppCo
 
     for skipped_index in 0..=2 {
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({ "a.rs": "one", "b.rs": "two" }))
+        fs.insert_tree("/dir", json!({ "a.rs": "one", "b.rs": "two" }))
             .await;
-        let project = Project::test(fs, [Path::new(path!("/dir"))], cx).await;
+        let project = Project::test(fs, [Path::new("/dir")], cx).await;
         let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
         let buffer_a = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/dir/a.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/dir/a.rs", cx))
             .await
             .unwrap();
         let worktree_id =
@@ -57,8 +55,8 @@ async fn test_diagnostic_batches_skip_paths_without_worktrees(cx: &mut TestAppCo
                 );
             });
             let mut events = cx.events(&project);
-            let mut paths = vec![path!("/dir/a.rs"), path!("/dir/b.rs")];
-            paths.insert(skipped_index, path!("/outside.rs"));
+            let mut paths = vec!["/dir/a.rs", "/dir/b.rs"];
+            paths.insert(skipped_index, "/outside.rs");
             let updates = paths
                 .into_iter()
                 .map(|path| DocumentDiagnosticsUpdate {
@@ -128,9 +126,7 @@ async fn test_diagnostic_batches_skip_paths_without_worktrees(cx: &mut TestAppCo
             );
 
             let buffer_b = project
-                .update(cx, |project, cx| {
-                    project.open_local_buffer(path!("/dir/b.rs"), cx)
-                })
+                .update(cx, |project, cx| project.open_local_buffer("/dir/b.rs", cx))
                 .await
                 .unwrap();
             for buffer in [&buffer_a, &buffer_b] {
@@ -155,22 +151,22 @@ async fn test_removing_invisible_worktree_cleans_reused_lsp_bookkeeping(cx: &mut
     cx.executor().allow_parking();
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/the-root"), json!({ "main.rs": "fn main() {}" }))
+    fs.insert_tree("/the-root", json!({ "main.rs": "fn main() {}" }))
         .await;
     fs.insert_tree(
-        path!("/the-registry"),
+        "/the-registry",
         json!({ "dep": { "src": { "dep.rs": "pub fn dep() {}" } } }),
     )
     .await;
 
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp("Rust", FakeLspAdapter::default());
 
     let (visible_buffer, _visible_handle) = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/main.rs", cx)
         })
         .await
         .unwrap();
@@ -186,7 +182,7 @@ async fn test_removing_invisible_worktree_cleans_reused_lsp_bookkeeping(cx: &mut
             .unwrap()
             .0
     });
-    let external_uri = Uri::from_file_path(path!("/the-registry/dep/src/dep.rs")).unwrap();
+    let external_uri = Uri::from_file_path("/the-registry/dep/src/dep.rs").unwrap();
     let external_buffer = project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(external_uri.clone(), server_id, cx)
@@ -252,7 +248,7 @@ async fn test_removing_invisible_worktree_cleans_reused_lsp_bookkeeping(cx: &mut
         .text_document;
     assert_eq!(
         document.uri,
-        Uri::from_file_path(path!("/the-root/main.rs")).unwrap()
+        Uri::from_file_path("/the-root/main.rs").unwrap()
     );
     project.update(cx, |project, cx| {
         project.restart_language_servers_for_buffers(
@@ -282,20 +278,17 @@ async fn test_open_buffer_via_lsp_case_variant_no_duplicate(cx: &mut TestAppCont
 
     let fs = FakeFs::new(cx.executor());
     fs.set_case_sensitive(false);
-    fs.insert_tree(
-        path!("/root"),
-        json!({ "src": { "main.rs": "fn main() {}" } }),
-    )
-    .await;
+    fs.insert_tree("/root", json!({ "src": { "main.rs": "fn main() {}" } }))
+        .await;
 
-    let project = Project::test(fs.clone(), [path!("/root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
     let mut fake_servers = language_registry.register_fake_lsp("Rust", FakeLspAdapter::default());
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/root/src/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/root/src/main.rs", cx)
         })
         .await
         .unwrap();
@@ -315,7 +308,7 @@ async fn test_open_buffer_via_lsp_case_variant_no_duplicate(cx: &mut TestAppCont
     project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/root/SRC/main.rs")).unwrap(),
+                Uri::from_file_path("/root/SRC/main.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -342,30 +335,21 @@ async fn test_open_buffer_via_lsp_preserves_external_symlink_path(cx: &mut TestA
     cx.executor().allow_parking();
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(
-        path!("/shared"),
-        json!({ "pkg": { "def.rs": "pub fn def() {}" } }),
-    )
-    .await;
-    fs.insert_tree(
-        path!("/project"),
-        json!({ "src": { "main.rs": "fn main() {}" } }),
-    )
-    .await;
-    fs.create_symlink(
-        path!("/project/pkg").as_ref(),
-        PathBuf::from(path!("/shared/pkg")),
-    )
-    .await
-    .unwrap();
+    fs.insert_tree("/shared", json!({ "pkg": { "def.rs": "pub fn def() {}" } }))
+        .await;
+    fs.insert_tree("/project", json!({ "src": { "main.rs": "fn main() {}" } }))
+        .await;
+    fs.create_symlink("/project/pkg".as_ref(), PathBuf::from("/shared/pkg"))
+        .await
+        .unwrap();
 
     let (project, server_id) =
-        project_with_rust_server(fs, path!("/project"), path!("/project/src/main.rs"), cx).await;
+        project_with_rust_server(fs, "/project", "/project/src/main.rs", cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/project/pkg/def.rs")).unwrap(),
+                Uri::from_file_path("/project/pkg/def.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -378,12 +362,12 @@ async fn test_open_buffer_via_lsp_preserves_external_symlink_path(cx: &mut TestA
         buffer_paths(&buffer, cx),
         (
             "pkg/def.rs".to_string(),
-            PathBuf::from(path!("/project/pkg/def.rs"))
+            PathBuf::from("/project/pkg/def.rs")
         )
     );
     assert_eq!(
         worktree_roots(&project, cx),
-        vec![PathBuf::from(path!("/project"))]
+        vec![PathBuf::from("/project")]
     );
 }
 
@@ -394,29 +378,23 @@ async fn test_open_buffer_via_lsp_maps_external_symlink_target(cx: &mut TestAppC
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/shared"),
+        "/shared",
         json!({ "pkg": { "def.rs": "pub fn def() {}", "other.rs": "pub fn other() {}" } }),
     )
     .await;
-    fs.insert_tree(
-        path!("/project"),
-        json!({ "src": { "main.rs": "fn main() {}" } }),
-    )
-    .await;
-    fs.create_symlink(
-        path!("/project/pkg").as_ref(),
-        PathBuf::from(path!("/shared/pkg")),
-    )
-    .await
-    .unwrap();
+    fs.insert_tree("/project", json!({ "src": { "main.rs": "fn main() {}" } }))
+        .await;
+    fs.create_symlink("/project/pkg".as_ref(), PathBuf::from("/shared/pkg"))
+        .await
+        .unwrap();
 
     let (project, server_id) =
-        project_with_rust_server(fs, path!("/project"), path!("/project/src/main.rs"), cx).await;
+        project_with_rust_server(fs, "/project", "/project/src/main.rs", cx).await;
 
     project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/project/pkg/def.rs")).unwrap(),
+                Uri::from_file_path("/project/pkg/def.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -428,7 +406,7 @@ async fn test_open_buffer_via_lsp_maps_external_symlink_target(cx: &mut TestAppC
     let buffer = project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/shared/pkg/other.rs")).unwrap(),
+                Uri::from_file_path("/shared/pkg/other.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -441,12 +419,12 @@ async fn test_open_buffer_via_lsp_maps_external_symlink_target(cx: &mut TestAppC
         buffer_paths(&buffer, cx),
         (
             "pkg/other.rs".to_string(),
-            PathBuf::from(path!("/project/pkg/other.rs"))
+            PathBuf::from("/project/pkg/other.rs")
         )
     );
     assert_eq!(
         worktree_roots(&project, cx),
-        vec![PathBuf::from(path!("/project"))]
+        vec![PathBuf::from("/project")]
     );
 }
 
@@ -466,29 +444,23 @@ async fn test_open_buffer_via_lsp_maps_external_symlink_target_with_scan_symlink
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/shared"),
+        "/shared",
         json!({ "pkg": { "other.rs": "pub fn other() {}" } }),
     )
     .await;
-    fs.insert_tree(
-        path!("/project"),
-        json!({ "src": { "main.rs": "fn main() {}" } }),
-    )
-    .await;
-    fs.create_symlink(
-        path!("/project/pkg").as_ref(),
-        PathBuf::from(path!("/shared/pkg")),
-    )
-    .await
-    .unwrap();
+    fs.insert_tree("/project", json!({ "src": { "main.rs": "fn main() {}" } }))
+        .await;
+    fs.create_symlink("/project/pkg".as_ref(), PathBuf::from("/shared/pkg"))
+        .await
+        .unwrap();
 
     let (project, server_id) =
-        project_with_rust_server(fs, path!("/project"), path!("/project/src/main.rs"), cx).await;
+        project_with_rust_server(fs, "/project", "/project/src/main.rs", cx).await;
 
     let buffer = project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/shared/pkg/other.rs")).unwrap(),
+                Uri::from_file_path("/shared/pkg/other.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -501,12 +473,12 @@ async fn test_open_buffer_via_lsp_maps_external_symlink_target_with_scan_symlink
         buffer_paths(&buffer, cx),
         (
             "pkg/other.rs".to_string(),
-            PathBuf::from(path!("/project/pkg/other.rs"))
+            PathBuf::from("/project/pkg/other.rs")
         )
     );
     assert_eq!(
         worktree_roots(&project, cx),
-        vec![PathBuf::from(path!("/project"))]
+        vec![PathBuf::from("/project")]
     );
 }
 
@@ -518,7 +490,7 @@ async fn test_open_buffer_via_lsp_case_variant_in_unscanned_dir(cx: &mut TestApp
     let fs = FakeFs::new(cx.executor());
     fs.set_case_sensitive(false);
     fs.insert_tree(
-        path!("/root"),
+        "/root",
         json!({
             ".gitignore": "ignored\n",
             "src": { "main.rs": "fn main() {}" },
@@ -527,8 +499,7 @@ async fn test_open_buffer_via_lsp_case_variant_in_unscanned_dir(cx: &mut TestApp
     )
     .await;
 
-    let (project, server_id) =
-        project_with_rust_server(fs, path!("/root"), path!("/root/src/main.rs"), cx).await;
+    let (project, server_id) = project_with_rust_server(fs, "/root", "/root/src/main.rs", cx).await;
     assert_eq!(
         worktree_entries(&project, cx),
         vec!["", ".gitignore", "ignored", "src", "src/main.rs"]
@@ -537,7 +508,7 @@ async fn test_open_buffer_via_lsp_case_variant_in_unscanned_dir(cx: &mut TestApp
     let buffer = project
         .update(cx, |project, cx| {
             project.open_local_buffer_via_lsp(
-                Uri::from_file_path(path!("/root/IGNORED/LIB.rs")).unwrap(),
+                Uri::from_file_path("/root/IGNORED/LIB.rs").unwrap(),
                 server_id,
                 cx,
             )
@@ -550,13 +521,10 @@ async fn test_open_buffer_via_lsp_case_variant_in_unscanned_dir(cx: &mut TestApp
         buffer_paths(&buffer, cx),
         (
             "ignored/lib.rs".to_string(),
-            PathBuf::from(path!("/root/ignored/lib.rs"))
+            PathBuf::from("/root/ignored/lib.rs")
         )
     );
-    assert_eq!(
-        worktree_roots(&project, cx),
-        vec![PathBuf::from(path!("/root"))]
-    );
+    assert_eq!(worktree_roots(&project, cx), vec![PathBuf::from("/root")]);
     assert_eq!(
         worktree_entries(&project, cx),
         vec![
@@ -889,7 +857,7 @@ async fn test_user_initialization_options_override_adapter_arrays(cx: &mut TestA
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/the-root"),
+        "/the-root",
         json!({
             ".oxed": {
                 "settings.json": user_settings.to_string(),
@@ -899,7 +867,7 @@ async fn test_user_initialization_options_override_adapter_arrays(cx: &mut TestA
     )
     .await;
 
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -937,7 +905,7 @@ async fn test_user_initialization_options_override_adapter_arrays(cx: &mut TestA
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/main.rs", cx)
         })
         .await
         .unwrap();
@@ -978,7 +946,7 @@ async fn test_other_adapters_lsp_configuration_contributions_are_unioned(cx: &mu
 
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree(
-        path!("/the-root"),
+        "/the-root",
         json!({
             ".oxed": {
                 "settings.json": user_settings.to_string(),
@@ -988,7 +956,7 @@ async fn test_other_adapters_lsp_configuration_contributions_are_unioned(cx: &mu
     )
     .await;
 
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -1057,7 +1025,7 @@ async fn test_other_adapters_lsp_configuration_contributions_are_unioned(cx: &mu
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/main.rs", cx)
         })
         .await
         .unwrap();
@@ -1096,10 +1064,10 @@ async fn test_initialization_options_contributions_without_own_options(cx: &mut 
     init_test(cx);
 
     let fs = FakeFs::new(cx.executor());
-    fs.insert_tree(path!("/the-root"), json!({ "main.rs": "fn main() {}" }))
+    fs.insert_tree("/the-root", json!({ "main.rs": "fn main() {}" }))
         .await;
 
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(rust_lang());
 
@@ -1146,7 +1114,7 @@ async fn test_initialization_options_contributions_without_own_options(cx: &mut 
 
     project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/main.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/main.rs", cx)
         })
         .await
         .unwrap();

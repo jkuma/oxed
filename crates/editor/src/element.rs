@@ -11895,7 +11895,7 @@ mod tests {
 
         let fs = project::FakeFs::new(cx.executor());
         fs.insert_tree(
-            util::path!("/my-repo"),
+            "/my-repo",
             serde_json::json!({
                 ".git": {},
                 "file.txt": "a ".repeat(100),
@@ -11903,7 +11903,7 @@ mod tests {
         )
         .await;
         fs.set_blame_for_repo(
-            std::path::Path::new(util::path!("/my-repo/.git")),
+            std::path::Path::new("/my-repo/.git"),
             vec![(
                 git::repository::repo_path("file.txt"),
                 git::blame::Blame {
@@ -11929,10 +11929,10 @@ mod tests {
             )],
         );
 
-        let project = project::Project::test(fs, [util::path!("/my-repo").as_ref()], cx).await;
+        let project = project::Project::test(fs, ["/my-repo".as_ref()], cx).await;
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(util::path!("/my-repo/file.txt"), cx)
+                project.open_local_buffer("/my-repo/file.txt", cx)
             })
             .await
             .unwrap();

@@ -8,7 +8,6 @@ use pretty_assertions::assert_eq;
 use project::Project;
 use serde_json::json;
 use settings::SettingsStore;
-use util::path;
 use workspace::{MultiWorkspace, Workspace, pane};
 
 use crate::file_finder_tests::{self, open_file_picker};
@@ -40,7 +39,7 @@ impl TestContext {
             .fs
             .as_fake()
             .insert_tree(
-                path!("/root"),
+                "/root",
                 json!({
                     "a.rs": "// a",
                     "b.rs": "// b",
@@ -48,7 +47,7 @@ impl TestContext {
                 }),
             )
             .await;
-        let project = Project::test(app_state.fs.clone(), [path!("/root").as_ref()], cx).await;
+        let project = Project::test(app_state.fs.clone(), ["/root".as_ref()], cx).await;
         let window =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window

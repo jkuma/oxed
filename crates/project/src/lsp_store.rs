@@ -13073,11 +13073,11 @@ mod tests {
         });
         let fs = fs::FakeFs::new(cx.executor());
         fs.insert_tree(
-            util::path!("/the-root"),
+            "/the-root",
             serde_json::json!({ "main.rs": "fn main() {}" }),
         )
         .await;
-        let project = Project::test(fs, [util::path!("/the-root").as_ref()], cx).await;
+        let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
         let languages = project.read_with(cx, |project, _| project.languages().clone());
         languages.add(language::rust_lang());
         let (request_sender, request_receiver) = async_channel::bounded(1);
@@ -13128,7 +13128,7 @@ mod tests {
         );
         let (buffer, _lsp_handle) = project
             .update(cx, |project, cx| {
-                project.open_local_buffer_with_lsp(util::path!("/the-root/main.rs"), cx)
+                project.open_local_buffer_with_lsp("/the-root/main.rs", cx)
             })
             .await
             .expect("open buffer");

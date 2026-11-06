@@ -11,7 +11,6 @@ use project::{
 use serde_json::json;
 use text::Rope;
 use util::{
-    path,
     paths::{PathMatcher, PathStyle},
     rel_path::RelPath,
 };
@@ -503,10 +502,9 @@ async fn searches_legacy_text_after_utf8_prefixes(cx: &mut gpui::TestAppContext)
             .map(|(offset, matched)| offset..offset + matched.len())
             .collect::<Vec<_>>();
         let fs = FakeFs::new(cx.executor());
-        fs.insert_tree(path!("/dir"), json!({})).await;
-        fs.insert_file(path!("/dir/legacy.txt"), bytes.into_owned())
-            .await;
-        let project = Project::test(fs, [path!("/dir").as_ref()], cx).await;
+        fs.insert_tree("/dir", json!({})).await;
+        fs.insert_file("/dir/legacy.txt", bytes.into_owned()).await;
+        let project = Project::test(fs, ["/dir".as_ref()], cx).await;
         let query = SearchQuery::text(
             needle,
             false,
@@ -521,7 +519,7 @@ async fn searches_legacy_text_after_utf8_prefixes(cx: &mut gpui::TestAppContext)
         assert_eq!(
             super::search(&project, query, cx).await.unwrap(),
             HashMap::from_iter(
-                (!expected.is_empty()).then(|| (path!("dir/legacy.txt").to_string(), expected))
+                (!expected.is_empty()).then(|| ("dir/legacy.txt".to_string(), expected))
             ),
         );
     }

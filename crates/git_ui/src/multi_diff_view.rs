@@ -393,7 +393,6 @@ mod tests {
     use language::{Language, LanguageConfig};
     use project::{FakeFs, Project};
     use settings::{DiffViewStyle, SettingsStore};
-    use util::path;
     use workspace::MultiWorkspace;
 
     async fn test_init(
@@ -413,7 +412,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/test"),
+            "/test",
             serde_json::json!({
                 "old": {
                     "file.rs": "fn main() {}\n",
@@ -427,7 +426,7 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs.clone(), [path!("/test").as_ref()], cx).await;
+        let project = Project::test(fs.clone(), ["/test".as_ref()], cx).await;
         let (multi_workspace, cx) =
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
@@ -436,17 +435,14 @@ mod tests {
             .update_in(cx, |workspace, window, cx| {
                 MultiDiffView::open(
                     vec![
+                        ["/test/old/file.rs".into(), "/test/new/file.rs".into()],
                         [
-                            path!("/test/old/file.rs").into(),
-                            path!("/test/new/file.rs").into(),
+                            "/test/old/old_file.rs".into(),
+                            "/test/new/old_file.rs".into(),
                         ],
                         [
-                            path!("/test/old/old_file.rs").into(),
-                            path!("/test/new/old_file.rs").into(),
-                        ],
-                        [
-                            path!("/test/old/new_file.rs").into(),
-                            path!("/test/new/new_file.rs").into(),
+                            "/test/old/new_file.rs".into(),
+                            "/test/new/new_file.rs".into(),
                         ],
                     ],
                     workspace,

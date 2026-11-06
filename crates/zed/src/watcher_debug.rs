@@ -761,7 +761,7 @@ mod tests {
     async fn tabs_separate_rows_and_keep_footer_visible(cx: &mut gpui::TestAppContext) {
         let app_state = cx.update(AppState::test);
         let fs = app_state.fs.clone();
-        let root = std::path::Path::new(util::path!("/watched"));
+        let root = std::path::Path::new("/watched");
         fs.create_dir(root).await.unwrap();
         let (_events, _watcher) = fs.watch(root, Duration::ZERO).await;
         cx.update(|cx| {
@@ -877,7 +877,7 @@ mod tests {
         cx.update(|cx| release_channel::init("1.2.3+dev.test".parse().unwrap(), cx));
         let app_state = cx.update(AppState::test);
         let fs = app_state.fs.clone();
-        let root = std::path::Path::new(util::path!("/exports"));
+        let root = std::path::Path::new("/exports");
         fs.create_dir(root).await.unwrap();
         let (_events, _watcher) = fs.watch(root, Duration::ZERO).await;
         cx.update(|cx| {

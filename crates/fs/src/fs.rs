@@ -2388,7 +2388,7 @@ impl FakeFs {
         let mut result = Vec::new();
         let mut queue = collections::VecDeque::new();
         let state = &*self.state.lock();
-        queue.push_back((PathBuf::from(util::path!("/")), &state.root));
+        queue.push_back((PathBuf::from("/"), &state.root));
         while let Some((path, entry)) = queue.pop_front() {
             if let FakeFsEntry::Dir { entries, .. } = entry {
                 for (name, entry) in entries {
@@ -2410,7 +2410,7 @@ impl FakeFs {
         let mut result = Vec::new();
         let mut queue = collections::VecDeque::new();
         let state = &*self.state.lock();
-        queue.push_back((PathBuf::from(util::path!("/")), &state.root));
+        queue.push_back((PathBuf::from("/"), &state.root));
         while let Some((path, entry)) = queue.pop_front() {
             if let FakeFsEntry::Dir { entries, .. } = entry {
                 for (name, entry) in entries {
@@ -2432,7 +2432,7 @@ impl FakeFs {
         let mut result = Vec::new();
         let mut queue = collections::VecDeque::new();
         let state = &*self.state.lock();
-        queue.push_back((PathBuf::from(util::path!("/")), &state.root));
+        queue.push_back((PathBuf::from("/"), &state.root));
         while let Some((path, entry)) = queue.pop_front() {
             match entry {
                 FakeFsEntry::File { .. } => result.push(path),
@@ -2451,7 +2451,7 @@ impl FakeFs {
         let mut result = Vec::new();
         let mut queue = collections::VecDeque::new();
         let state = &*self.state.lock();
-        queue.push_back((PathBuf::from(util::path!("/")), &state.root));
+        queue.push_back((PathBuf::from("/"), &state.root));
         while let Some((path, entry)) = queue.pop_front() {
             match entry {
                 FakeFsEntry::File { content, .. } => {
@@ -2650,7 +2650,7 @@ impl FileHandle for FakeHandle {
         let fs = fs.as_fake();
         let state = fs.state.lock();
         let mut queue = collections::VecDeque::new();
-        queue.push_back((PathBuf::from(util::path!("/")), &state.root));
+        queue.push_back((PathBuf::from("/"), &state.root));
         while let Some((path, entry)) = queue.pop_front() {
             match entry {
                 FakeFsEntry::File { inode, .. } | FakeFsEntry::Dir { inode, .. }

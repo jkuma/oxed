@@ -932,7 +932,6 @@ mod tests {
     use pretty_assertions::assert_eq;
     use settings::SettingsStore;
     use theme::SyntaxTheme;
-    use util::path;
 
     #[gpui::test]
     async fn test_process_rust_diagnostics() {
@@ -945,7 +944,7 @@ mod tests {
             value: "consider importing this struct: `use b::c;\n`".to_string(),
         };
         let mut params = lsp::PublishDiagnosticsParams {
-            uri: lsp::Uri::from_file_path(path!("/a")).unwrap(),
+            uri: lsp::Uri::from_file_path("/a").unwrap(),
             version: None,
             diagnostics: vec![
                 // no newlines

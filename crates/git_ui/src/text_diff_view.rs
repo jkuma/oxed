@@ -470,7 +470,7 @@ mod tests {
     use serde_json::json;
     use settings::{DiffViewStyle, SettingsStore};
     use unindent::unindent;
-    use util::{path, test::marked_text_ranges};
+    use util::test::marked_text_ranges;
     use workspace::MultiWorkspace;
 
     fn init_test(cx: &mut TestAppContext) {
@@ -491,8 +491,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "def process_incoming_inventory(items, warehouse_id):\n    pass\n",
             "def process_outgoing_inventory(items, warehouse_id):\n    passˇ\n",
             &unindent(
@@ -503,7 +503,7 @@ mod tests {
                 ",
             ),
             "Clipboard ↔ text.txt @ L1:1-L3:1",
-            &format!("Clipboard ↔ {} @ L1:1-L3:1", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-L3:1", "test/text.txt"),
             cx,
         )
         .await;
@@ -514,8 +514,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "def process_incoming_inventory(items, warehouse_id):\n    pass\n",
             "«def process_outgoing_inventory(items, warehouse_id):\n    passˇ»\n",
             &unindent(
@@ -526,7 +526,7 @@ mod tests {
                 ",
             ),
             "Clipboard ↔ text.txt @ L1:1-L3:1",
-            &format!("Clipboard ↔ {} @ L1:1-L3:1", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-L3:1", "test/text.txt"),
             cx,
         )
         .await;
@@ -535,8 +535,8 @@ mod tests {
     #[gpui::test]
     async fn test_diffing_clipboard_against_single_line_selection(cx: &mut TestAppContext) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "a",
             "«bbˇ»",
             &unindent(
@@ -545,7 +545,7 @@ mod tests {
                 + ˇbb",
             ),
             "Clipboard ↔ text.txt @ L1:1-3",
-            &format!("Clipboard ↔ {} @ L1:1-3", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-3", "test/text.txt"),
             cx,
         )
         .await;
@@ -554,8 +554,8 @@ mod tests {
     #[gpui::test]
     async fn test_diffing_clipboard_with_leading_whitespace_against_line(cx: &mut TestAppContext) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "    a",
             "«bbˇ»",
             &unindent(
@@ -564,7 +564,7 @@ mod tests {
                 + ˇbb",
             ),
             "Clipboard ↔ text.txt @ L1:1-3",
-            &format!("Clipboard ↔ {} @ L1:1-3", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-3", "test/text.txt"),
             cx,
         )
         .await;
@@ -573,8 +573,8 @@ mod tests {
     #[gpui::test]
     async fn test_diffing_clipboard_against_line_with_leading_whitespace(cx: &mut TestAppContext) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "a",
             "    «bbˇ»",
             &unindent(
@@ -583,7 +583,7 @@ mod tests {
                 + ˇ    bb",
             ),
             "Clipboard ↔ text.txt @ L1:1-7",
-            &format!("Clipboard ↔ {} @ L1:1-7", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-7", "test/text.txt"),
             cx,
         )
         .await;
@@ -594,8 +594,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "a",
             "«    bbˇ»",
             &unindent(
@@ -604,7 +604,7 @@ mod tests {
                 + ˇ    bb",
             ),
             "Clipboard ↔ text.txt @ L1:1-7",
-            &format!("Clipboard ↔ {} @ L1:1-7", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-7", "test/text.txt"),
             cx,
         )
         .await;
@@ -615,8 +615,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "    a",
             "    «bbˇ»",
             &unindent(
@@ -625,7 +625,7 @@ mod tests {
                 + ˇ    bb",
             ),
             "Clipboard ↔ text.txt @ L1:1-7",
-            &format!("Clipboard ↔ {} @ L1:1-7", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-7", "test/text.txt"),
             cx,
         )
         .await;
@@ -636,8 +636,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "    a",
             "«    bbˇ»",
             &unindent(
@@ -646,7 +646,7 @@ mod tests {
                 + ˇ    bb",
             ),
             "Clipboard ↔ text.txt @ L1:1-7",
-            &format!("Clipboard ↔ {} @ L1:1-7", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-7", "test/text.txt"),
             cx,
         )
         .await;
@@ -657,8 +657,8 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         base_test(
-            path!("/test"),
-            path!("/test/text.txt"),
+            "/test",
+            "/test/text.txt",
             "a",
             "«bˇ»b",
             &unindent(
@@ -667,7 +667,7 @@ mod tests {
                 + ˇbb",
             ),
             "Clipboard ↔ text.txt @ L1:1-3",
-            &format!("Clipboard ↔ {} @ L1:1-3", path!("test/text.txt")),
+            &format!("Clipboard ↔ {} @ L1:1-3", "test/text.txt"),
             cx,
         )
         .await;
@@ -679,7 +679,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "a.txt": "alpha\nbeta\ngamma",
                 "b.txt": "one\ntwo\nthree"
@@ -687,17 +687,17 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
         let buffer_a = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/a.txt"), cx)
+                project.open_local_buffer("/project/a.txt", cx)
             })
             .await
             .unwrap();
         let buffer_b = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/b.txt"), cx)
+                project.open_local_buffer("/project/b.txt", cx)
             })
             .await
             .unwrap();
@@ -768,7 +768,7 @@ mod tests {
 
         let fs = FakeFs::new(cx.executor());
         fs.insert_tree(
-            path!("/project"),
+            "/project",
             json!({
                 "a.txt": "alpha\nbeta\ngamma",
                 "b.txt": "one\ntwo\nthree"
@@ -776,17 +776,17 @@ mod tests {
         )
         .await;
 
-        let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
+        let project = Project::test(fs, ["/project".as_ref()], cx).await;
 
         let buffer_a = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/a.txt"), cx)
+                project.open_local_buffer("/project/a.txt", cx)
             })
             .await
             .unwrap();
         let buffer_b = project
             .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/project/b.txt"), cx)
+                project.open_local_buffer("/project/b.txt", cx)
             })
             .await
             .unwrap();

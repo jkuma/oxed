@@ -3,28 +3,7 @@
 use perf::*;
 use proc_macro::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{ItemFn, LitStr, parse_macro_input, parse_quote};
-
-/// Expands to the given path string literal.
-#[proc_macro]
-pub fn path(input: TokenStream) -> TokenStream {
-    let path = parse_macro_input!(input as LitStr).value();
-    TokenStream::from(quote! { #path })
-}
-
-/// Expands to the given URI string literal.
-#[proc_macro]
-pub fn uri(input: TokenStream) -> TokenStream {
-    let uri = parse_macro_input!(input as LitStr).value();
-    TokenStream::from(quote! { #uri })
-}
-
-/// Expands to the given text string literal.
-#[proc_macro]
-pub fn line_endings(input: TokenStream) -> TokenStream {
-    let text = parse_macro_input!(input as LitStr).value();
-    TokenStream::from(quote! { #text })
-}
+use syn::{ItemFn, parse_macro_input, parse_quote};
 
 /// Inner data for the perf macro.
 #[derive(Default)]

@@ -64,7 +64,6 @@ mod tests {
     use lsp::{LanguageServerId, LanguageServerName};
     use multi_buffer::MultiBuffer;
     use project::{FakeFs, Project};
-    use util::path;
 
     use crate::{MoveToEnd, editor_tests::init_test, test::build_editor_with_project};
 
@@ -75,19 +74,16 @@ mod tests {
         init_test(cx, |_| {});
 
         let fs = FakeFs::new(cx.executor());
-        fs.insert_file(path!("/file.rs"), "fn main() {}".into())
-            .await;
+        fs.insert_file("/file.rs", "fn main() {}".into()).await;
 
-        let project = Project::test(fs, [path!("/file.rs").as_ref()], cx).await;
+        let project = Project::test(fs, ["/file.rs".as_ref()], cx).await;
         let language_registry = project.read_with(cx, |project, _| project.languages().clone());
         language_registry.add(rust_lang());
         let mut fake_servers =
             language_registry.register_fake_lsp("Rust", FakeLspAdapter::default());
 
         let underlying_buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer(path!("/file.rs"), cx)
-            })
+            .update(cx, |project, cx| project.open_local_buffer("/file.rs", cx))
             .await
             .unwrap();
 

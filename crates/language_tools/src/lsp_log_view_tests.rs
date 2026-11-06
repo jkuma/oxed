@@ -15,20 +15,19 @@ use project::{
 };
 use serde_json::json;
 use settings::SettingsStore;
-use util::path;
 
 #[gpui::test]
 async fn test_lsp_log_view_filters_servers_from_other_projects(cx: &mut TestAppContext) {
     init_test(cx);
 
     let fs = FakeFs::new(cx.background_executor.clone());
-    fs.insert_tree(path!("/current-project"), json!({ "test.rs": "" }))
+    fs.insert_tree("/current-project", json!({ "test.rs": "" }))
         .await;
-    fs.insert_tree(path!("/other-project"), json!({ "test.rs": "" }))
+    fs.insert_tree("/other-project", json!({ "test.rs": "" }))
         .await;
 
-    let project = Project::test(fs.clone(), [path!("/current-project").as_ref()], cx).await;
-    let other_project = Project::test(fs.clone(), [path!("/other-project").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/current-project".as_ref()], cx).await;
+    let other_project = Project::test(fs.clone(), ["/other-project".as_ref()], cx).await;
     let worktree_id = project.read_with(cx, |project, cx| {
         project.worktrees(cx).next().unwrap().read(cx).id()
     });
@@ -98,9 +97,8 @@ async fn test_lsp_log_view_labels_registered_supplementary_servers(cx: &mut Test
     init_test(cx);
 
     let fs = FakeFs::new(cx.background_executor.clone());
-    fs.insert_tree(path!("/the-root"), json!({ "test.rs": "" }))
-        .await;
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    fs.insert_tree("/the-root", json!({ "test.rs": "" })).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let lsp_store = project.read_with(cx, |project, _| project.lsp_store());
     let log_store = cx.new(LogStore::new);
     log_store.update(cx, |store, cx| store.add_project(&project, cx));
@@ -161,9 +159,9 @@ async fn test_lsp_log_view_rpc_checkbox_tracks_view_ownership(cx: &mut TestAppCo
     init_test(cx);
 
     let fs = FakeFs::new(cx.background_executor.clone());
-    fs.insert_tree(path!("/rpc-ownership"), json!({ "test.rs": "" }))
+    fs.insert_tree("/rpc-ownership", json!({ "test.rs": "" }))
         .await;
-    let project = Project::test(fs, [path!("/rpc-ownership").as_ref()], cx).await;
+    let project = Project::test(fs, ["/rpc-ownership".as_ref()], cx).await;
     let log_store = cx.new(LogStore::new);
     let server_keys = [
         LanguageServerKind::Local {
@@ -375,9 +373,8 @@ async fn test_log_store_does_not_retain_language_servers(cx: &mut TestAppContext
     init_test(cx);
 
     let fs = FakeFs::new(cx.background_executor.clone());
-    fs.insert_tree(path!("/the-root"), json!({ "test.rs": "" }))
-        .await;
-    let project = Project::test(fs, [path!("/the-root").as_ref()], cx).await;
+    fs.insert_tree("/the-root", json!({ "test.rs": "" })).await;
+    let project = Project::test(fs, ["/the-root".as_ref()], cx).await;
     let server_id = LanguageServerId(100);
     let server_kind = LanguageServerKind::Local {
         project: project.downgrade(),
@@ -468,7 +465,7 @@ async fn test_lsp_log_view(cx: &mut TestAppContext) {
 
     let fs = FakeFs::new(cx.background_executor.clone());
     fs.insert_tree(
-        path!("/the-root"),
+        "/the-root",
         json!({
             "test.rs": "",
             "package.json": "",
@@ -476,7 +473,7 @@ async fn test_lsp_log_view(cx: &mut TestAppContext) {
     )
     .await;
 
-    let project = Project::test(fs.clone(), [path!("/the-root").as_ref()], cx).await;
+    let project = Project::test(fs.clone(), ["/the-root".as_ref()], cx).await;
 
     let language_registry = project.read_with(cx, |project, _| project.languages().clone());
     language_registry.add(Arc::new(Language::new(
@@ -504,7 +501,7 @@ async fn test_lsp_log_view(cx: &mut TestAppContext) {
 
     let _rust_buffer = project
         .update(cx, |project, cx| {
-            project.open_local_buffer_with_lsp(path!("/the-root/test.rs"), cx)
+            project.open_local_buffer_with_lsp("/the-root/test.rs", cx)
         })
         .await
         .unwrap();

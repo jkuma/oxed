@@ -390,7 +390,6 @@ mod tests {
     use settings::{DocumentSymbols, SettingsStore};
     use text::Point;
     use theme::SyntaxTheme;
-    use util::path;
     use workspace::item::{Item, ItemEvent};
     use zed_actions::editor::MoveDown;
 
@@ -921,7 +920,7 @@ mod tests {
                             tags: None,
                             deprecated: None,
                             location: lsp::Location {
-                                uri: lsp::Uri::from_file_path(path!("/a/main.rs")).unwrap(),
+                                uri: lsp::Uri::from_file_path("/a/main.rs").unwrap(),
                                 range: lsp_range(0, 0, 2, 1),
                             },
                             container_name: None,
@@ -1402,7 +1401,7 @@ mod tests {
         cx.update_editor(|editor, _window, cx| {
             assert_eq!(
                 breadcrumb_texts(editor, cx),
-                vec![path!("dir/file.rs").to_string()],
+                vec!["dir/file.rs".to_string()],
                 "Breadcrumbs should fall back to the file name when the language server returns no symbols"
             );
 
@@ -1440,7 +1439,7 @@ mod tests {
         cx.update_editor(|editor, _window, cx| {
             assert_eq!(
                 breadcrumb_texts(editor, cx),
-                vec![path!("dir/file.rs").to_string(), "fn main".to_string()],
+                vec!["dir/file.rs".to_string(), "fn main".to_string()],
                 "With tree-sitter symbols, breadcrumbs should show the file name and the symbol"
             );
         });
@@ -1469,7 +1468,7 @@ mod tests {
         cx.update_editor(|editor, _window, cx| {
             assert_eq!(
                 breadcrumb_texts(editor, cx),
-                vec![path!("dir/file.rs").to_string()],
+                vec!["dir/file.rs".to_string()],
                 "After enabling LSP symbols that return nothing, breadcrumbs should keep the file name"
             );
         });
@@ -1487,7 +1486,7 @@ mod tests {
         cx.update_editor(|editor, _window, cx| {
             assert_eq!(
                 breadcrumb_texts(editor, cx),
-                vec![path!("dir/file.rs").to_string(), "fn main".to_string()],
+                vec!["dir/file.rs".to_string(), "fn main".to_string()],
                 "After disabling LSP symbols, tree-sitter breadcrumbs should return"
             );
         });

@@ -606,29 +606,24 @@ mod tests {
 
         #[test]
         fn test_match_glob_pattern() {
-            let pattern = unix_path_to_platform("/test/*/");
-            let file_path = PathBuf::from(unix_path_to_platform("/test/foo/bar/file.txt"));
+            let pattern = "/test/*/".to_string();
+            let file_path = PathBuf::from("/test/foo/bar/file.txt");
             let matched = match_glob_pattern(&pattern, &file_path);
-            assert_eq!(matched, Some(unix_path_to_platform("/test/foo/")));
+            assert_eq!(matched, Some("/test/foo/".to_string()));
         }
 
         #[test]
         fn test_match_glob_pattern_globstar() {
-            let pattern = unix_path_to_platform("/workspace/**/src/");
-            let file_path = PathBuf::from(unix_path_to_platform(
-                "/workspace/packages/core/src/index.ts",
-            ));
+            let pattern = "/workspace/**/src/".to_string();
+            let file_path = PathBuf::from("/workspace/packages/core/src/index.ts");
             let matched = match_glob_pattern(&pattern, &file_path);
-            assert_eq!(
-                matched,
-                Some(unix_path_to_platform("/workspace/packages/core/src/"))
-            );
+            assert_eq!(matched, Some("/workspace/packages/core/src/".to_string()));
         }
 
         #[test]
         fn test_match_glob_pattern_no_match() {
-            let pattern = unix_path_to_platform("/other/*/");
-            let file_path = PathBuf::from(unix_path_to_platform("/test/foo/bar/file.txt"));
+            let pattern = "/other/*/".to_string();
+            let file_path = PathBuf::from("/test/foo/bar/file.txt");
             let matched = match_glob_pattern(&pattern, &file_path);
             assert_eq!(matched, None);
         }
@@ -641,30 +636,22 @@ mod tests {
         fn test_working_directory_string() {
             let uri = make_uri("/workspace/packages/foo/src/file.ts");
             let working_directories = vec![WorkingDirectory::String("packages/foo".to_string())];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/packages/foo/"),
-                false,
-            );
+            assert_directory_result(result, "/workspace/packages/foo/", false);
         }
 
         #[test]
         fn test_working_directory_absolute_path() {
             let uri = make_uri("/workspace/packages/foo/src/file.ts");
-            let working_directories = vec![WorkingDirectory::String(unix_path_to_platform(
-                "/workspace/packages/foo",
-            ))];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let working_directories = vec![WorkingDirectory::String(
+                "/workspace/packages/foo".to_string(),
+            )];
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/packages/foo/"),
-                false,
-            );
+            assert_directory_result(result, "/workspace/packages/foo/", false);
         }
 
         #[test]
@@ -674,14 +661,10 @@ mod tests {
                 directory: "packages/foo".to_string(),
                 not_cwd: Some(true),
             })];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/packages/foo/"),
-                true,
-            );
+            assert_directory_result(result, "/workspace/packages/foo/", true);
         }
 
         #[test]
@@ -692,14 +675,10 @@ mod tests {
                     directory: "packages/foo".to_string(),
                     change_process_cwd: false,
                 })];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/packages/foo/"),
-                true,
-            );
+            assert_directory_result(result, "/workspace/packages/foo/", true);
         }
 
         #[test]
@@ -709,14 +688,10 @@ mod tests {
                 pattern: "packages/*/".to_string(),
                 not_cwd: Some(false),
             })];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/packages/foo/"),
-                false,
-            );
+            assert_directory_result(result, "/workspace/packages/foo/", false);
         }
 
         #[test]
@@ -732,14 +707,10 @@ mod tests {
                     not_cwd: None,
                 }),
             ];
-            let workspace_folder = PathBuf::from(unix_path_to_platform("/workspace"));
+            let workspace_folder = PathBuf::from("/workspace");
 
             let result = determine_working_directory(uri, working_directories, workspace_folder);
-            assert_directory_result(
-                result,
-                &unix_path_to_platform("/workspace/apps/web/"),
-                false,
-            );
+            assert_directory_result(result, "/workspace/apps/web/", false);
         }
     }
 
@@ -750,10 +721,8 @@ mod tests {
 
         #[test]
         fn test_ancestor_directories_for_package_local_file() {
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform(
-                "/workspace/packages/web/src/index.js",
-            ));
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/packages/web/src/index.js");
 
             let directories: Vec<&Path> =
                 ancestor_directories(&worktree_root, Some(&requested_file)).collect();
@@ -761,10 +730,10 @@ mod tests {
             assert_eq!(
                 directories,
                 vec![
-                    Path::new(&unix_path_to_platform("/workspace/packages/web/src")),
-                    Path::new(&unix_path_to_platform("/workspace/packages/web")),
-                    Path::new(&unix_path_to_platform("/workspace/packages")),
-                    Path::new(&unix_path_to_platform("/workspace")),
+                    Path::new("/workspace/packages/web/src"),
+                    Path::new("/workspace/packages/web"),
+                    Path::new("/workspace/packages"),
+                    Path::new("/workspace"),
                 ]
             );
         }
@@ -820,13 +789,10 @@ mod tests {
         #[gpui::test]
         async fn test_eslint_8_56_does_not_treat_cjs_as_flat_config(cx: &mut TestAppContext) {
             let fs = FakeFs::new(cx.executor());
-            fs.insert_tree(
-                unix_path_to_platform("/workspace"),
-                json!({ "eslint.config.cjs": "" }),
-            )
-            .await;
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform("/workspace/src/index.js"));
+            fs.insert_tree("/workspace".to_string(), json!({ "eslint.config.cjs": "" }))
+                .await;
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/src/index.js");
             let version = Version::parse("8.56.0").expect("valid ESLint version");
 
             let config_kind = find_eslint_config_kind(
@@ -843,13 +809,10 @@ mod tests {
         #[gpui::test]
         async fn test_eslint_8_57_treats_cjs_as_flat_config(cx: &mut TestAppContext) {
             let fs = FakeFs::new(cx.executor());
-            fs.insert_tree(
-                unix_path_to_platform("/workspace"),
-                json!({ "eslint.config.cjs": "" }),
-            )
-            .await;
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform("/workspace/src/index.js"));
+            fs.insert_tree("/workspace".to_string(), json!({ "eslint.config.cjs": "" }))
+                .await;
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/src/index.js");
             let version = Version::parse("8.57.0").expect("valid ESLint version");
 
             let config_kind = find_eslint_config_kind(
@@ -866,13 +829,10 @@ mod tests {
         #[gpui::test]
         async fn test_eslint_10_treats_typescript_config_as_flat_config(cx: &mut TestAppContext) {
             let fs = FakeFs::new(cx.executor());
-            fs.insert_tree(
-                unix_path_to_platform("/workspace"),
-                json!({ "eslint.config.ts": "" }),
-            )
-            .await;
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform("/workspace/src/index.js"));
+            fs.insert_tree("/workspace".to_string(), json!({ "eslint.config.ts": "" }))
+                .await;
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/src/index.js");
             let version = Version::parse("10.0.0").expect("valid ESLint version");
 
             let config_kind = find_eslint_config_kind(
@@ -892,7 +852,7 @@ mod tests {
         ) {
             let fs = FakeFs::new(cx.executor());
             fs.insert_tree(
-                unix_path_to_platform("/workspace"),
+                "/workspace".to_string(),
                 json!({
                     "eslint.config.js": "",
                     "packages": {
@@ -903,10 +863,8 @@ mod tests {
                 }),
             )
             .await;
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform(
-                "/workspace/packages/web/src/index.js",
-            ));
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/packages/web/src/index.js");
             let version = Version::parse("8.56.0").expect("valid ESLint version");
 
             let config_kind = find_eslint_config_kind(
@@ -926,7 +884,7 @@ mod tests {
         ) {
             let fs = FakeFs::new(cx.executor());
             fs.insert_tree(
-                unix_path_to_platform("/workspace"),
+                "/workspace".to_string(),
                 json!({
                     "packages": {
                         "web": {
@@ -936,10 +894,8 @@ mod tests {
                 }),
             )
             .await;
-            let worktree_root = PathBuf::from(unix_path_to_platform("/workspace"));
-            let requested_file = PathBuf::from(unix_path_to_platform(
-                "/workspace/packages/web/src/index.js",
-            ));
+            let worktree_root = PathBuf::from("/workspace");
+            let requested_file = PathBuf::from("/workspace/packages/web/src/index.js");
             let version = Version::parse("9.0.0").expect("valid ESLint version");
 
             let config_kind = find_eslint_config_kind(
@@ -954,13 +910,8 @@ mod tests {
         }
     }
 
-    fn unix_path_to_platform(path: &str) -> String {
-        path.to_string()
-    }
-
     fn make_uri(path: &str) -> Uri {
-        let platform_path = unix_path_to_platform(path);
-        Uri::from_file_path(&platform_path).unwrap()
+        Uri::from_file_path(path).unwrap()
     }
 
     fn assert_directory_result(
