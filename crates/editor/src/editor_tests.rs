@@ -39147,7 +39147,6 @@ async fn test_invisible_worktree_servers(cx: &mut TestAppContext) {
                     .lsp_store()
                     .read(cx)
                     .as_local()
-                    .unwrap()
                     .language_servers
                     .len();
                 assert_eq!(expected, current, "{context}");

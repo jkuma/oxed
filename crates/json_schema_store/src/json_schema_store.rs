@@ -249,9 +249,7 @@ async fn resolve_dynamic_schema(
             let delegate: Arc<dyn LspAdapterDelegate> = cx
                 .update(|inner_cx| {
                     lsp_store.update(inner_cx, |lsp_store, cx| {
-                        let Some(local) = lsp_store.as_local() else {
-                            return None;
-                        };
+                        let local = lsp_store.as_local();
                         let Some(worktree) = local.worktree_store.read(cx).worktrees().next()
                         else {
                             return None;

@@ -46,9 +46,7 @@ pub fn notify_schemas_changed(lsp_store: Entity<LspStore>, uris: &[String], cx: 
     zlog::trace!(LOGGER => "Notifying schema changes for URIs: {:?}", uris);
     let servers = lsp_store.read_with(cx, |lsp_store, _| {
         let mut servers = Vec::new();
-        let Some(local) = lsp_store.as_local() else {
-            return servers;
-        };
+        let local = lsp_store.as_local();
 
         for states in local.language_servers.values() {
             let json_server = match states {

@@ -6203,7 +6203,7 @@ async fn test_edits_from_lsp2_with_past_version(cx: &mut gpui::TestAppContext) {
 
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 vec![
                     // replace body of first function
@@ -6298,7 +6298,7 @@ async fn test_edits_from_lsp2_with_edits_on_adjacent_lines(cx: &mut gpui::TestAp
     // Rust-analyzer does this when performing a merge-imports code action.
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 [
                     // Replace the first use statement without editing the semicolon.
@@ -6400,7 +6400,7 @@ async fn test_edits_from_lsp_with_replacement_followed_by_adjacent_insertion(
     // with an insertion following a replacement (which violates the LSP spec).
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 [
                     lsp::TextEdit {
@@ -6461,7 +6461,7 @@ async fn test_invalid_edits_from_lsp2(cx: &mut gpui::TestAppContext) {
     // with ranges sometimes being inverted or pointing to invalid locations.
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 [
                     lsp::TextEdit {
@@ -6589,7 +6589,7 @@ async fn test_edits_from_lsp_with_crlf_line_endings(cx: &mut gpui::TestAppContex
     // is replaced and cursor positions are lost.
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 [lsp::TextEdit {
                     range: lsp::Range::new(lsp::Position::new(0, 0), lsp::Position::new(3, 0)),
@@ -6608,7 +6608,7 @@ async fn test_edits_from_lsp_with_crlf_line_endings(cx: &mut gpui::TestAppContex
     // line, must produce an edit for just that change.
     let edits = lsp_store
         .update(cx, |lsp_store, cx| {
-            lsp_store.as_local_mut().unwrap().edits_from_lsp(
+            lsp_store.as_local_mut().edits_from_lsp(
                 &buffer,
                 [lsp::TextEdit {
                     range: lsp::Range::new(lsp::Position::new(0, 0), lsp::Position::new(3, 0)),

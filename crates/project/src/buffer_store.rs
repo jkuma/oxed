@@ -144,8 +144,9 @@ impl LocalBufferStore {
         };
 
         let buffer_id = this
-            .as_local_mut()
-            .and_then(|local| local.local_buffer_ids_by_entry_id.get(&entry_id))
+            .local
+            .local_buffer_ids_by_entry_id
+            .get(&entry_id)
             .copied()
             .or_else(|| this.path_to_buffer_id.get(&project_path).copied())?;
 
@@ -161,8 +162,7 @@ impl LocalBufferStore {
             buffer
         } else {
             this.path_to_buffer_id.remove(&project_path);
-            let this = this.as_local_mut()?;
-            this.local_buffer_ids_by_entry_id.remove(&entry_id);
+            this.local.local_buffer_ids_by_entry_id.remove(&entry_id);
             return None;
         };
 
@@ -258,7 +258,7 @@ impl LocalBufferStore {
                     old_file: buffer.file().cloned(),
                 });
             }
-            let local = this.as_local_mut()?;
+            let local = &mut this.local;
             if new_file.entry_id != old_file.entry_id {
                 if let Some(entry_id) = old_file.entry_id {
                     local.local_buffer_ids_by_entry_id.remove(&entry_id);
@@ -399,7 +399,7 @@ impl LocalBufferStore {
                     }
 
                     this.path_to_buffer_id.insert(project_path, buffer_id);
-                    let this = this.as_local_mut().unwrap();
+                    let this = &mut this.local;
                     if let Some(entry_id) = entry_id {
                         this.local_buffer_ids_by_entry_id
                             .insert(entry_id, buffer_id);
@@ -472,7 +472,7 @@ impl BufferStore {
                 worktree_store: worktree_store.clone(),
                 _subscription: cx.subscribe(&worktree_store, |this, _, event, cx| {
                     if let WorktreeStoreEvent::WorktreeAdded(worktree) = event {
-                        let this = this.as_local_mut().unwrap();
+                        let this = &mut this.local;
                         this.subscribe_to_worktree(worktree, cx);
                     }
                 }),
@@ -483,10 +483,6 @@ impl BufferStore {
             non_searchable_buffers: Default::default(),
             worktree_store,
         }
-    }
-
-    fn as_local_mut(&mut self) -> Option<&mut LocalBufferStore> {
-        Some(&mut self.local)
     }
 
     #[ztracing::instrument(skip_all)]
@@ -665,16 +661,14 @@ impl BufferStore {
 
         let remote_id = buffer.read(cx).remote_id();
         if let Some(entry_id) = file.entry_id {
-            if let Some(local) = self.as_local_mut() {
-                match local.local_buffer_ids_by_entry_id.get(&entry_id) {
-                    Some(_) => {
-                        return None;
-                    }
-                    None => {
-                        local
-                            .local_buffer_ids_by_entry_id
-                            .insert(entry_id, remote_id);
-                    }
+            match self.local.local_buffer_ids_by_entry_id.get(&entry_id) {
+                Some(_) => {
+                    return None;
+                }
+                None => {
+                    self.local
+                        .local_buffer_ids_by_entry_id
+                        .insert(entry_id, remote_id);
                 }
             }
             self.path_to_buffer_id.insert(
@@ -744,9 +738,7 @@ impl BufferStore {
                 },
                 buffer_id,
             );
-            let this = self
-                .as_local_mut()
-                .expect("local-only method called in a non-local context");
+            let this = &mut self.local;
             if let Some(entry_id) = file.entry_id {
                 this.local_buffer_ids_by_entry_id
                     .insert(entry_id, buffer_id);

@@ -83,9 +83,7 @@ impl LspStore {
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<CapabilityRegistrationChange> {
         let server_id = server.server_id();
-        let local = self
-            .as_local_mut()
-            .context("Expected LSP Store to be local")?;
+        let local = self.as_local_mut();
         let mut server_capabilities = lsp::ServerCapabilities::default();
         *capability_of(&mut server_capabilities) = Some(options);
         let new_registration = DynamicTextDocumentRegistration {
@@ -161,9 +159,7 @@ impl LspStore {
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<Option<CapabilityRegistrationChange>> {
         let server_id = server.server_id();
-        let local = self
-            .as_local_mut()
-            .context("Expected LSP Store to be local")?;
+        let local = self.as_local_mut();
         let Some(registrations) = local
             .language_server_dynamic_registrations
             .get_mut(&server_id)
@@ -229,9 +225,7 @@ impl LspStore {
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<bool> {
         let server_id = server.server_id();
-        let local = self
-            .as_local_mut()
-            .context("Expected LSP Store to be local")?;
+        let local = self.as_local_mut();
         let dynamic_registrations = local
             .language_server_dynamic_registrations
             .entry(server_id)
@@ -272,9 +266,7 @@ impl LspStore {
         capability_of: impl FnOnce(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<Option<bool>> {
         let server_id = server.server_id();
-        let local = self
-            .as_local_mut()
-            .context("Expected LSP Store to be local")?;
+        let local = self.as_local_mut();
         let Some(dynamic_registrations) = local
             .language_server_dynamic_registrations
             .get_mut(&server_id)
@@ -310,9 +302,7 @@ impl LspStore {
     }
 
     fn update_paths_watched_for_rename(&mut self, server: &LanguageServer) {
-        let Some(local) = self.as_local_mut() else {
-            return;
-        };
+        let local = self.as_local_mut();
         let watcher = server
             .capabilities()
             .workspace
@@ -342,9 +332,7 @@ impl LspStore {
     }
 
     fn apply_completion_triggers(&self, server_id: LanguageServerId, cx: &mut Context<Self>) {
-        let Some(local) = self.as_local() else {
-            return;
-        };
+        let local = self.as_local();
         let Some(LanguageServerState::Running { adapter, .. }) =
             local.language_servers.get(&server_id)
         else {
@@ -384,13 +372,13 @@ impl LspStore {
             match reg.method.as_str() {
                 "workspace/didChangeWatchedFiles" => {
                     if let Some(options) = reg.register_options {
-                        let notify = if let Some(local_lsp_store) = self.as_local_mut() {
+                        let notify = {
+                            let local_lsp_store = self.as_local_mut();
+
                             let caps = serde_json::from_value(options)?;
                             local_lsp_store
                                 .on_lsp_did_change_watched_files(server_id, &reg.id, caps, cx);
                             true
-                        } else {
-                            false
                         };
                         if notify {
                             self.sync_server_capabilities(&server);
@@ -777,9 +765,7 @@ impl LspStore {
                                 }
                             };
 
-                        let local = self
-                            .as_local_mut()
-                            .context("Expected LSP Store to be local")?;
+                        let local = self.as_local_mut();
                         let state = local
                             .language_servers
                             .get_mut(&server_id)
@@ -917,12 +903,12 @@ impl LspStore {
         for unreg in params.unregisterations.iter() {
             match unreg.method.as_str() {
                 "workspace/didChangeWatchedFiles" => {
-                    let notify = if let Some(local_lsp_store) = self.as_local_mut() {
+                    let notify = {
+                        let local_lsp_store = self.as_local_mut();
+
                         local_lsp_store
                             .on_lsp_unregister_did_change_watched_files(server_id, &unreg.id, cx);
                         true
-                    } else {
-                        false
                     };
                     if notify {
                         self.sync_server_capabilities(&server);
@@ -1140,9 +1126,7 @@ impl LspStore {
                         )?
                         .is_some()
                     {
-                        let local = self
-                            .as_local_mut()
-                            .context("Expected LSP Store to be local")?;
+                        let local = self.as_local_mut();
                         let state = local
                             .language_servers
                             .get_mut(&server_id)

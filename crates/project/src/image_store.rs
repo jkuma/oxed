@@ -309,8 +309,6 @@ trait ImageStoreImpl {
         images: HashSet<Entity<ImageItem>>,
         cx: &mut Context<ImageStore>,
     ) -> Task<Result<()>>;
-
-    fn as_local(&self) -> Option<Entity<LocalImageStore>>;
 }
 
 struct LocalImageStore {
@@ -321,7 +319,7 @@ struct LocalImageStore {
 }
 
 pub struct ImageStore {
-    state: Box<dyn ImageStoreImpl>,
+    state: Entity<LocalImageStore>,
     opened_images: HashMap<ImageId, WeakEntity<ImageItem>>,
     worktree_store: Entity<WorktreeStore>,
     #[allow(clippy::type_complexity)]
@@ -335,7 +333,7 @@ impl ImageStore {
     pub fn local(worktree_store: Entity<WorktreeStore>, cx: &mut Context<Self>) -> Self {
         let this = cx.weak_entity();
         Self {
-            state: Box::new(cx.new(|cx| {
+            state: cx.new(|cx| {
                 let subscription = cx.subscribe(
                     &worktree_store,
                     |this: &mut LocalImageStore, _, event, cx| {
@@ -351,7 +349,7 @@ impl ImageStore {
                     image_store: this,
                     _subscription: subscription,
                 }
-            })),
+            }),
             opened_images: Default::default(),
             loading_images_by_path: Default::default(),
             worktree_store,
@@ -471,10 +469,8 @@ impl ImageStore {
         event: &ImageItemEvent,
         cx: &mut Context<Self>,
     ) {
-        if let ImageItemEvent::FileHandleChanged = event
-            && let Some(local) = self.state.as_local()
-        {
-            local.update(cx, |local, cx| {
+        if let ImageItemEvent::FileHandleChanged = event {
+            self.state.update(cx, |local, cx| {
                 local.image_changed_file(image, cx);
             })
         }
@@ -543,10 +539,6 @@ impl ImageStoreImpl for Entity<LocalImageStore> {
             }
             Ok(())
         })
-    }
-
-    fn as_local(&self) -> Option<Entity<LocalImageStore>> {
-        Some(self.clone())
     }
 }
 
