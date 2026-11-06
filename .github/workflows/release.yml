@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # The bundle links against the build machine's libraries; an older glibc keeps it portable.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Install dependencies
+        run: script/linux
+
+      - name: Check that the tag matches the version
+        run: |
+          version="$(script/get-crate-version zed)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match the zed crate version $version" >&2
+            exit 1
+          fi
+
+      - name: Build the bundle
+        run: script/bundle-oxed-linux
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            target/release/oxed-linux-x86_64.tar.gz \
+            --title "Oxed ${GITHUB_REF_NAME#v}" \
+            --generate-notes
