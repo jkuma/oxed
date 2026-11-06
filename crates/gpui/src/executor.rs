@@ -1,4 +1,4 @@
-use crate::{ActivityGuard, App, PlatformDispatcher, PlatformScheduler};
+use crate::{App, PlatformDispatcher, PlatformScheduler};
 use futures::channel::mpsc;
 use futures::prelude::*;
 use gpui_util::{TryFutureExt, TryFutureExtBacktrace};
@@ -25,8 +25,6 @@ pub struct BackgroundExecutor {
 pub struct ForegroundExecutor {
     inner: scheduler::LocalExecutor,
     dispatcher: Arc<dyn PlatformDispatcher>,
-    #[cfg(feature = "profiler")]
-    foreground_runnables: Option<crate::profiler::journal::ForegroundRunnableCounter>,
     not_send: PhantomData<Rc<()>>,
 }
 
@@ -87,13 +85,6 @@ impl BackgroundExecutor {
     /// This is used by Ex to pass the executor to thread/worktree code.
     pub fn scheduler_executor(&self) -> scheduler::BackgroundExecutor {
         self.inner.clone()
-    }
-
-    /// Prevents App Nap-style throttling while the returned guard is held.
-    ///
-    /// This does not prevent the system from entering idle sleep.
-    pub fn prevent_app_nap(&self, reason: &str) -> ActivityGuard {
-        self.dispatcher.prevent_app_nap(reason)
     }
 
     /// Enqueues the given future to be run to completion on a background thread.
@@ -308,8 +299,6 @@ impl ForegroundExecutor {
                 return Self {
                     inner,
                     dispatcher,
-                    #[cfg(feature = "profiler")]
-                    foreground_runnables: Some(platform_scheduler.foreground_runnable_counter()),
                     not_send: PhantomData,
                 };
             };
@@ -318,8 +307,6 @@ impl ForegroundExecutor {
         let platform_scheduler = Arc::new(PlatformScheduler::new(dispatcher.clone()));
         #[cfg(not(any(test, feature = "test-support")))]
         let inner = platform_scheduler.foreground_executor();
-        #[cfg(all(not(any(test, feature = "test-support")), feature = "profiler"))]
-        let foreground_runnables = Some(platform_scheduler.foreground_runnable_counter());
 
         #[cfg(any(test, feature = "test-support"))]
         let inner = {
@@ -331,16 +318,9 @@ impl ForegroundExecutor {
             })
         };
 
-        #[cfg(all(any(test, feature = "test-support"), feature = "profiler"))]
-        // The deterministic test scheduler does not invoke GPUI's task profiler
-        // hooks, so an increment here would have no matching decrement.
-        let foreground_runnables = None;
-
         Self {
             inner,
             dispatcher,
-            #[cfg(feature = "profiler")]
-            foreground_runnables,
             not_send: PhantomData,
         }
     }
@@ -366,46 +346,6 @@ impl ForegroundExecutor {
     {
         // Priority is ignored for foreground tasks - they run in order on the main thread
         self.inner.spawn(future)
-    }
-
-    /// On platforms with dedicated support, enqueues the given future to run
-    /// on the main thread during platform idle time. Without a `timeout`,
-    /// polls may be deferred indefinitely while the platform stays busy;
-    /// with one, a poll still waiting after that long runs as ordinary main-thread work.
-    /// Each poll occupies part of one idle slice, so long synchronous stretches
-    /// should bound themselves against [`Self::idle_time_remaining`] and yield.
-    ///
-    /// On platforms without dedicated support, schedules the given future to run
-    /// with a low priority, ignoring `timeout`.
-    #[track_caller]
-    pub fn spawn_when_idle<R>(
-        &self,
-        timeout: Option<Duration>,
-        future: impl Future<Output = R> + 'static,
-    ) -> Task<R>
-    where
-        R: 'static,
-    {
-        let dispatcher = self.dispatcher.clone();
-        #[cfg(feature = "profiler")]
-        let foreground_runnables = self.foreground_runnables.clone();
-        self.inner
-            .spawn_with_dispatch(future.boxed_local(), move |runnable| {
-                #[cfg(feature = "profiler")]
-                if let Some(foreground_runnables) = &foreground_runnables {
-                    foreground_runnables.queued();
-                }
-                dispatcher.dispatch_on_main_thread_when_idle(runnable, timeout);
-            })
-    }
-
-    /// The time remaining in the current idle slice, when called from a task
-    /// spawned via [`Self::spawn_when_idle`] on a platform that meters idle
-    /// time. `None` when idle time is unmetered (or the caller is not inside
-    /// an idle slice); work that must bound itself should then fall back to a
-    /// budget of its own.
-    pub fn idle_time_remaining(&self) -> Option<Duration> {
-        self.dispatcher.idle_time_remaining()
     }
 
     /// Used by the test harness to run an async test in a synchronous fashion.

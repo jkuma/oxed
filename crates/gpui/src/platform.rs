@@ -162,11 +162,6 @@ impl ActivityGuard {
             _release: gpui_util::defer(Box::new(release)),
         }
     }
-
-    /// A guard for platforms without a corresponding activity.
-    pub fn noop() -> Self {
-        Self::new(|| {})
-    }
 }
 
 // TODO(jk): return an enum instead of a string
@@ -1108,9 +1103,6 @@ pub trait PlatformHeadlessRenderer {
 pub type RunnableVariant = Runnable<RunnableMeta>;
 
 #[doc(hidden)]
-pub type TimerResolutionGuard = gpui_util::Deferred<Box<dyn FnOnce() + Send>>;
-
-#[doc(hidden)]
 pub enum TasksIncluded {
     OnlyCompleted,
     CompletedAndRunning,
@@ -1125,31 +1117,10 @@ pub trait PlatformDispatcher: Send + Sync {
     fn dispatch_on_main_thread(&self, runnable: RunnableVariant, priority: Priority);
     fn dispatch_after(&self, duration: Duration, runnable: RunnableVariant);
 
-    fn dispatch_on_main_thread_when_idle(
-        &self,
-        runnable: RunnableVariant,
-        timeout: Option<Duration>,
-    ) {
-        let _ = timeout;
-        self.dispatch_on_main_thread(runnable, Priority::Low);
-    }
-
-    fn idle_time_remaining(&self) -> Option<Duration> {
-        None
-    }
-
     fn spawn_realtime(&self, f: Box<dyn FnOnce() + Send>);
 
     fn now(&self) -> Instant {
         Instant::now()
-    }
-
-    fn increase_timer_resolution(&self) -> TimerResolutionGuard {
-        gpui_util::defer(Box::new(|| {}))
-    }
-
-    fn prevent_app_nap(&self, _reason: &str) -> ActivityGuard {
-        ActivityGuard::noop()
     }
 
     #[cfg(any(test, feature = "test-support", feature = "bench-support"))]

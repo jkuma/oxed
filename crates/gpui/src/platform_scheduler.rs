@@ -55,13 +55,6 @@ impl PlatformScheduler {
     fn next_session_id(&self) -> SessionId {
         SessionId::new(self.next_session_id.fetch_add(1, Ordering::SeqCst))
     }
-
-    #[cfg(feature = "profiler")]
-    pub(crate) fn foreground_runnable_counter(
-        &self,
-    ) -> crate::profiler::journal::ForegroundRunnableCounter {
-        self.foreground_runnables.clone()
-    }
 }
 
 impl Scheduler for PlatformScheduler {
@@ -83,12 +76,7 @@ impl Scheduler for PlatformScheduler {
             return true;
         }
 
-        let park_deadline = |deadline: Instant| {
-            // Timer expirations are only delivered every ~15.6 milliseconds by default on Windows.
-            // We increase the resolution during this wait so that short timeouts stay reasonably short.
-            let _timer_guard = self.dispatcher.increase_timer_resolution();
-            parker.park_deadline(deadline)
-        };
+        let park_deadline = |deadline: Instant| parker.park_deadline(deadline);
 
         loop {
             match deadline {
