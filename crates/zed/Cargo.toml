@@ -2,7 +2,7 @@
 description = "A minimal, LSP-first code editor."
 edition.workspace = true
 name = "zed"
-version = "1.26.2"
+version = "0.1.0"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Zed Team <hi@zed.dev>"]
