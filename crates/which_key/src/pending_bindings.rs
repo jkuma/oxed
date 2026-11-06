@@ -444,7 +444,6 @@ mod tests {
                             .expect("valid context")
                             .into(),
                     ),
-                    true,
                     None,
                     cx.keyboard_mapper().as_ref(),
                 )

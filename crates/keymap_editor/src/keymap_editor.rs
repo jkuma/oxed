@@ -3602,10 +3602,7 @@ async fn save_keybinding_update(
             source,
         }
     } else {
-        settings::KeybindUpdateOperation::Add {
-            source,
-            from: Some(target),
-        }
+        settings::KeybindUpdateOperation::Add { source }
     };
 
     let updated_keymap_contents = settings::KeymapFile::update_keybinding(

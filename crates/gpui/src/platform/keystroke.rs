@@ -242,12 +242,8 @@ impl Keystroke {
 
 impl KeybindingKeystroke {
     /// Create a new keybinding keystroke from the given keystroke using the given keyboard mapper.
-    pub fn new_with_mapper(
-        inner: Keystroke,
-        use_key_equivalents: bool,
-        keyboard_mapper: &dyn PlatformKeyboardMapper,
-    ) -> Self {
-        keyboard_mapper.map_key_equivalent(inner, use_key_equivalents)
+    pub fn new_with_mapper(inner: Keystroke, keyboard_mapper: &dyn PlatformKeyboardMapper) -> Self {
+        keyboard_mapper.map_key_equivalent(inner)
     }
 
     /// Create a new keybinding keystroke from the given keystroke, without any platform-specific mapping.

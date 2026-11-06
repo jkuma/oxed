@@ -190,7 +190,6 @@
   },
   {
     "context": "BufferSearchBar && !in_replace > Editor",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-enter": "editor::Newline",
       "shift-enter": "search::SelectPreviousMatch",
@@ -365,7 +364,6 @@
   },
   {
     "context": "Editor && extension == md",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-k v": "markdown::OpenPreviewToTheSide",
       "ctrl-shift-v": "markdown::OpenPreview",
@@ -373,7 +371,6 @@
   },
   {
     "context": "Editor && extension == svg",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-k v": "svg::OpenPreviewToTheSide",
       "ctrl-shift-v": "svg::OpenPreview",
@@ -381,7 +378,6 @@
   },
   {
     "context": "Editor && (extension == csv || extension == tsv || extension == ssv || extension == psv || extension == jsonl || extension == ndjson)",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-k v": "tabular_data::OpenPreviewToTheSide",
       "ctrl-shift-v": "tabular_data::OpenPreview",
@@ -542,14 +538,12 @@
   },
   {
     "context": "Editor && in_snippet && has_next_tabstop && !showing_completions",
-    "use_key_equivalents": true,
     "bindings": {
       "tab": "editor::NextSnippetTabstop",
     },
   },
   {
     "context": "Editor && in_snippet && has_previous_tabstop && !showing_completions",
-    "use_key_equivalents": true,
     "bindings": {
       "shift-tab": "editor::PreviousSnippetTabstop",
     },
@@ -732,7 +726,6 @@
   },
   {
     "context": "GitPanel && CommitEditor",
-    "use_key_equivalents": true,
     "bindings": {
       "escape": "git::Cancel",
     },
@@ -823,7 +816,6 @@
   },
   {
     "context": "ToolchainSelector",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-shift-a": "toolchain::AddToolchain",
     },
@@ -869,7 +861,6 @@
   },
   {
     "context": "Diagnostics",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-r": "diagnostics::ToggleDiagnosticsRefresh",
     },
@@ -892,7 +883,6 @@
   },
   {
     "context": "KeymapEditor",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-f": "search::FocusSearch",
       "alt-find": "keymap_editor::ToggleKeystrokeSearch",
@@ -915,7 +905,6 @@
   },
   {
     "context": "KeystrokeInput",
-    "use_key_equivalents": true,
     "bindings": {
       "enter": "keystroke_input::StartRecording",
       "escape escape escape": "keystroke_input::StopRecording",
@@ -924,7 +913,6 @@
   },
   {
     "context": "KeybindEditorModal",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-enter": "menu::Confirm",
       "escape": "menu::Cancel",
@@ -932,7 +920,6 @@
   },
   {
     "context": "KeybindEditorModal > Editor",
-    "use_key_equivalents": true,
     "bindings": {
       "up": "menu::SelectPrevious",
       "down": "menu::SelectNext",
@@ -940,7 +927,6 @@
   },
   {
     "context": "Onboarding",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-=": ["zed::IncreaseUiFontSize", { "persist": false }],
       "ctrl-+": ["zed::IncreaseUiFontSize", { "persist": false }],
@@ -951,7 +937,6 @@
   },
   {
     "context": "Welcome",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-n": "workspace::NewFile",
       "ctrl-=": ["zed::IncreaseUiFontSize", { "persist": false }],
@@ -967,7 +952,6 @@
   },
   {
     "context": "InvalidItem",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-shift-enter": "workspace::OpenWithSystem",
     },
@@ -976,14 +960,12 @@
     // Handled under a more specific context to avoid conflicts with the
     // `OpenCurrentFile` keybind from the settings UI
     "context": "!SettingsWindow",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-,": "zed::OpenSettings",
     },
   },
   {
     "context": "SettingsWindow",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-w": "workspace::CloseWindow",
       "escape": "workspace::CloseWindow",
@@ -1017,7 +999,6 @@
   },
   {
     "context": "SettingsWindow > NavigationMenu",
-    "use_key_equivalents": true,
     "bindings": {
       "up": "settings_editor::FocusPreviousNavEntry",
       "shift-tab": "settings_editor::FocusPreviousNavEntry",
@@ -1033,7 +1014,6 @@
   },
   {
     "context": "GitBranchSelector || (GitBranchSelector > Picker > Editor)",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-shift-backspace": "branch_picker::DeleteBranch",
       "ctrl-alt-shift-backspace": "branch_picker::ForceDeleteBranch",
@@ -1062,7 +1042,6 @@
   },
   {
     "context": "WorktreePicker || (WorktreePicker > Picker > Editor)",
-    "use_key_equivalents": true,
     "bindings": {
       "ctrl-shift-backspace": "worktree_picker::DeleteWorktree",
       "ctrl-alt-shift-backspace": "worktree_picker::ForceDeleteWorktree",

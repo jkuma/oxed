@@ -300,11 +300,8 @@ impl KeystrokeInput {
             return;
         }
 
-        let keystroke = KeybindingKeystroke::new_with_mapper(
-            keystroke.clone(),
-            false,
-            cx.keyboard_mapper().as_ref(),
-        );
+        let keystroke =
+            KeybindingKeystroke::new_with_mapper(keystroke.clone(), cx.keyboard_mapper().as_ref());
         if let Some(last) = self.keystrokes.last()
             && last.key().is_empty()
             && (!self.search || self.previous_modifiers.modified())

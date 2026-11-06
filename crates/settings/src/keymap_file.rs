@@ -11,7 +11,6 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::borrow::Cow;
 use std::{any::TypeId, fmt::Write, rc::Rc, sync::Arc, sync::LazyLock};
-use util::ResultExt as _;
 use util::{
     asset_str,
     markdown::{MarkdownEscaped, MarkdownInlineCode, MarkdownString},
@@ -69,11 +68,10 @@ pub struct KeymapSection {
     /// documentation](https://zed.dev/docs/key-bindings#contexts) for more details.
     #[serde(default)]
     pub context: String,
-    /// This option enables specifying keys based on their position on a QWERTY keyboard, by using
-    /// position-equivalent mappings for some non-QWERTY keyboards. This is currently only supported
-    /// on macOS. See the documentation for more details.
-    #[serde(default)]
-    use_key_equivalents: bool,
+    /// Has no effect; accepted so keymaps written for other platforms still load.
+    #[serde(default, rename = "use_key_equivalents")]
+    #[schemars(skip)]
+    _use_key_equivalents: bool,
     /// This keymap section's unbindings, as a JSON object mapping keystrokes to actions. These are
     /// parsed before `bindings`, so bindings later in the same section can still take precedence.
     #[serde(default)]
@@ -273,7 +271,7 @@ impl KeymapFile {
 
         for KeymapSection {
             context,
-            use_key_equivalents,
+            _use_key_equivalents: _,
             unbind,
             bindings,
             unrecognized_fields,
@@ -309,13 +307,8 @@ impl KeymapFile {
 
             if let Some(unbind) = unbind {
                 for (keystrokes, action) in unbind {
-                    let result = Self::load_unbinding(
-                        keystrokes,
-                        action,
-                        context_predicate.clone(),
-                        *use_key_equivalents,
-                        cx,
-                    );
+                    let result =
+                        Self::load_unbinding(keystrokes, action, context_predicate.clone(), cx);
                     match result {
                         Ok(key_binding) => {
                             key_bindings.push(key_binding);
@@ -341,13 +334,8 @@ impl KeymapFile {
 
             if let Some(bindings) = bindings {
                 for (keystrokes, action) in bindings {
-                    let result = Self::load_keybinding(
-                        keystrokes,
-                        action,
-                        context_predicate.clone(),
-                        *use_key_equivalents,
-                        cx,
-                    );
+                    let result =
+                        Self::load_keybinding(keystrokes, action, context_predicate.clone(), cx);
                     match result {
                         Ok(key_binding) => {
                             key_bindings.push(key_binding);
@@ -405,17 +393,15 @@ impl KeymapFile {
         keystrokes: &str,
         action: &KeymapAction,
         context: Option<Rc<KeyBindingContextPredicate>>,
-        use_key_equivalents: bool,
         cx: &App,
     ) -> std::result::Result<KeyBinding, String> {
-        Self::load_keybinding_action_value(keystrokes, &action.0, context, use_key_equivalents, cx)
+        Self::load_keybinding_action_value(keystrokes, &action.0, context, cx)
     }
 
     fn load_keybinding_action_value(
         keystrokes: &str,
         action: &Value,
         context: Option<Rc<KeyBindingContextPredicate>>,
-        use_key_equivalents: bool,
         cx: &App,
     ) -> std::result::Result<KeyBinding, String> {
         let (action, action_input_string) = Self::build_keymap_action_value(action, cx)?;
@@ -424,7 +410,6 @@ impl KeymapFile {
             keystrokes,
             action,
             context,
-            use_key_equivalents,
             action_input_string.map(SharedString::from),
             cx.keyboard_mapper().as_ref(),
         ) {
@@ -452,16 +437,9 @@ impl KeymapFile {
         keystrokes: &str,
         action: &UnbindTargetAction,
         context: Option<Rc<KeyBindingContextPredicate>>,
-        use_key_equivalents: bool,
         cx: &App,
     ) -> std::result::Result<KeyBinding, String> {
-        let key_binding = Self::load_keybinding_action_value(
-            keystrokes,
-            &action.0,
-            context,
-            use_key_equivalents,
-            cx,
-        )?;
+        let key_binding = Self::load_keybinding_action_value(keystrokes, &action.0, context, cx)?;
 
         if key_binding.action().partial_eq(&NoAction) {
             return Err("expected action name string or [name, input] array.".to_string());
@@ -478,7 +456,6 @@ impl KeymapFile {
             keystrokes,
             Box::new(Unbind(key_binding.action().name().into())),
             key_binding.predicate(),
-            use_key_equivalents,
             key_binding.action_input(),
             cx.keyboard_mapper().as_ref(),
         )
@@ -911,7 +888,6 @@ impl KeymapFile {
                 }
                 operation = KeybindUpdateOperation::Add {
                     source: source.clone(),
-                    from: Some(target.clone()),
                 };
             }
             // if trying to remove a keybinding that is not user-defined, treat it as creating an
@@ -1049,10 +1025,7 @@ impl KeymapFile {
                         tab_size,
                     );
                     keymap_contents.replace_range(replace_range, &replace_value);
-                    operation = KeybindUpdateOperation::Add {
-                        source,
-                        from: Some(target),
-                    };
+                    operation = KeybindUpdateOperation::Add { source };
                 }
             } else {
                 log::warn!(
@@ -1062,32 +1035,15 @@ impl KeymapFile {
                     source.keystrokes,
                     source_action_value,
                 );
-                operation = KeybindUpdateOperation::Add {
-                    source,
-                    from: Some(target),
-                };
+                operation = KeybindUpdateOperation::Add { source };
             }
         }
 
-        if let KeybindUpdateOperation::Add {
-            source: keybinding,
-            from,
-        } = operation
-        {
+        if let KeybindUpdateOperation::Add { source: keybinding } = operation {
             let mut value = serde_json::Map::with_capacity(4);
             if let Some(context) = keybinding.context {
                 value.insert("context".to_string(), context.into());
             }
-            let use_key_equivalents = from.and_then(|from| {
-                let action_value = from.action_value().context("Failed to serialize action value. `use_key_equivalents` on new keybinding may be incorrect.").log_err()?;
-                let binding_location =
-                    find_binding(&keymap, &from, &action_value, keyboard_mapper, deprecated_aliases)?;
-                Some(keymap.0[binding_location.index].use_key_equivalents)
-            }).unwrap_or(false);
-            if use_key_equivalents {
-                value.insert("use_key_equivalents".to_string(), true.into());
-            }
-
             value.insert("bindings".to_string(), {
                 let mut bindings = serde_json::Map::new();
                 let action = keybinding.action_value()?;
@@ -1189,7 +1145,6 @@ impl KeymapFile {
                         let keystroke = Keystroke::parse(source)?;
                         Ok(KeybindingKeystroke::new_with_mapper(
                             keystroke,
-                            false,
                             keyboard_mapper,
                         ))
                     })
@@ -1298,7 +1253,6 @@ pub enum KeybindUpdateOperation<'a> {
     },
     Add {
         source: KeybindUpdateTarget<'a>,
-        from: Option<KeybindUpdateTarget<'a>>,
     },
     Remove {
         target: KeybindUpdateTarget<'a>,
@@ -1308,7 +1262,7 @@ pub enum KeybindUpdateOperation<'a> {
 
 impl<'a> KeybindUpdateOperation<'a> {
     pub fn add(source: KeybindUpdateTarget<'a>) -> Self {
-        Self::Add { source, from: None }
+        Self::Add { source }
     }
 }
 
@@ -1764,7 +1718,6 @@ mod tests {
             .map(|s| {
                 KeybindingKeystroke::new_with_mapper(
                     Keystroke::parse(s).expect("Keystrokes valid"),
-                    false,
                     &DummyKeyboardMapper,
                 )
             })
@@ -2501,12 +2454,6 @@ mod tests {
                     action_name: "foo::baz",
                     action_arguments: Some("true"),
                 },
-                from: Some(KeybindUpdateTarget {
-                    context: Some("SomeOtherContext"),
-                    keystrokes: &parse_keystrokes("b"),
-                    action_name: "foo::bar",
-                    action_arguments: None,
-                }),
             },
             r#"[
                 {
@@ -2518,7 +2465,6 @@ mod tests {
                 },
                 {
                     "context": "SomeContext",
-                    "use_key_equivalents": true,
                     "bindings": {
                         "a": [
                             "foo::baz",

@@ -37,7 +37,6 @@ impl KeyBinding {
             keystrokes,
             Box::new(action),
             context_predicate,
-            false,
             None,
             &DummyKeyboardMapper,
         )
@@ -49,7 +48,6 @@ impl KeyBinding {
         keystrokes: &str,
         action: Box<dyn Action>,
         context_predicate: Option<Rc<KeyBindingContextPredicate>>,
-        use_key_equivalents: bool,
         action_input: Option<SharedString>,
         keyboard_mapper: &dyn PlatformKeyboardMapper,
     ) -> std::result::Result<Self, InvalidKeystrokeError> {
@@ -59,7 +57,6 @@ impl KeyBinding {
                 let keystroke = Keystroke::parse(source)?;
                 Ok(KeybindingKeystroke::new_with_mapper(
                     keystroke,
-                    use_key_equivalents,
                     keyboard_mapper,
                 ))
             })

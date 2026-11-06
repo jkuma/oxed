@@ -37,7 +37,7 @@ pub(crate) fn map_pending_keystrokes(
     keystrokes
         .iter()
         .cloned()
-        .map(|keystroke| KeybindingKeystroke::new_with_mapper(keystroke, false, keyboard_mapper))
+        .map(|keystroke| KeybindingKeystroke::new_with_mapper(keystroke, keyboard_mapper))
         .collect()
 }
 
@@ -181,7 +181,6 @@ pub static FILTERED_KEYSTROKES: LazyLock<Vec<Vec<Keystroke>>> = LazyLock::new(||
 mod tests {
     use std::cell::Cell;
 
-    use collections::HashMap;
     use gpui::PlatformKeyboardMapper;
 
     use super::*;
@@ -191,19 +190,10 @@ mod tests {
     }
 
     impl PlatformKeyboardMapper for TestKeyboardMapper {
-        fn map_key_equivalent(
-            &self,
-            keystroke: Keystroke,
-            use_key_equivalents: bool,
-        ) -> KeybindingKeystroke {
-            assert!(!use_key_equivalents);
+        fn map_key_equivalent(&self, keystroke: Keystroke) -> KeybindingKeystroke {
             self.call_count.set(self.call_count.get() + 1);
 
             KeybindingKeystroke::from_keystroke(keystroke)
-        }
-
-        fn get_key_equivalents(&self) -> Option<&HashMap<char, char>> {
-            None
         }
     }
 
