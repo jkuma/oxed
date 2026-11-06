@@ -23,7 +23,7 @@ pub struct BufferStore {
     #[allow(clippy::type_complexity)]
     loading_buffers: HashMap<ProjectPath, Shared<Task<Result<Entity<Buffer>, Arc<anyhow::Error>>>>>,
     worktree_store: Entity<WorktreeStore>,
-    opened_buffers: HashMap<BufferId, OpenBuffer>,
+    opened_buffers: HashMap<BufferId, WeakEntity<Buffer>>,
     path_to_buffer_id: HashMap<ProjectPath, BufferId>,
     non_searchable_buffers: HashSet<BufferId>,
 }
@@ -32,10 +32,6 @@ struct LocalBufferStore {
     local_buffer_ids_by_entry_id: HashMap<ProjectEntryId, BufferId>,
     worktree_store: Entity<WorktreeStore>,
     _subscription: Subscription,
-}
-
-enum OpenBuffer {
-    Complete { buffer: WeakEntity<Buffer> },
 }
 
 pub enum BufferStoreEvent {
@@ -584,9 +580,7 @@ impl BufferStore {
             path: file.path.clone(),
             worktree_id: file.worktree_id(cx),
         });
-        let open_buffer = OpenBuffer::Complete {
-            buffer: buffer_entity.downgrade(),
-        };
+        let open_buffer = buffer_entity.downgrade();
 
         let handle = cx.entity().downgrade();
         buffer_entity.update(cx, move |_, cx| {
@@ -759,14 +753,6 @@ impl BufferStore {
             }
         }
         buffer
-    }
-}
-
-impl OpenBuffer {
-    fn upgrade(&self) -> Option<Entity<Buffer>> {
-        match self {
-            OpenBuffer::Complete { buffer, .. } => buffer.upgrade(),
-        }
     }
 }
 
