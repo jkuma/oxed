@@ -1,0 +1,31 @@
+// Loaded after jetbrains.json: the shortcuts JetBrains moves in its GNOME keymap, whose desktop
+// reserves Ctrl+Alt+arrows and Alt+F1–F12.
+[
+  {
+    "context": "Editor",
+    "bindings": {
+      "shift-alt-left": "pane::GoBack",
+      "shift-alt-right": "pane::GoForward",
+      "shift-alt-7": "editor::FindAllReferences",
+      "ctrl-alt-7": "editor::FindAllReferences",
+      "shift-alt-up": "search::SelectPreviousMatch",
+      "shift-alt-down": "search::SelectNextMatch",
+      "ctrl-shift-up": "editor::MoveLineUp",
+      "ctrl-shift-down": "editor::MoveLineDown",
+    },
+  },
+  {
+    "context": "Editor && mode == full",
+    "bindings": {
+      "shift-alt-1": "pane::RevealInProjectPanel",
+      "shift-alt-3": "buffer_search::Deploy",
+    },
+  },
+  {
+    "context": "Pane",
+    "bindings": {
+      "shift-alt-left": "pane::GoBack",
+      "shift-alt-right": "pane::GoForward",
+    },
+  },
+]

@@ -3676,8 +3676,8 @@ fn collect_contexts_from_assets() -> Vec<SharedString> {
     keymap_assets.extend(
         BaseKeymap::OPTIONS
             .iter()
-            .filter_map(|(_, base_keymap)| base_keymap.asset_path())
-            .map(util::asset_str::<SettingsAssets>),
+            .flat_map(|(_, base_keymap)| base_keymap.asset_paths())
+            .map(|path| util::asset_str::<SettingsAssets>(path)),
     );
 
     let mut contexts = HashSet::default();

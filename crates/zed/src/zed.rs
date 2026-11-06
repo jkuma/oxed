@@ -1594,7 +1594,7 @@ pub fn load_default_keymap(cx: &mut App) {
         KeymapFile::load_asset(DEFAULT_KEYMAP_PATH, Some(KeybindSource::Default), cx).unwrap(),
     );
 
-    if let Some(asset_path) = base_keymap.asset_path() {
+    for asset_path in base_keymap.asset_paths() {
         cx.bind_keys(KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap());
     }
 
@@ -4425,6 +4425,20 @@ mod tests {
             vec![("backspace", &ActionB), ("b", &ToggleLeftDock)],
             line!(),
         );
+    }
+
+    #[gpui::test]
+    fn test_base_keymap_assets_load(cx: &mut TestAppContext) {
+        init_test(cx);
+        cx.update(|cx| {
+            for (name, base_keymap) in BaseKeymap::OPTIONS {
+                for asset_path in base_keymap.asset_paths() {
+                    if let Err(error) = KeymapFile::load_asset(asset_path, None, cx) {
+                        panic!("{name} keymap {asset_path} failed to load: {error:#}");
+                    }
+                }
+            }
+        });
     }
 
     #[gpui::test]

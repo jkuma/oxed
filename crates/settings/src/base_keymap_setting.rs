@@ -16,6 +16,7 @@ pub enum BaseKeymap {
     Zed,
     VSCode,
     JetBrains,
+    JetBrainsGnome,
     SublimeText,
     Atom,
     TextMate,
@@ -30,6 +31,7 @@ impl From<BaseKeymapContent> for BaseKeymap {
             BaseKeymapContent::Zed => Self::Zed,
             BaseKeymapContent::VSCode => Self::VSCode,
             BaseKeymapContent::JetBrains => Self::JetBrains,
+            BaseKeymapContent::JetBrainsGnome => Self::JetBrainsGnome,
             BaseKeymapContent::SublimeText => Self::SublimeText,
             BaseKeymapContent::Atom => Self::Atom,
             BaseKeymapContent::TextMate => Self::TextMate,
@@ -45,6 +47,7 @@ impl Into<BaseKeymapContent> for BaseKeymap {
             BaseKeymap::Zed => BaseKeymapContent::Zed,
             BaseKeymap::VSCode => BaseKeymapContent::VSCode,
             BaseKeymap::JetBrains => BaseKeymapContent::JetBrains,
+            BaseKeymap::JetBrainsGnome => BaseKeymapContent::JetBrainsGnome,
             BaseKeymap::SublimeText => BaseKeymapContent::SublimeText,
             BaseKeymap::Atom => BaseKeymapContent::Atom,
             BaseKeymap::TextMate => BaseKeymapContent::TextMate,
@@ -61,6 +64,7 @@ impl Display for BaseKeymap {
             BaseKeymap::Zed => write!(f, "Zed"),
             BaseKeymap::VSCode => write!(f, "VS Code"),
             BaseKeymap::JetBrains => write!(f, "JetBrains"),
+            BaseKeymap::JetBrainsGnome => write!(f, "JetBrains (GNOME)"),
             BaseKeymap::SublimeText => write!(f, "Sublime Text"),
             BaseKeymap::Atom => write!(f, "Atom"),
             BaseKeymap::TextMate => write!(f, "TextMate"),
@@ -72,27 +76,33 @@ impl Display for BaseKeymap {
 }
 
 impl BaseKeymap {
-    pub const OPTIONS: [(&'static str, Self); 7] = [
+    pub const OPTIONS: [(&'static str, Self); 8] = [
         ("Zed (Default)", Self::Zed),
         ("VS Code", Self::VSCode),
         ("Atom", Self::Atom),
         ("JetBrains", Self::JetBrains),
+        ("JetBrains (GNOME)", Self::JetBrainsGnome),
         ("Sublime Text", Self::SublimeText),
         ("Emacs (beta)", Self::Emacs),
         ("Cursor", Self::Cursor),
     ];
 
-    pub fn asset_path(&self) -> Option<&'static str> {
+    /// The keymap assets to load, in order; later files take precedence.
+    pub fn asset_paths(&self) -> &'static [&'static str] {
         match self {
-            BaseKeymap::JetBrains => Some("keymaps/linux/jetbrains.json"),
-            BaseKeymap::SublimeText => Some("keymaps/linux/sublime_text.json"),
-            BaseKeymap::Atom => Some("keymaps/linux/atom.json"),
-            BaseKeymap::Emacs => Some("keymaps/linux/emacs.json"),
-            BaseKeymap::Cursor => Some("keymaps/linux/cursor.json"),
-            BaseKeymap::TextMate => None,
-            BaseKeymap::VSCode => Some("keymaps/linux/vscode.json"),
-            BaseKeymap::Zed => None,
-            BaseKeymap::None => None,
+            BaseKeymap::JetBrains => &["keymaps/linux/jetbrains.json"],
+            BaseKeymap::JetBrainsGnome => &[
+                "keymaps/linux/jetbrains.json",
+                "keymaps/linux/jetbrains_gnome.json",
+            ],
+            BaseKeymap::SublimeText => &["keymaps/linux/sublime_text.json"],
+            BaseKeymap::Atom => &["keymaps/linux/atom.json"],
+            BaseKeymap::Emacs => &["keymaps/linux/emacs.json"],
+            BaseKeymap::Cursor => &["keymaps/linux/cursor.json"],
+            BaseKeymap::TextMate => &[],
+            BaseKeymap::VSCode => &["keymaps/linux/vscode.json"],
+            BaseKeymap::Zed => &[],
+            BaseKeymap::None => &[],
         }
     }
 

@@ -4320,7 +4320,8 @@ mod tests {
             cx.bind_keys(default_bindings);
 
             let jetbrains_keymap_path = settings::BaseKeymap::JetBrains
-                .asset_path()
+                .asset_paths()
+                .first()
                 .expect("JetBrains base keymap should have an asset path");
             let mut jetbrains_bindings =
                 settings::KeymapFile::load_asset_allow_partial_failure(jetbrains_keymap_path, cx)

@@ -19,11 +19,12 @@
   // 2. "VSCode"
   // 3. "Atom"
   // 4. "JetBrains"
-  // 5. "SublimeText"
-  // 6. "TextMate"
-  // 7. "Emacs"
-  // 8. "Cursor"
-  // 9. "None"
+  // 5. "JetBrainsGnome"
+  // 6. "SublimeText"
+  // 7. "TextMate"
+  // 8. "Emacs"
+  // 9. "Cursor"
+  // 10. "None"
   "base_keymap": "Zed",
   // The name of a font to use for rendering text in the editor
   // ".ZedMono" currently aliases to Lilex
