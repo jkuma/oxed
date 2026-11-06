@@ -126,7 +126,14 @@ pub fn with_parser<F, R>(func: F) -> R
 where
     F: FnOnce(&mut Parser) -> R,
 {
-    let mut parser = PARSERS.lock().pop().unwrap_or_else(|| {
+    with_parser_in(&PARSERS, func)
+}
+
+fn with_parser_in<F, R>(pool: &Mutex<Vec<Parser>>, func: F) -> R
+where
+    F: FnOnce(&mut Parser) -> R,
+{
+    let mut parser = pool.lock().pop().unwrap_or_else(|| {
         let mut parser = Parser::new();
         parser
             .set_wasm_store(WasmStore::new(&WASM_ENGINE).unwrap())
@@ -141,7 +148,7 @@ where
     parser.reset();
     parser.set_included_ranges(&[]).unwrap();
     let result = func(&mut parser);
-    PARSERS.lock().push(parser);
+    pool.lock().push(parser);
     result
 }
 
@@ -1960,10 +1967,8 @@ mod tests {
 
         let rust_language: TsLanguage = tree_sitter_rust::LANGUAGE.into();
 
-        // Drain the shared pool so this test sees a deterministic LIFO order:
-        // the parser we push at the end of the first `with_parser` call is the
-        // one we pop at the start of the second call.
-        PARSERS.lock().clear();
+        // A private pool guarantees the second call reuses the parser the first one cancelled.
+        let pool = Mutex::new(Vec::new());
 
         // Large enough that tree-sitter invokes the progress callback before
         // the parse completes; otherwise the cancellation never fires.
@@ -1975,7 +1980,7 @@ mod tests {
         // and/or non-empty parse stack), and the next call to
         // `parse_with_options` will *resume* that parse unless the parser is
         // reset first.
-        let cancelled = with_parser(|parser| {
+        let cancelled = with_parser_in(&pool, |parser| {
             parser.set_language(&rust_language).unwrap();
             let bytes = large_input.as_bytes();
             let mut break_immediately = |_: &_| ControlFlow::Break(());
@@ -2003,7 +2008,7 @@ mod tests {
         // would mask the very bug we're checking for. Instead we rely on the
         // language being preserved across `parser.reset()` (it is) and verify
         // that `with_parser` itself produces a clean parser for the next user.
-        let tree = with_parser(|parser| {
+        let tree = with_parser_in(&pool, |parser| {
             let bytes = small_input.as_bytes();
             parser
                 .parse_with_options(
