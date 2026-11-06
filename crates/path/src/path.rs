@@ -8,15 +8,13 @@
 
 use std::os::unix::prelude::OsStrExt;
 use std::{
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
+    ffi::OsStr,
+    path::{Component, Path, PathBuf},
 };
 
-use crate::path_component::{Component, Components, Prefix, PrefixExt, iter_after};
 use crate::rel_path::{RelPath, StripPrefixError};
 
 pub mod abs_path;
-mod path_component;
 pub mod rel_path;
 
 pub fn try_from_bytes<'a, T>(bytes: &'a [u8]) -> anyhow::Result<T>
@@ -48,36 +46,28 @@ impl PathStyle {
 
     #[inline]
     pub fn primary_separator(&self) -> &'static str {
-        match self {
-            PathStyle::Unix => "/",
-        }
+        "/"
     }
 
     pub fn separators(&self) -> &'static [&'static str] {
-        match self {
-            PathStyle::Unix => &["/"],
-        }
+        &["/"]
     }
 
     pub fn separators_ch(&self) -> &'static [char] {
-        match self {
-            PathStyle::Unix => &['/'],
-        }
+        &['/']
     }
 
     pub fn is_absolute(&self, path: &Path) -> bool {
-        match self {
-            PathStyle::Unix => self.has_root(path),
-        }
+        path.is_absolute()
     }
 
     pub fn has_root(&self, path: &Path) -> bool {
-        self.components(path).has_root()
+        path.has_root()
     }
 
     pub fn join(self, left: impl AsRef<Path>, right: impl AsRef<Path>) -> Option<String> {
         let right = right.as_ref();
-        if self.has_root(right) {
+        if right.has_root() {
             return None;
         }
         let right = right.to_str()?;
@@ -87,11 +77,7 @@ impl PathStyle {
         } else {
             Some(format!(
                 "{left}{}{right}",
-                if left.ends_with(self.primary_separator()) {
-                    ""
-                } else {
-                    self.primary_separator()
-                }
+                if left.ends_with('/') { "" } else { "/" }
             ))
         }
     }
@@ -135,14 +121,14 @@ impl PathStyle {
     }
 
     pub fn normalize_separators(&self, path: impl AsRef<Path>) -> PathBuf {
-        self.collect_components(self.components(path.as_ref()))
+        path.as_ref().components().collect()
     }
 
     pub fn normalize_lexically(self, path: impl AsRef<Path>) -> PathBuf {
         let path = path.as_ref();
         let mut normalized: Vec<Component<'_>> = Vec::new();
 
-        for component in self.components(path) {
+        for component in path.components() {
             match component {
                 Component::CurDir => {}
                 Component::ParentDir => match normalized.last() {
@@ -162,34 +148,20 @@ impl PathStyle {
         if normalized.is_empty() && !path.as_os_str().is_empty() {
             PathBuf::from(".")
         } else {
-            self.collect_components(normalized)
+            normalized.into_iter().collect()
         }
     }
 
     pub fn file_name<'a>(&self, path: &'a Path) -> Option<&'a OsStr> {
-        self.components(path).next_back().and_then(|p| match p {
-            Component::Normal(p) => Some(p),
-            _ => None,
-        })
+        path.file_name()
     }
 
     pub fn parent<'a>(&self, path: &'a Path) -> Option<&'a Path> {
-        let mut comps = self.components(path);
-        let comp = comps.next_back();
-        comp.and_then(|p| match p {
-            Component::Normal(_) | Component::CurDir | Component::ParentDir => {
-                Some(comps.as_path())
-            }
-            _ => None,
-        })
+        path.parent()
     }
 
     pub fn starts_with(&self, path: impl AsRef<Path>, prefix: impl AsRef<Path>) -> bool {
-        iter_after(
-            self.components(path.as_ref()),
-            self.components(prefix.as_ref()),
-        )
-        .is_some()
+        path.as_ref().starts_with(prefix)
     }
 
     pub fn strip_prefix<'a>(
@@ -197,87 +169,9 @@ impl PathStyle {
         path: &'a (impl AsRef<Path> + ?Sized),
         prefix: impl AsRef<Path>,
     ) -> Result<&'a Path, StripPrefixError> {
-        iter_after(
-            self.components(path.as_ref()),
-            self.components(prefix.as_ref()),
-        )
-        .map(|c| c.as_path())
-        .ok_or(StripPrefixError)
-    }
-}
-
-// This part contains the methods adopted from the std lib
-// to make the pub api of `PathStyle` compatible with `Path`
-impl PathStyle {
-    fn components<'a>(&self, path: &'a Path) -> Components<'a> {
-        Components::new(*self, path)
-    }
-
-    fn parse_prefix<'a>(&self, _path: &'a OsStr) -> Option<Prefix<'a>> {
-        match self {
-            PathStyle::Unix => None,
-        }
-    }
-
-    fn has_prefixes(&self) -> bool {
-        match self {
-            PathStyle::Unix => false,
-        }
-    }
-
-    fn is_sep_byte(&self, b: u8) -> bool {
-        match self {
-            Self::Unix => b == b'/',
-        }
-    }
-
-    fn is_verbatim_sep(&self, b: u8) -> bool {
-        match self {
-            Self::Unix => self.is_sep_byte(b),
-        }
-    }
-
-    fn has_physical_root(&self, s: &[u8], prefix: Option<Prefix<'_>>) -> bool {
-        let path = if let Some(p) = prefix {
-            &s[p.len()..]
-        } else {
-            s
-        };
-        !path.is_empty() && self.is_sep_byte(path[0])
-    }
-
-    /// Collects `components` into a `PathBuf`, replacing std's
-    /// `impl<P: AsRef<Path>> FromIterator<P> for PathBuf` (which is implemented
-    /// in terms of `PathBuf::push`) with a [`PathStyle`]-aware version.
-    ///
-    /// Unlike std's implementation, this appends each component's raw `OsStr`
-    /// rather than pushing it as a standalone path. That distinction matters for
-    /// Windows verbatim paths: `\\?\C:\a/b` has a single `Normal("a/b")`
-    /// component, std lib is buggy here (rust-lang/rust#164467)
-    fn collect_components<'a>(
-        self,
-        components: impl IntoIterator<Item = Component<'a>>,
-    ) -> PathBuf {
-        let mut result = OsString::new();
-        let mut need_sep = false;
-
-        for component in components {
-            match component {
-                Component::Prefix(_) | Component::RootDir => {
-                    result.push(component.as_os_str(self));
-                    need_sep = false;
-                }
-                _ => {
-                    if need_sep {
-                        result.push(self.primary_separator());
-                    }
-                    result.push(component.as_os_str(self));
-                    need_sep = true;
-                }
-            }
-        }
-
-        PathBuf::from(result)
+        path.as_ref()
+            .strip_prefix(prefix)
+            .map_err(|_| StripPrefixError)
     }
 }
 
