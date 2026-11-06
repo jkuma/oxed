@@ -494,34 +494,6 @@ impl<D: PickerDelegate> Picker<D> {
         )
     }
 
-    /// A picker similar to [`list()`](Self::list) (variable-height rows) but with
-    /// a preview window. Use this instead of [`uniform_list_with_preview()`](Self::uniform_list_with_preview)
-    /// when [`PickerDelegate::render_match`] can return rows of different heights
-    /// (e.g. section headers and separators interleaved with matches).
-    pub fn list_with_preview(
-        delegate: D,
-        preview: Arc<dyn PreviewBackend>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Self {
-        let head = Head::editor(
-            delegate.placeholder_text(window, cx),
-            Self::on_input_editor_event,
-            window,
-            cx,
-        );
-
-        let preview = Preview::new(preview);
-        Self::new(
-            delegate,
-            ContainerKind::List,
-            head,
-            Some(preview),
-            window,
-            cx,
-        )
-    }
-
     pub fn list_with_preview_and_query_editor(
         delegate: D,
         preview: Arc<dyn PreviewBackend>,

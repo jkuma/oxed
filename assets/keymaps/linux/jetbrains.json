@@ -37,7 +37,7 @@
       "shift-f6": "editor::Rename",
       "ctrl-alt-left": "pane::GoBack",
       "ctrl-alt-right": "pane::GoForward",
-      "alt-f7": "editor::FindAllReferences",
+      "alt-f7": ["editor::FindAllReferences", { "open_results_in": "multi_buffer" }],
       "ctrl-alt-f7": "editor::FindAllReferences",
       "ctrl-b": "editor::GoToDefinition", // Conflicts with workspace::ToggleLeftDock
       "ctrl-alt-b": "editor::GoToImplementation", // Conflicts with workspace::ToggleRightDock

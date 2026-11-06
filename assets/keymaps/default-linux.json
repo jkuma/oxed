@@ -332,7 +332,7 @@
       "ctrl-f12": "editor::GoToTypeDefinition",
       "shift-f12": "editor::GoToImplementation",
       "alt-ctrl-f12": "editor::GoToTypeDefinitionSplit",
-      "alt-shift-f12": "editor::FindAllReferences",
+      "alt-shift-f12": ["editor::FindAllReferences", { "open_results_in": "multi_buffer" }],
       "ctrl-k ctrl-h": "call_hierarchy::ShowIncomingCalls",
       "ctrl-m": "editor::MoveToEnclosingBracket", // from jetbrains
       "ctrl-|": "editor::MoveToEnclosingBracket",

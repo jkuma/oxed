@@ -6,7 +6,7 @@
     "bindings": {
       "shift-alt-left": "pane::GoBack",
       "shift-alt-right": "pane::GoForward",
-      "shift-alt-7": "editor::FindAllReferences",
+      "shift-alt-7": ["editor::FindAllReferences", { "open_results_in": "multi_buffer" }],
       "ctrl-alt-7": "editor::FindAllReferences",
       "shift-alt-up": "search::SelectPreviousMatch",
       "shift-alt-down": "search::SelectNextMatch",

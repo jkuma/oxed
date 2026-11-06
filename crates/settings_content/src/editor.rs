@@ -198,7 +198,7 @@ pub struct EditorSettingsContent {
     /// result always opens directly. Individual actions can override this with
     /// their `open_results_in` argument.
     ///
-    /// Default: multi_buffer
+    /// Default: picker
     pub lsp_results_location: Option<OpenResultsIn>,
 
     /// How to scroll the target into view when navigating to a definition or reference
@@ -888,9 +888,9 @@ pub enum GoToDefinitionFallback {
 #[serde(rename_all = "snake_case")]
 pub enum OpenResultsIn {
     /// Open the results in a multibuffer.
-    #[default]
     MultiBuffer,
-    /// Open the results in a filterable picker.
+    /// Open the results in a filterable popup at the cursor.
+    #[default]
     Picker,
 }
 

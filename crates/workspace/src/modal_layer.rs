@@ -1,6 +1,6 @@
 use gpui::{
-    AnyView, App, DismissEvent, Entity, EventEmitter, FocusHandle, Global, ManagedView,
-    MouseButton, Subscription, WeakFocusHandle,
+    AnyView, App, Bounds, DismissEvent, Entity, EventEmitter, FocusHandle, Global, ManagedView,
+    MouseButton, Pixels, Subscription, WeakFocusHandle, anchored, point,
 };
 use ui::prelude::*;
 
@@ -62,6 +62,11 @@ pub trait ModalView: ManagedView {
     fn render_bare(&self) -> bool {
         false
     }
+
+    /// The text line, in window coordinates, the modal opens below instead of being centered.
+    fn anchor(&self) -> Option<Bounds<Pixels>> {
+        None
+    }
 }
 
 trait ModalViewHandle {
@@ -71,6 +76,7 @@ trait ModalViewHandle {
     fn subscribe_dismiss(&self, window: &mut Window, cx: &mut Context<ModalLayer>) -> Subscription;
     fn fade_out_background(&self, cx: &mut App) -> bool;
     fn render_bare(&self, cx: &mut App) -> bool;
+    fn anchor(&self, cx: &App) -> Option<Bounds<Pixels>>;
 }
 
 impl<V: ModalView> ModalViewHandle for Entity<V> {
@@ -98,6 +104,10 @@ impl<V: ModalView> ModalViewHandle for Entity<V> {
 
     fn render_bare(&self, cx: &mut App) -> bool {
         self.read(cx).render_bare()
+    }
+
+    fn anchor(&self, cx: &App) -> Option<Bounds<Pixels>> {
+        self.read(cx).anchor()
     }
 }
 
@@ -311,21 +321,32 @@ impl Render for ModalLayer {
                     this.hide_modal(window, cx);
                 }),
             )
-            .child(
-                v_flex()
-                    .h(px(0.0))
-                    .top_20()
-                    .items_center()
-                    .track_focus(&active_modal.focus_handle)
-                    .child(
-                        h_flex()
-                            .occlude()
-                            .child(active_modal.modal.view())
-                            .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                                cx.stop_propagation();
-                            }),
-                    ),
-            )
+            .child({
+                let modal = h_flex()
+                    .occlude()
+                    .child(active_modal.modal.view())
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                        cx.stop_propagation();
+                    });
+                match active_modal.modal.anchor(cx) {
+                    Some(line) => div()
+                        .track_focus(&active_modal.focus_handle)
+                        .child(
+                            anchored()
+                                .position(line.origin)
+                                .offset(point(px(0.), line.size.height))
+                                .child(modal),
+                        )
+                        .into_any_element(),
+                    None => v_flex()
+                        .h(px(0.0))
+                        .top_20()
+                        .items_center()
+                        .track_focus(&active_modal.focus_handle)
+                        .child(modal)
+                        .into_any_element(),
+                }
+            })
             .into_any_element()
     }
 }

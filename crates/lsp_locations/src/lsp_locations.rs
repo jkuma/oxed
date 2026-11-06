@@ -8,23 +8,21 @@ use editor::actions::{
 };
 use editor::hover_links::{HoverLink, OpenDefinitionLocations};
 use editor::{Editor, EditorSettings, GotoDefinitionKind, OpenResultsIn};
-use file_icons::FileIcons;
 use fuzzy::StringMatchCandidate;
 use gpui::{
-    AnyElement, App, AppContext, AsyncWindowContext, Context, DismissEvent, DispatchPhase, Entity,
-    EventEmitter, FocusHandle, Focusable, HighlightStyle, StyledText, Subscription, Task,
-    TextStyle, WeakEntity, prelude::*,
+    AnyElement, App, AppContext, AsyncWindowContext, Bounds, Context, DismissEvent, DispatchPhase,
+    Entity, EventEmitter, FocusHandle, Focusable, HighlightStyle, Pixels, StyledText, Subscription,
+    Task, TextStyle, WeakEntity, point, prelude::*, size,
 };
-use language::{Buffer, HighlightId, LanguageAwareStyling};
+use language::{Buffer, CharKind, HighlightId, LanguageAwareStyling};
 use picker::{Picker, PickerDelegate};
 use project::{Location, LocationLink, Project, ProjectPath};
 use settings::{GoToDefinitionFallback, Settings as _};
 use text::{Anchor, Point};
 use theme_settings::ThemeSettings;
-use ui::{Divider, FluentBuilder};
 use ui::{ListItem, ListItemSpacing, prelude::*};
 use util::ResultExt as _;
-use workspace::item::ItemSettings;
+use workspace::item::Item as _;
 use workspace::notifications::NotificationId;
 use workspace::pane::NavigationEntry;
 use workspace::{ModalView, Toast, Workspace};
@@ -191,20 +189,44 @@ fn handle_definition_locations(
         GotoDefinitionKind::Declaration => LspPickerKind::Declaration,
         GotoDefinitionKind::Implementation => LspPickerKind::Implementation,
     };
+    let anchor = cursor_line(&editor, window, cx);
+    let symbol = word_at(&editor, action.position, cx);
     workspace.update(cx, |workspace, cx| {
-        let project = workspace.project().clone();
         workspace.toggle_modal(window, cx, |window, cx| {
             LspLocationsPicker::new(
                 kind,
                 matches,
-                project,
+                symbol,
                 action.editor.clone(),
                 action.origin.clone(),
+                anchor,
                 window,
                 cx,
             )
         });
     });
+}
+
+/// The cursor line in window coordinates, which the popup opens below.
+fn cursor_line(editor: &Entity<Editor>, window: &Window, cx: &mut App) -> Option<Bounds<Pixels>> {
+    let center = editor.read(cx).pixel_position_of_cursor(cx)?;
+    let line_height = editor.update(cx, |editor, cx| {
+        editor
+            .style(cx)
+            .text
+            .line_height_in_pixels(window.rem_size())
+    });
+    Some(Bounds::new(
+        point(center.x, center.y - line_height / 2.),
+        size(px(0.), line_height),
+    ))
+}
+
+/// The word at `position`, which names the symbol in the popup title.
+fn word_at(editor: &Entity<Editor>, position: editor::Anchor, cx: &App) -> Option<String> {
+    let snapshot = editor.read(cx).buffer().read(cx).snapshot(cx);
+    let (range, kind) = snapshot.surrounding_word(position, None);
+    (kind == Some(CharKind::Word)).then(|| snapshot.text_for_range(range).collect())
 }
 
 /// Runs the LSP query for `kind` and returns the raw locations. Returns `None`
@@ -278,13 +300,18 @@ pub enum LspPickerKind {
 }
 
 impl LspPickerKind {
-    fn placeholder(self) -> &'static str {
-        match self {
-            LspPickerKind::References => "Filter references…",
-            LspPickerKind::Definition => "Filter definitions…",
-            LspPickerKind::Declaration => "Filter declarations…",
-            LspPickerKind::Implementation => "Filter implementations…",
-            LspPickerKind::TypeDefinition => "Filter type definitions…",
+    /// The popup title, e.g. "Implementations of Foo (3)".
+    fn title(self, symbol: Option<&str>, count: usize) -> String {
+        let label = match self {
+            LspPickerKind::References => "Usages",
+            LspPickerKind::Definition => "Definitions",
+            LspPickerKind::Declaration => "Declarations",
+            LspPickerKind::Implementation => "Implementations",
+            LspPickerKind::TypeDefinition => "Type definitions",
+        };
+        match symbol {
+            Some(symbol) => format!("{label} of {symbol} ({count})"),
+            None => format!("{label} ({count})"),
         }
     }
 
@@ -328,6 +355,7 @@ impl LspPickerKind {
 
 pub struct LspLocationsPicker {
     picker: Entity<Picker<LspLocationsDelegate>>,
+    anchor: Option<Bounds<Pixels>>,
     _subscription: Subscription,
 }
 
@@ -362,6 +390,9 @@ impl LspLocationsPicker {
     ) {
         let project = workspace.project().clone();
         let fallback = EditorSettings::get_global(cx).go_to_definition_fallback;
+        let anchor = cursor_line(&editor, window, cx);
+        let cursor = editor.read(cx).selections.newest_anchor().head();
+        let symbol = word_at(&editor, cursor, cx);
         let editor = editor.downgrade();
         cx.spawn_in(window, async move |workspace, cx| {
             // The kind the user invoked, kept for user-facing messages even if
@@ -415,7 +446,7 @@ impl LspLocationsPicker {
             workspace
                 .update_in(cx, |workspace, window, cx| {
                     workspace.toggle_modal(window, cx, |window, cx| {
-                        Self::new(kind, matches, project, editor, None, window, cx)
+                        Self::new(kind, matches, symbol, editor, None, anchor, window, cx)
                     });
                 })
                 .log_err();
@@ -426,26 +457,31 @@ impl LspLocationsPicker {
     fn new(
         kind: LspPickerKind,
         matches: Vec<LocationMatch>,
-        project: Entity<Project>,
+        symbol: Option<String>,
         editor: WeakEntity<Editor>,
         origin: Option<NavigationEntry>,
+        anchor: Option<Bounds<Pixels>>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let preview = picker_preview::editor_preview(project, window, cx);
-        let delegate = LspLocationsDelegate::new(kind, matches, editor, origin);
-        let picker = cx.new(|cx| Picker::list_with_preview(delegate, preview, window, cx));
+        let delegate = LspLocationsDelegate::new(kind, matches, symbol, editor, origin);
+        let picker = cx.new(|cx| Picker::uniform_list(delegate, window, cx).popover());
         let subscription = cx.subscribe(&picker, |_, _, _: &DismissEvent, cx| {
             cx.emit(DismissEvent);
         });
         Self {
             picker,
+            anchor,
             _subscription: subscription,
         }
     }
 }
 
-impl ModalView for LspLocationsPicker {}
+impl ModalView for LspLocationsPicker {
+    fn anchor(&self) -> Option<Bounds<Pixels>> {
+        self.anchor
+    }
+}
 
 impl EventEmitter<DismissEvent> for LspLocationsPicker {}
 
@@ -472,30 +508,21 @@ struct LocationMatch {
     line_number: u32,
 }
 
-/// A row in the grouped display list: a non-selectable file header, a match, or
-/// a separator between file groups. `selected_index` indexes into this list.
-enum Entry {
-    Header(ProjectPath),
-    Match(usize),
-    Separator,
-}
-
 struct LspLocationsDelegate {
-    kind: LspPickerKind,
+    title: Arc<str>,
     editor: WeakEntity<Editor>,
     origin: Option<NavigationEntry>,
     all_matches: Vec<LocationMatch>,
     candidates: Arc<[StringMatchCandidate]>,
     matches: Vec<usize>,
-    entries: Vec<Entry>,
     selected_index: usize,
-    max_line_number: u32,
 }
 
 impl LspLocationsDelegate {
     fn new(
         kind: LspPickerKind,
         all_matches: Vec<LocationMatch>,
+        symbol: Option<String>,
         editor: WeakEntity<Editor>,
         origin: Option<NavigationEntry>,
     ) -> Self {
@@ -516,56 +543,20 @@ impl LspLocationsDelegate {
             })
             .collect();
         let matches = (0..all_matches.len()).collect();
-        let mut this = Self {
-            kind,
+        Self {
+            title: kind.title(symbol.as_deref(), all_matches.len()).into(),
             editor,
             origin,
             all_matches,
             candidates,
             matches,
-            entries: Vec::new(),
             selected_index: 0,
-            max_line_number: 0,
-        };
-        this.rebuild_entries();
-        this
-    }
-
-    /// Rebuilds the grouped [`Self::entries`] from the filtered [`Self::matches`]:
-    /// one header per file, its matches, and a separator before every group
-    /// after the first. Selection snaps to the first selectable row.
-    fn rebuild_entries(&mut self) {
-        let mut entries = Vec::with_capacity(self.matches.len());
-        let mut last_path: Option<&ProjectPath> = None;
-        let mut max_line_number = 0;
-        for &match_index in &self.matches {
-            let location_match = &self.all_matches[match_index];
-            if last_path != Some(&location_match.path) {
-                if last_path.is_some() {
-                    entries.push(Entry::Separator);
-                }
-                entries.push(Entry::Header(location_match.path.clone()));
-                last_path = Some(&location_match.path);
-            }
-            max_line_number = max_line_number.max(location_match.line_number);
-            entries.push(Entry::Match(match_index));
         }
-        self.entries = entries;
-        self.max_line_number = max_line_number;
-        self.selected_index = self.first_selectable_index().unwrap_or(0);
-    }
-
-    fn first_selectable_index(&self) -> Option<usize> {
-        self.entries
-            .iter()
-            .position(|entry| matches!(entry, Entry::Match(_)))
     }
 
     fn selected_location_match(&self) -> Option<&LocationMatch> {
-        match self.entries.get(self.selected_index)? {
-            Entry::Match(match_index) => self.all_matches.get(*match_index),
-            Entry::Header(_) | Entry::Separator => None,
-        }
+        self.all_matches
+            .get(*self.matches.get(self.selected_index)?)
     }
 
     fn open_selected(&mut self, split: bool, window: &mut Window, cx: &mut Context<Picker<Self>>) {
@@ -685,16 +676,12 @@ impl PickerDelegate for LspLocationsDelegate {
         "lsp locations picker"
     }
 
-    fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> std::sync::Arc<str> {
-        self.kind.placeholder().into()
+    fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
+        self.title.clone()
     }
 
     fn match_count(&self) -> usize {
-        self.entries.len()
-    }
-
-    fn can_select(&self, ix: usize, _window: &mut Window, _cx: &mut Context<Picker<Self>>) -> bool {
-        matches!(self.entries.get(ix), Some(Entry::Match(_)))
+        self.matches.len()
     }
 
     fn selected_index(&self) -> usize {
@@ -740,14 +727,14 @@ impl PickerDelegate for LspLocationsDelegate {
                     .into_iter()
                     .map(|string_match| string_match.candidate_id)
                     .collect::<Vec<_>>();
-                // Restore the file-grouped, positional order (fuzzy returns by score).
+                // Keep the file and position order; fuzzy matching returns by score.
                 indices.sort_unstable();
                 indices
             };
             picker
                 .update(cx, |picker, cx| {
                     picker.delegate.matches = matches;
-                    picker.delegate.rebuild_entries();
+                    picker.delegate.selected_index = 0;
                     cx.notify();
                 })
                 .ok();
@@ -762,17 +749,6 @@ impl PickerDelegate for LspLocationsDelegate {
         cx.emit(DismissEvent);
     }
 
-    fn try_get_preview_data_for_match(&self, _cx: &App) -> Option<picker::PreviewUpdate> {
-        let location_match = self.selected_location_match()?;
-        Some(picker::PreviewUpdate::from_buffer(
-            location_match.buffer.clone(),
-            picker::MatchLocation {
-                anchor_range: location_match.anchor_range.clone(),
-                range: location_match.range.clone(),
-            },
-        ))
-    }
-
     fn render_match(
         &self,
         ix: usize,
@@ -780,96 +756,37 @@ impl PickerDelegate for LspLocationsDelegate {
         _window: &mut Window,
         cx: &mut Context<Picker<Self>>,
     ) -> Option<Self::ListItem> {
-        match self.entries.get(ix)? {
-            Entry::Separator => Some(
-                div()
-                    .py(DynamicSpacing::Base04.rems(cx))
-                    .child(Divider::horizontal())
-                    .into_any_element(),
-            ),
-            Entry::Header(path) => {
-                let file_name = path
-                    .path
-                    .file_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
-                let directory = path
-                    .path
-                    .parent()
-                    .map(|parent| parent.display())
-                    .map(SharedString::new)
-                    .unwrap_or_default();
-                let file_icon = ItemSettings::get_global(cx)
-                    .file_icons
-                    .then(|| FileIcons::get_icon(path.path.as_std_path(), cx))
-                    .flatten()
-                    .map(|icon| {
-                        Icon::from_path(icon)
-                            .color(Color::Muted)
-                            .size(IconSize::Small)
-                    });
-                Some(
+        let location_match = self.all_matches.get(*self.matches.get(ix)?)?;
+        let file_name = location_match.path.path.file_name().unwrap_or_default();
+        Some(
+            ListItem::new(ix)
+                .spacing(ListItemSpacing::Sparse)
+                .inset(true)
+                .toggle_state(selected)
+                .child(
                     h_flex()
                         .w_full()
                         .min_w_0()
-                        .px(DynamicSpacing::Base06.rems(cx))
-                        .py_1()
-                        .gap_1p5()
-                        .children(file_icon)
+                        .gap_2()
+                        .text_sm()
                         .child(
-                            h_flex()
-                                .gap_1()
-                                .child(Label::new(file_name).size(LabelSize::Small))
-                                .when(!directory.is_empty(), |this| {
-                                    this.child(
-                                        Label::new(directory)
-                                            .size(LabelSize::Small)
-                                            .color(Color::Muted)
-                                            .truncate_start(),
-                                    )
-                                }),
-                        )
-                        .into_any_element(),
-                )
-            }
-            Entry::Match(match_index) => {
-                let location_match = self.all_matches.get(*match_index)?;
-                Some(
-                    ListItem::new(ix)
-                        .spacing(ListItemSpacing::Sparse)
-                        .inset(true)
-                        .toggle_state(selected)
-                        .child(
-                            h_flex()
-                                .w_full()
+                            div()
+                                .flex_1()
                                 .min_w_0()
-                                .gap_2p5()
-                                .text_sm()
-                                .child(
-                                    h_flex()
-                                        .w(rems(
-                                            (self.max_line_number.max(1).ilog10() + 1) as f32 * 0.5,
-                                        ))
-                                        .justify_end()
-                                        .child(
-                                            Label::new(location_match.line_number.to_string())
-                                                .color(Color::Custom(
-                                                    cx.theme().colors().text_muted.opacity(0.5),
-                                                )),
-                                        ),
-                                )
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .truncate()
-                                        .child(render_matched_line(location_match, cx)),
-                                ),
+                                .truncate()
+                                .child(render_matched_line(location_match, cx)),
                         )
-                        .into_any_element(),
+                        .child(
+                            div().flex_none().max_w(relative(0.5)).child(
+                                Label::new(format!("{file_name}:{}", location_match.line_number))
+                                    .size(LabelSize::Small)
+                                    .color(Color::Muted)
+                                    .truncate_start(),
+                            ),
+                        ),
                 )
-            }
-        }
+                .into_any_element(),
+        )
     }
 }
 
@@ -917,7 +834,6 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::{sync::Mutex, time::Duration};
     use text::OffsetRangeExt as _;
-    use workspace::Item as _;
 
     async fn rust_cx(
         capabilities: lsp::ServerCapabilities,
@@ -1244,7 +1160,7 @@ mod tests {
         let modal = active_picker(&mut cx).expect("reopened locations picker");
         cx.update(|window, cx| {
             modal.read(cx).picker.clone().update(cx, |picker, cx| {
-                picker.set_selected_index(2, None, true, window, cx);
+                picker.set_selected_index(1, None, true, window, cx);
                 picker.delegate.confirm(false, window, cx);
             });
         });
@@ -1482,11 +1398,15 @@ mod tests {
             let actual_ranges = if results == OpenResultsIn::Picker && !split {
                 let picker = picker.expect("locations picker");
                 let delegate = &picker.read(cx).picker.read(cx).delegate;
-                let kind = match shift {
-                    true => LspPickerKind::TypeDefinition,
-                    false => LspPickerKind::Definition,
+                let title_prefix = match shift {
+                    true => "Type definitions",
+                    false => "Definitions",
                 };
-                assert_eq!(delegate.kind, kind);
+                assert!(
+                    delegate.title.starts_with(title_prefix),
+                    "unexpected title {:?}",
+                    delegate.title
+                );
                 assert_eq!(workspace.items(cx).count(), 1);
                 delegate
                     .all_matches
@@ -1570,5 +1490,101 @@ mod tests {
         cx.simulate_click(position, Modifiers::secondary_key());
         cx.simulate_modifiers_change(Modifiers::none());
         (cx, requests)
+    }
+
+    async fn references_cx(cx: &mut TestAppContext) -> EditorLspTestContext {
+        cx.update(crate::init);
+        let mut cx = rust_cx(
+            lsp::ServerCapabilities {
+                references_provider: Some(lsp::OneOf::Left(true)),
+                ..Default::default()
+            },
+            cx,
+        )
+        .await;
+        cx.set_state(SOURCE);
+        cx.lsp
+            .set_request_handler::<lsp::request::References, _, _>(async move |params, _| {
+                let uri = params.text_document_position.text_document.uri;
+                Ok(Some(references(uri, &[(1, 8, 11), (2, 14, 17)])))
+            });
+        cx
+    }
+
+    #[gpui::test]
+    async fn test_popup_is_the_default(cx: &mut TestAppContext) {
+        let mut cx = references_cx(cx).await;
+        cx.update(|_window, cx| {
+            assert_eq!(
+                EditorSettings::get_global(cx).lsp_results_location,
+                OpenResultsIn::Picker
+            );
+        });
+
+        cx.dispatch_action(FindAllReferences::default());
+        cx.run_until_parked();
+
+        assert!(
+            active_picker(&mut cx).is_some(),
+            "references should open the popup by default"
+        );
+    }
+
+    #[gpui::test]
+    async fn test_multi_buffer_argument_opens_results_tab(cx: &mut TestAppContext) {
+        let mut cx = references_cx(cx).await;
+
+        cx.dispatch_action(FindAllReferences {
+            open_results_in: Some(OpenResultsIn::MultiBuffer),
+            ..FindAllReferences::default()
+        });
+        cx.run_until_parked();
+
+        assert!(active_picker(&mut cx).is_none());
+        let workspace = cx.workspace.clone();
+        cx.update(|_window, cx| {
+            let active_editor = workspace
+                .read(cx)
+                .active_item_as::<Editor>(cx)
+                .expect("an active editor");
+            assert!(
+                !active_editor.read(cx).buffer().read(cx).is_singleton(),
+                "the references should open in a multibuffer tab"
+            );
+        });
+    }
+
+    #[gpui::test]
+    async fn test_popup_is_anchored_at_the_cursor_line(cx: &mut TestAppContext) {
+        let mut cx = references_cx(cx).await;
+        let editor = cx.editor.clone();
+
+        open(&mut cx, LspPickerKind::References);
+
+        let picker = active_picker(&mut cx).expect("references popup");
+        cx.update(|_window, cx| {
+            let cursor = editor
+                .read(cx)
+                .pixel_position_of_cursor(cx)
+                .expect("painted cursor");
+            let line = picker.read(cx).anchor.expect("anchored popup");
+            assert_eq!(line.origin.x, cursor.x);
+            assert_eq!(line.origin.y + line.size.height / 2., cursor.y);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_title_names_the_symbol_and_the_count(cx: &mut TestAppContext) {
+        let mut cx = references_cx(cx).await;
+
+        open(&mut cx, LspPickerKind::References);
+
+        let picker = active_picker(&mut cx).expect("references popup");
+        cx.update(|_window, cx| {
+            assert_eq!(
+                picker.read(cx).picker.read(cx).delegate.title.as_ref(),
+                "Usages of abc (2)"
+            );
+        });
     }
 }
