@@ -71,7 +71,6 @@ use std::{
 };
 use sum_tree::{Edit, SumTree, TreeMap};
 use text::{Bias, BufferId, OffsetRangeExt, Rope, ToOffset};
-use util::shell::Shell;
 use util::{
     ResultExt, debug_panic,
     paths::{PathStyle, SanitizedPath, normalize_path},
@@ -613,7 +612,7 @@ impl LocalRepositoryState {
     ) -> anyhow::Result<Self> {
         let environment = project_environment
                 .update(cx, |project_environment, cx| {
-                    project_environment.local_directory_environment(&Shell::System, work_directory_abs_path.clone(), cx)
+                    project_environment.local_directory_environment(work_directory_abs_path.clone(), cx)
                 })?
                 .await
                 .unwrap_or_else(|| {

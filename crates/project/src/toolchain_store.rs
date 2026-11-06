@@ -14,7 +14,6 @@ use language::{
 };
 use settings::WorktreeId;
 use util::rel_path::RelPath;
-use util::shell::Shell;
 
 use crate::{
     ProjectEnvironment, ProjectPath,
@@ -305,11 +304,7 @@ impl LocalToolchainStore {
 
             let project_env = environment
                 .update(cx, |environment, cx| {
-                    environment.local_directory_environment(
-                        &Shell::System,
-                        abs_path.as_path().into(),
-                        cx,
-                    )
+                    environment.local_directory_environment(abs_path.as_path().into(), cx)
                 })
                 .await;
 
@@ -361,11 +356,7 @@ impl LocalToolchainStore {
 
             let project_env = environment
                 .update(cx, |environment, cx| {
-                    environment.local_directory_environment(
-                        &Shell::System,
-                        path.as_path().into(),
-                        cx,
-                    )
+                    environment.local_directory_environment(path.as_path().into(), cx)
                 })
                 .await;
             cx.background_spawn(async move { toolchain_lister.resolve(path, project_env).await })

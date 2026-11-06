@@ -29,10 +29,9 @@ pub fn print_env() {
 /// Capture all environment variables from the login shell in the given directory.
 pub async fn capture(
     shell_path: impl AsRef<Path>,
-    args: &[String],
     directory: impl AsRef<Path>,
 ) -> Result<collections::HashMap<String, String>> {
-    return capture_unix(shell_path.as_ref(), args, directory.as_ref()).await;
+    capture_unix(shell_path.as_ref(), directory.as_ref()).await
 }
 
 /// Try to parse the environment output before checking the exit status.
@@ -70,19 +69,17 @@ fn parse_env_output(
 
 async fn capture_unix(
     shell_path: &Path,
-    args: &[String],
     directory: &Path,
 ) -> Result<collections::HashMap<String, String>> {
     use std::os::unix::process::CommandExt;
 
     use crate::command::new_std_command;
 
-    let shell_kind = ShellKind::new(shell_path, false);
+    let shell_kind = ShellKind::new(shell_path);
     let quoted_zed_path = super::get_shell_safe_zed_path(shell_kind)?;
 
     let mut command_string = String::new();
     let mut command = new_std_command(shell_path);
-    command.args(args);
     let (fd_num, redir) = capture_output_redirection(shell_kind);
 
     match shell_kind {
@@ -172,7 +169,7 @@ fn capture_output_redirection(shell_kind: ShellKind) -> (std::os::fd::RawFd, Str
         // xonsh doesn't support redirecting to stdin, and control sequences are printed to
         // stdout on startup
         ShellKind::Xonsh => (FD_STDERR, "o>e".to_string()),
-        ShellKind::PowerShell | ShellKind::Pwsh => (FD_STDIN, format!("> /dev/fd/{FD_STDIN}")),
+        ShellKind::Pwsh => (FD_STDIN, format!("> /dev/fd/{FD_STDIN}")),
         _ => (FD_STDIN, format!(">&{FD_STDIN}")), // `>&0`
     }
 }
@@ -217,26 +214,23 @@ mod tests {
 
     #[test]
     fn capture_powershell_environment_without_startup_output() -> Result<()> {
-        for shell in ["pwsh", "powershell"] {
-            let (descriptor, redirection) =
-                capture_output_redirection(ShellKind::new(shell, false));
-            if let Ok(shell_path) = which::which(shell) {
-                let directory = tempfile::tempdir()?;
-                let script =
-                    format!("Write-Output '{{}}'; /bin/echo '{{\"PROBE\":\"ok\"}}' {redirection}");
-                let mut command = crate::command::new_std_command(shell_path);
-                command
-                    .args(["-NoProfile", "-l", "-i", "-c", &script])
-                    .current_dir(directory.path());
-                let (output, process_output) =
-                    smol::block_on(spawn_and_read_fd(command, descriptor))?;
-                assert!(process_output.status.success(), "{process_output:?}");
-                assert_eq!(output, b"{\"PROBE\":\"ok\"}\n");
-                assert_eq!(process_output.stdout, b"{}\n");
-                assert!(!directory.path().join("0").exists());
-            }
-            assert_eq!((descriptor, redirection), (0, String::from("> /dev/fd/0")));
+        let shell = "pwsh";
+        let (descriptor, redirection) = capture_output_redirection(ShellKind::new(shell));
+        if let Ok(shell_path) = which::which(shell) {
+            let directory = tempfile::tempdir()?;
+            let script =
+                format!("Write-Output '{{}}'; /bin/echo '{{\"PROBE\":\"ok\"}}' {redirection}");
+            let mut command = crate::command::new_std_command(shell_path);
+            command
+                .args(["-NoProfile", "-l", "-i", "-c", &script])
+                .current_dir(directory.path());
+            let (output, process_output) = smol::block_on(spawn_and_read_fd(command, descriptor))?;
+            assert!(process_output.status.success(), "{process_output:?}");
+            assert_eq!(output, b"{\"PROBE\":\"ok\"}\n");
+            assert_eq!(process_output.stdout, b"{}\n");
+            assert!(!directory.path().join("0").exists());
         }
+        assert_eq!((descriptor, redirection), (0, String::from("> /dev/fd/0")));
         Ok(())
     }
 

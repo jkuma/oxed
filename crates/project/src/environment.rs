@@ -2,7 +2,7 @@ use anyhow::{Context as _, bail};
 use futures::{FutureExt, StreamExt as _, channel::mpsc, future::Shared};
 use language::Buffer;
 use std::{collections::VecDeque, path::Path, sync::Arc};
-use util::{ResultExt, command::new_command, shell::Shell};
+use util::{ResultExt, command::new_command, get_system_shell};
 use worktree::Worktree;
 
 use collections::HashMap;
@@ -16,7 +16,7 @@ use crate::{
 
 pub struct ProjectEnvironment {
     cli_environment: Option<HashMap<String, String>>,
-    local_environments: HashMap<(Shell, Arc<Path>), Shared<Task<Option<HashMap<String, String>>>>>,
+    local_environments: HashMap<Arc<Path>, Shared<Task<Option<HashMap<String, String>>>>>,
     environment_error_messages: VecDeque<String>,
     environment_error_messages_tx: mpsc::UnboundedSender<String>,
     worktree_store: WeakEntity<WorktreeStore>,
@@ -109,7 +109,7 @@ impl ProjectEnvironment {
             abs_path = parent.into();
         }
 
-        self.local_directory_environment(&Shell::System, abs_path, cx)
+        self.local_directory_environment(abs_path, cx)
     }
 
     pub fn directory_environment(
@@ -122,7 +122,7 @@ impl ProjectEnvironment {
                 worktree_store.find_worktree(&abs_path, cx)
             })
             .ok()
-            .map(|_| self.local_directory_environment(&Shell::System, abs_path, cx))
+            .map(|_| self.local_directory_environment(abs_path, cx))
             .unwrap_or_else(|| Task::ready(None).shared())
     }
 
@@ -144,7 +144,7 @@ impl ProjectEnvironment {
             .flatten()
             .map(|path| Arc::<Path>::from(path))
             .unwrap_or_else(|| paths::home_dir().as_path().into());
-        self.local_directory_environment(&Shell::System, abs_path, cx)
+        self.local_directory_environment(abs_path, cx)
     }
 
     /// Returns the project environment, if possible.
@@ -153,7 +153,6 @@ impl ProjectEnvironment {
     /// that directory, to get environment variables as if the user has `cd`'d there.
     pub fn local_directory_environment(
         &mut self,
-        shell: &Shell,
         abs_path: Arc<Path>,
         cx: &mut App,
     ) -> Shared<Task<Option<HashMap<String, String>>>> {
@@ -163,15 +162,13 @@ impl ProjectEnvironment {
         }
 
         self.local_environments
-            .entry((shell.clone(), abs_path.clone()))
+            .entry(abs_path.clone())
             .or_insert_with(|| {
                 let load_direnv = ProjectSettings::get_global(cx).load_direnv.clone();
-                let shell = shell.clone();
                 let tx = self.environment_error_messages_tx.clone();
                 cx.spawn(async move |cx| {
                     let mut shell_env = match cx
                         .background_spawn(load_directory_shell_environment(
-                            shell,
                             abs_path.clone(),
                             load_direnv,
                             tx,
@@ -238,7 +235,6 @@ impl From<EnvironmentOrigin> for String {
 }
 
 async fn load_directory_shell_environment(
-    shell: Shell,
     abs_path: Arc<Path>,
     load_direnv: DirenvSettings,
     tx: mpsc::UnboundedSender<String>,
@@ -266,8 +262,8 @@ async fn load_directory_shell_environment(
             .into()
     };
 
-    let (shell, args) = shell.program_and_args();
-    let mut envs = util::shell_env::capture(shell.clone(), args, abs_path)
+    let shell = get_system_shell();
+    let mut envs = util::shell_env::capture(&shell, abs_path)
         .await
         .with_context(|| {
             tx.unbounded_send("Failed to load environment variables".into())

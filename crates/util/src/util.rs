@@ -6,7 +6,6 @@ pub mod command;
 pub mod fs;
 pub mod process;
 pub mod shell;
-pub mod shell_builder;
 pub mod shell_env;
 
 pub mod disambiguate;
@@ -36,7 +35,7 @@ pub use gpui_util::*;
 pub use path::PathExt;
 pub use path::rel_path;
 
-pub use self::shell::{get_default_system_shell, get_system_shell};
+pub use self::shell::get_system_shell;
 
 pub fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
@@ -335,7 +334,7 @@ pub async fn load_login_shell_environment() -> Result<()> {
     // into shell's `cd` command (and hooks) to manipulate env.
     // We do this so that we get the env a user would have when spawning a shell
     // in home directory.
-    for (name, value) in shell_env::capture(get_system_shell(), &[], paths::home_dir())
+    for (name, value) in shell_env::capture(get_system_shell(), paths::home_dir())
         .await
         .with_context(|| format!("capturing environment with {:?}", get_system_shell()))?
     {
