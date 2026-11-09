@@ -2338,7 +2338,6 @@ mod tests {
         assert_eq!(cx.update(|cx| cx.windows().len()), 0);
     }
 
-    #[ignore = "This test has timing issues across platforms."]
     #[gpui::test]
     async fn test_window_edit_state_restoring_enabled(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
@@ -4828,6 +4827,7 @@ mod tests {
             app_state.languages.add(markdown_lang());
 
             gpui_tokio::init(cx);
+            cx.set_global(db::AppDatabase::test_new());
             AppState::set_global(app_state.clone(), cx);
             theme_settings::init(theme::LoadThemes::JustBase, cx);
             workspace::init(cx);

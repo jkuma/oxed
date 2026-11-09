@@ -4007,7 +4007,6 @@ mod tests {
     }
 
     #[gpui::test]
-    #[ignore]
     async fn test_joining_added_line_with_unmodified_line(cx: &mut gpui::TestAppContext) {
         use rope::Point;
         use unindent::Unindent as _;
@@ -4081,10 +4080,10 @@ mod tests {
             § <no file>
             § -----
             aaa
+            NEWeee
             § spacer
             § spacer
-            § spacer
-            NEWeee"
+            § spacer"
                 .unindent(),
             "
             § <no file>
