@@ -2959,7 +2959,7 @@ impl Workspace {
                         project
                             .visible_worktrees(cx)
                             .next()
-                            .map(|worktree| worktree.read(cx).as_local().abs_path().to_path_buf())
+                            .map(|worktree| worktree.read(cx).abs_path().to_path_buf())
                     })
                     .or_else(std::env::home_dir)
                     .unwrap_or_else(|| PathBuf::from(""));
@@ -3027,7 +3027,7 @@ impl Workspace {
     pub fn worktree_scans_complete(&self, cx: &App) -> impl Future<Output = ()> + 'static + use<> {
         let futures = self
             .worktrees(cx)
-            .map(|worktree| worktree.read(cx).as_local().scan_complete())
+            .map(|worktree| worktree.read(cx).scan_complete())
             .collect::<Vec<_>>();
         async move {
             for future in futures {

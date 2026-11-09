@@ -57,7 +57,7 @@ async fn test_traversal(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -109,7 +109,7 @@ async fn test_entry_id_is_reused_when_rename_events_are_split(cx: &mut TestAppCo
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     let old_entry_id = tree.read_with(cx, |tree, _| {
         tree.entry_for_path(rel_path("one.rs")).unwrap().id
@@ -155,7 +155,7 @@ async fn test_rescan_requests_processed_before_root_creation_events(cx: &mut Tes
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     fs.pause_events();
     fs.insert_tree(
@@ -170,13 +170,11 @@ async fn test_rescan_requests_processed_before_root_creation_events(cx: &mut Tes
     .await;
 
     let mut refresh = tree.update(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("a/b/f1").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("a/b/f1").into()])
     });
     refresh.recv().await;
     let mut refresh = tree.update(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("a/c/f2").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("a/c/f2").into()])
     });
     refresh.recv().await;
 
@@ -253,7 +251,7 @@ async fn test_circular_symlinks(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -368,7 +366,7 @@ async fn test_symlinks_pointing_outside(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     let tree_updates = Arc::new(Mutex::new(Vec::new()));
     tree.update(cx, |_, cx| {
@@ -412,8 +410,7 @@ async fn test_symlinks_pointing_outside(cx: &mut TestAppContext) {
 
     // Expand one of the symlinked directories.
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir3").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir3").into()])
     })
     .recv()
     .await;
@@ -451,8 +448,7 @@ async fn test_symlinks_pointing_outside(cx: &mut TestAppContext) {
 
     // Expand a subdirectory of one of the symlinked directories.
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir3/src").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir3/src").into()])
     })
     .recv()
     .await;
@@ -521,22 +517,19 @@ async fn test_symlinks_pointing_outside(cx: &mut TestAppContext) {
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-alias").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-alias").into()])
     })
     .recv()
     .await;
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-alias/src").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-alias/src").into()])
     })
     .recv()
     .await;
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-nested").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir3-nested").into()])
     })
     .recv()
     .await;
@@ -634,7 +627,7 @@ async fn test_renaming_subdir_under_symlinked_root_keeps_children(cx: &mut TestA
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     fs.rename(
         Path::new("/link/subdir-a"),
@@ -713,7 +706,7 @@ async fn test_symlinked_dir_inside_project(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -830,7 +823,7 @@ async fn test_scan_symlinks_always(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // With scan_symlinks = Always, the symlinked directory's contents should be
     // fully visible on the first scan without any manual expansion.
@@ -910,10 +903,10 @@ async fn test_relative_path_for_external_abs_path(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
-        let snapshot = tree.as_local().snapshot();
+        let snapshot = tree.local_snapshot();
         let lookup = |abs_path: &str| {
             snapshot
                 .relative_path_for_external_abs_path(Path::new(abs_path))
@@ -981,7 +974,7 @@ async fn test_scan_symlinks_expanded(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // With the default scan_symlinks = Expanded, the symlinked directory
     // should appear as an UnloadedDir entry with no children visible.
@@ -1007,8 +1000,7 @@ async fn test_scan_symlinks_expanded(cx: &mut TestAppContext) {
 
     // Manually expand the symlinked directory.
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir2").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir2").into()])
     })
     .recv()
     .await;
@@ -1040,8 +1032,7 @@ async fn test_scan_symlinks_expanded(cx: &mut TestAppContext) {
 
     // Expand the subdirectory inside the symlinked directory.
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir2/src").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir2/src").into()])
     })
     .recv()
     .await;
@@ -1116,7 +1107,7 @@ async fn test_circular_symlinks_always(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         let entries: Vec<_> = tree
@@ -1199,7 +1190,7 @@ async fn test_scan_symlinks_always_respects_gitignore(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -1280,7 +1271,7 @@ async fn test_real_fs_scan_symlinks_always(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -1340,7 +1331,7 @@ async fn test_real_fs_scan_symlinks_expanded(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // Before expansion, the symlinked directory should appear as an UnloadedDir
     // with no children visible.
@@ -1370,8 +1361,7 @@ async fn test_real_fs_scan_symlinks_expanded(cx: &mut TestAppContext) {
     // added to fix; if this assertion fails it's a regression of that fix on
     // real filesystems.
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-external").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-external").into()])
     })
     .recv()
     .await;
@@ -1430,7 +1420,7 @@ async fn test_internal_symlink_updates_preserve_entry_ids(cx: &mut TestAppContex
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     let (real_entry_id, symlink_entry_id, old_mtime) = tree.read_with(cx, |tree, _| {
         let real_entry = tree
@@ -1508,7 +1498,7 @@ async fn test_root_rescan_reconciles_stale_state(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -1566,7 +1556,7 @@ async fn test_root_rescan_keeps_root_watcher_registered(cx: &mut TestAppContext)
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // Dropping and re-registering the recursive root watch would open a window
     // in which filesystem events are lost. Non-recursive watches may have been
@@ -1606,7 +1596,7 @@ async fn test_new_directory_scan_does_not_miss_event_before_adding_watcher(
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     fs.create_file_before_next_watch_add("/root/new-directory", "/root/new-directory/file.txt");
     fs.create_dir(Path::new("/root/new-directory"))
@@ -1668,7 +1658,7 @@ async fn test_subtree_rescan_reports_unchanged_descendants_as_updated(cx: &mut T
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     let tree_updates = Arc::new(Mutex::new(Vec::new()));
     tree.update(cx, |_, cx| {
@@ -1771,7 +1761,7 @@ async fn test_open_gitignored_files(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -1936,14 +1926,13 @@ async fn test_dirs_no_longer_ignored(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // Open a file within the gitignored directory, forcing some of its
     // subdirectories to be read, but not all.
     let read_dir_count_1 = fs.read_dir_call_count();
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("node_modules/d/d.js").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("node_modules/d/d.js").into()])
     })
     .recv()
     .await;
@@ -2036,8 +2025,7 @@ async fn test_write_file(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| worktree.read(cx).as_local().scan_complete())
-        .await;
+    cx.read(|cx| worktree.read(cx).scan_complete()).await;
     worktree.flush_fs_events(cx).await;
 
     worktree
@@ -2131,7 +2119,7 @@ async fn test_file_scan_inclusions(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
     tree.read_with(cx, |tree, _| {
         // Assert that file_scan_inclusions overrides  file_scan_exclusions.
@@ -2307,8 +2295,7 @@ async fn test_file_scan_inclusions_from_project_settings(cx: &mut TestAppContext
             });
         });
         cx.run_until_parked();
-        tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
-            .await;
+        tree.read_with(cx, |tree, _| tree.scan_complete()).await;
         tree.read_with(cx, |tree, _| {
             for path in ignored_directories {
                 assert_eq!(
@@ -2375,7 +2362,7 @@ async fn test_file_scan_exclusions_overrules_inclusions(cx: &mut TestAppContext)
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
     tree.read_with(cx, |tree, _| {
         // Assert that file_scan_inclusions overrides  file_scan_exclusions.
@@ -2436,7 +2423,7 @@ async fn test_file_scan_inclusions_reindexes_on_setting_change(cx: &mut TestAppC
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
 
     tree.read_with(cx, |tree, _| {
@@ -2458,7 +2445,7 @@ async fn test_file_scan_inclusions_reindexes_on_setting_change(cx: &mut TestAppC
             });
         });
     });
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
 
     tree.read_with(cx, |tree, _| {
@@ -2523,7 +2510,7 @@ async fn test_file_scan_exclusions(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
     tree.read_with(cx, |tree, _| {
         check_worktree_entries(
@@ -2609,7 +2596,7 @@ async fn test_hidden_files(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
 
     tree.read_with(cx, |tree, _| {
@@ -2753,8 +2740,7 @@ async fn test_hidden_files_from_project_settings(cx: &mut TestAppContext) {
             });
         });
         cx.run_until_parked();
-        tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
-            .await;
+        tree.read_with(cx, |tree, _| tree.scan_complete()).await;
         tree.read_with(cx, |tree, _| {
             assert_eq!(
                 tree.entries(true, 0)
@@ -2837,7 +2823,7 @@ async fn test_fs_events_in_exclusions(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
     tree.read_with(cx, |tree, _| {
         check_worktree_entries(
@@ -2953,7 +2939,7 @@ async fn test_fs_events_in_dot_git_worktree(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
     tree.read_with(cx, |tree, _| {
         check_worktree_entries(
@@ -3007,8 +2993,7 @@ async fn test_create_directory_during_initial_scan(cx: &mut TestAppContext) {
 
     let entry = tree
         .update(cx, |tree, cx| {
-            tree.as_local_mut()
-                .create_entry(rel_path("a/e").into(), true, None, cx)
+            tree.create_entry(rel_path("a/e").into(), true, None, cx)
         })
         .await
         .unwrap()
@@ -3054,8 +3039,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
 
     let entry = tree_fake
         .update(cx, |tree, cx| {
-            tree.as_local_mut()
-                .create_entry(rel_path("a/b/c/d.txt").into(), false, None, cx)
+            tree.create_entry(rel_path("a/b/c/d.txt").into(), false, None, cx)
         })
         .await
         .unwrap()
@@ -3093,8 +3077,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
 
     let entry = tree_real
         .update(cx, |tree, cx| {
-            tree.as_local_mut()
-                .create_entry(rel_path("a/b/c/d.txt").into(), false, None, cx)
+            tree.create_entry(rel_path("a/b/c/d.txt").into(), false, None, cx)
         })
         .await
         .unwrap()
@@ -3116,8 +3099,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
     // Test smallest change
     let entry = tree_real
         .update(cx, |tree, cx| {
-            tree.as_local_mut()
-                .create_entry(rel_path("a/b/c/e.txt").into(), false, None, cx)
+            tree.create_entry(rel_path("a/b/c/e.txt").into(), false, None, cx)
         })
         .await
         .unwrap()
@@ -3137,8 +3119,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
     // Test largest change
     let entry = tree_real
         .update(cx, |tree, cx| {
-            tree.as_local_mut()
-                .create_entry(rel_path("d/e/f/g.txt").into(), false, None, cx)
+            tree.create_entry(rel_path("d/e/f/g.txt").into(), false, None, cx)
         })
         .await
         .unwrap()
@@ -3189,7 +3170,7 @@ async fn test_create_file_in_expanded_gitignored_dir(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         let ignored_dir = tree.entry_for_path(rel_path("ignored_dir")).unwrap();
@@ -3285,7 +3266,7 @@ async fn test_fs_event_for_gitignored_dir_does_not_lose_contents(cx: &mut TestAp
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // Load a file to expand the ignored directory
     tree.update(cx, |tree, cx| {
@@ -3372,20 +3353,14 @@ async fn test_random_worktree_operations_during_initial_scan(
             })
             .await
             .log_err();
-        worktree.read_with(cx, |tree, _| {
-            tree.as_local().snapshot().check_invariants(true)
-        });
+        worktree.read_with(cx, |tree, _| tree.local_snapshot().check_invariants(true));
     }
 
-    worktree
-        .update(cx, |tree, _| tree.as_local_mut().scan_complete())
-        .await;
+    worktree.update(cx, |tree, _| tree.scan_complete()).await;
 
     cx.executor().run_until_parked();
 
-    worktree.read_with(cx, |tree, _| {
-        tree.as_local().snapshot().check_invariants(true)
-    });
+    worktree.read_with(cx, |tree, _| tree.local_snapshot().check_invariants(true));
 }
 
 #[gpui::test(iterations = 100)]
@@ -3420,9 +3395,7 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
 
     worktree.update(cx, |tree, cx| check_worktree_change_events(tree, cx));
 
-    worktree
-        .update(cx, |tree, _| tree.as_local_mut().scan_complete())
-        .await;
+    worktree.update(cx, |tree, _| tree.scan_complete()).await;
 
     fs.as_fake().pause_events();
     let mut mutations_len = operations;
@@ -3463,10 +3436,9 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
     fs.as_fake().flush_events(usize::MAX);
     cx.executor().run_until_parked();
 
-    let snapshot = worktree.read_with(cx, |tree, _| tree.as_local().snapshot());
+    let snapshot = worktree.read_with(cx, |tree, _| tree.local_snapshot());
     snapshot.check_invariants(true);
-    let file_scan_depth =
-        worktree.read_with(cx, |tree, _| tree.as_local().settings().file_scan_depth);
+    let file_scan_depth = worktree.read_with(cx, |tree, _| tree.settings().file_scan_depth);
     let expanded_paths = snapshot
         .expanded_entries(file_scan_depth)
         .map(|e| e.path.clone())
@@ -3484,16 +3456,13 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
     .await
     .unwrap();
     new_worktree
-        .update(cx, |tree, _| tree.as_local_mut().scan_complete())
+        .update(cx, |tree, _| tree.scan_complete())
         .await;
     new_worktree
-        .update(cx, |tree, _| {
-            tree.as_local_mut()
-                .refresh_entries_for_paths(expanded_paths)
-        })
+        .update(cx, |tree, _| tree.refresh_entries_for_paths(expanded_paths))
         .recv()
         .await;
-    let new_snapshot = new_worktree.read_with(cx, |tree, _| tree.as_local().snapshot());
+    let new_snapshot = new_worktree.read_with(cx, |tree, _| tree.local_snapshot());
     assert_eq!(
         snapshot.entries_without_ids(true),
         new_snapshot.entries_without_ids(true)
@@ -3539,9 +3508,7 @@ async fn test_random_git_updates_with_watcher_overflows(cx: &mut TestAppContext,
     )
     .await
     .unwrap();
-    worktree
-        .update(cx, |tree, _| tree.as_local_mut().scan_complete())
-        .await;
+    worktree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.executor().run_until_parked();
 
     // Set when the fake repository's state is mutated, cleared when the
@@ -3605,9 +3572,7 @@ async fn test_random_git_updates_with_watcher_overflows(cx: &mut TestAppContext,
     fs.as_fake().unpause_events_and_flush();
     cx.executor().run_until_parked();
 
-    worktree.read_with(cx, |tree, _| {
-        tree.as_local().snapshot().check_invariants(true)
-    });
+    worktree.read_with(cx, |tree, _| tree.local_snapshot().check_invariants(true));
     assert!(
         !pending_git_update.get(),
         "a git state change was never signaled via UpdatedGitRepositories"
@@ -3658,14 +3623,15 @@ fn randomly_mutate_worktree(
     cx: &mut Context<Worktree>,
 ) -> Task<Result<()>> {
     log::info!("mutating worktree");
-    let worktree = worktree.as_local_mut();
     let snapshot = worktree.snapshot();
     let entry = snapshot.entries(false, 0).choose(rng).unwrap();
 
     match rng.random_range(0_u32..100) {
         0..=33 if entry.path.as_ref() != RelPath::empty() => {
             log::info!("deleting entry {:?} ({})", entry.path, entry.id.to_usize());
-            let task = worktree.delete_entry(entry.clone(), cx);
+            let task = worktree
+                .delete_entry(entry.id, cx)
+                .expect("the entry comes from the worktree snapshot");
 
             cx.background_spawn(async move {
                 task.await?;
@@ -3894,7 +3860,7 @@ async fn test_private_single_file_worktree(cx: &mut TestAppContext) {
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.read_with(cx, |tree, _| {
         let entry = tree.entry_for_path(rel_path("")).unwrap();
         assert!(entry.is_private);
@@ -3928,19 +3894,19 @@ async fn test_repository_above_root(executor: BackgroundExecutor, cx: &mut TestA
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
-    let repos = worktree.update(cx, |worktree, _| worktree.as_local().repositories());
+    let repos = worktree.update(cx, |worktree, _| worktree.repositories());
     pretty_assertions::assert_eq!(repos, [Path::new("/root").into()]);
 
     fs.touch_path("/root/subproject").await;
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
-    let repos = worktree.update(cx, |worktree, _| worktree.as_local().repositories());
+    let repos = worktree.update(cx, |worktree, _| worktree.repositories());
     pretty_assertions::assert_eq!(repos, [Path::new("/root").into()]);
 }
 
@@ -3990,7 +3956,7 @@ async fn test_global_gitignore(executor: BackgroundExecutor, cx: &mut TestAppCon
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4015,7 +3981,7 @@ async fn test_global_gitignore(executor: BackgroundExecutor, cx: &mut TestAppCon
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4041,7 +4007,7 @@ async fn test_global_gitignore(executor: BackgroundExecutor, cx: &mut TestAppCon
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4097,7 +4063,7 @@ async fn test_global_gitignore_without_repository(
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4161,7 +4127,7 @@ async fn test_repo_exclude_in_worktree(executor: BackgroundExecutor, cx: &mut Te
     .unwrap();
 
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4213,7 +4179,7 @@ async fn test_repo_exclude_naming_a_worktree_ancestor(
     .unwrap();
 
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4269,7 +4235,7 @@ async fn test_repo_exclude(executor: BackgroundExecutor, cx: &mut TestAppContext
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4293,7 +4259,7 @@ async fn test_repo_exclude(executor: BackgroundExecutor, cx: &mut TestAppContext
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4351,7 +4317,7 @@ async fn test_repo_exclude_anchored_pattern(executor: BackgroundExecutor, cx: &m
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4436,7 +4402,7 @@ async fn test_repo_exclude_applies_within_nested_repos(
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4456,7 +4422,7 @@ async fn test_repo_exclude_applies_within_nested_repos(
     // search that includes ignored files runs or when the file is opened.
     worktree
         .update(cx, |worktree, _| {
-            worktree.as_local().refresh_entries_for_paths(vec![
+            worktree.refresh_entries_for_paths(vec![
                 rel_path(".scratch/worktrees/abc/project/src/main.rs").into(),
             ])
         })
@@ -4618,7 +4584,7 @@ async fn test_root_repo_common_dir_for_relative_gitdir(
     .await
     .unwrap();
     feature_tree
-        .update(cx, |tree, _| tree.as_local().scan_complete())
+        .update(cx, |tree, _| tree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -4650,9 +4616,7 @@ async fn test_root_repo_common_dir_for_relative_gitdir(
     )
     .await
     .unwrap();
-    nested_tree
-        .update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    nested_tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     nested_tree.read_with(cx, |tree, _| {
@@ -4740,8 +4704,7 @@ async fn test_root_repo_common_dir(executor: BackgroundExecutor, cx: &mut TestAp
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     // For a linked worktree, root_repo_common_dir should point to the
@@ -4813,14 +4776,13 @@ async fn test_invisible_worktree_does_not_track_ancestor_git_repository(
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
     worktree.read_with(cx, |worktree, _| {
-        let local_worktree = worktree.as_local();
-        assert!(local_worktree.repositories().is_empty());
-        assert_eq!(local_worktree.root_repo_common_dir(), None);
+        assert!(worktree.repositories().is_empty());
+        assert_eq!(worktree.root_repo_common_dir(), None);
     });
 }
 
@@ -4871,8 +4833,7 @@ async fn test_linked_worktree_gitfile_event_preserves_repo(
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     // Overwrite the .git gitfile with garbage to trigger an event for the
@@ -4940,8 +4901,7 @@ async fn test_shared_common_dir_event_updates_all_repositories(
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     let mut events = cx.events(&tree);
@@ -5024,8 +4984,7 @@ async fn test_noisy_dot_git_events_do_not_emit_git_repo_update(
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     let repo_update_count: Rc<Cell<usize>> = Rc::new(Cell::new(0));
@@ -5129,8 +5088,7 @@ async fn test_watcher_overflow_rescan_reloads_git_state(cx: &mut TestAppContext)
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     let repo_update_count: Rc<Cell<usize>> = Rc::new(Cell::new(0));
@@ -5196,8 +5154,7 @@ async fn test_git_update_in_same_batch_as_rescan_is_not_lost(cx: &mut TestAppCon
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     let repo_update_count: Rc<Cell<usize>> = Rc::new(Cell::new(0));
@@ -5281,8 +5238,7 @@ async fn test_linked_worktree_event_in_unregistered_common_git_dir_does_not_pani
     )
     .await
     .unwrap();
-    tree.update(cx, |tree, _| tree.as_local().scan_complete())
-        .await;
+    tree.update(cx, |tree, _| tree.scan_complete()).await;
     cx.run_until_parked();
 
     // Unregister the linked worktree's repository by removing its gitfile.
@@ -5336,7 +5292,7 @@ async fn test_dot_git_dir_event_does_not_suppress_children(
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -5472,7 +5428,7 @@ async fn test_dot_git_event_explained_by_filtered_sibling_does_not_emit_git_repo
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
@@ -5575,7 +5531,7 @@ async fn test_ref_updates_in_dot_git_subdirectories_are_detected(cx: &mut TestAp
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree.flush_fs_events(cx).await;
 
     let mut events = cx.events(&tree);
@@ -5770,7 +5726,7 @@ async fn test_load_file_encoding(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     let rel_path = |name: &str| RelPath::new(&Path::new(name)).unwrap().into_arc();
 
@@ -5965,7 +5921,7 @@ async fn test_refresh_entries_for_paths_creates_ancestors(cx: &mut TestAppContex
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -5986,8 +5942,7 @@ async fn test_refresh_entries_for_paths_creates_ancestors(cx: &mut TestAppContex
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("a/b/c/deep_file.txt").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("a/b/c/deep_file.txt").into()])
     })
     .recv()
     .await;
@@ -6036,7 +5991,7 @@ async fn test_single_file_worktree_deleted(cx: &mut TestAppContext) {
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert!(tree.is_single_file(), "Should be a single-file worktree");
@@ -6101,7 +6056,7 @@ async fn test_root_ancestor_rename_is_detected_without_fs_events(cx: &mut TestAp
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     // Renaming an ancestor of the root produces no event under the watched
     // path, so only the periodic root check can notice it.
@@ -6163,19 +6118,19 @@ async fn test_deferred_watch_repository_above_root(
     .await
     .unwrap();
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
     worktree.update(cx, |worktree, cx| {
-        worktree.as_local_mut().set_defer_watch(true, cx);
+        worktree.set_defer_watch(true, cx);
     });
     worktree
-        .update(cx, |worktree, _| worktree.as_local().scan_complete())
+        .update(cx, |worktree, _| worktree.scan_complete())
         .await;
     cx.run_until_parked();
 
-    let repos = worktree.update(cx, |worktree, _| worktree.as_local().repositories());
+    let repos = worktree.update(cx, |worktree, _| worktree.repositories());
     pretty_assertions::assert_eq!(repos, [Path::new("/root").into()]);
 }
 
@@ -6217,13 +6172,13 @@ async fn test_deferred_watch_symlinks_pointing_outside(cx: &mut TestAppContext) 
     .await
     .unwrap();
 
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     cx.run_until_parked();
 
     tree.update(cx, |tree, cx| {
-        tree.as_local_mut().set_defer_watch(true, cx);
+        tree.set_defer_watch(true, cx);
     });
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     cx.run_until_parked();
 
     tree.read_with(cx, |tree, _| {
@@ -6242,8 +6197,7 @@ async fn test_deferred_watch_symlinks_pointing_outside(cx: &mut TestAppContext) 
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir2").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir2").into()])
     })
     .recv()
     .await;
@@ -6265,8 +6219,7 @@ async fn test_deferred_watch_symlinks_pointing_outside(cx: &mut TestAppContext) 
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("deps/dep-dir2/src").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("deps/dep-dir2/src").into()])
     })
     .recv()
     .await;
@@ -6402,7 +6355,7 @@ async fn test_file_scan_depth_settings_change(cx: &mut TestAppContext) {
 
     set_file_scan_depth(cx, Some(0));
     cx.run_until_parked();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -6561,8 +6514,7 @@ async fn test_file_scan_depth_expansion(cx: &mut TestAppContext) {
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .refresh_entries_for_paths(vec![rel_path("junk/a").into()])
+        tree.refresh_entries_for_paths(vec![rel_path("junk/a").into()])
     })
     .recv()
     .await;
@@ -6655,7 +6607,7 @@ async fn test_file_scan_depth_settings_tightening(cx: &mut TestAppContext) {
 
     set_file_scan_depth(cx, Some(1));
     cx.run_until_parked();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
 
     tree.read_with(cx, |tree, _| {
         assert_eq!(
@@ -6774,7 +6726,7 @@ async fn build_worktree(fs: Arc<FakeFs>, root: &str, cx: &mut TestAppContext) ->
     )
     .await
     .unwrap();
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     tree
 }
 

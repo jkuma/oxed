@@ -1484,7 +1484,6 @@ mod view_commit_tests {
                 .next()
                 .unwrap()
                 .read(cx)
-                .as_local()
                 .scan_complete()
         })
         .await;

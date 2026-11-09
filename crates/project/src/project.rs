@@ -94,8 +94,8 @@ use text::{Anchor, BufferId, Rope};
 use util::{ResultExt as _, maybe, path_list::PathList, rel_path::RelPath};
 use worktree::{CreatedEntry, Snapshot, Traversal};
 pub use worktree::{
-    Entry, EntryKind, FS_WATCH_LATENCY, File, LocalWorktree, PathChange, ProjectEntryId,
-    UpdatedEntriesSet, UpdatedGitRepositoriesSet, Worktree, WorktreeId, WorktreeSettings,
+    Entry, EntryKind, FS_WATCH_LATENCY, File, PathChange, ProjectEntryId, UpdatedEntriesSet,
+    UpdatedGitRepositoriesSet, Worktree, WorktreeId, WorktreeSettings,
     discover_root_repo_common_dir,
 };
 use worktree_store::{WorktreeStore, WorktreeStoreEvent};
@@ -1056,8 +1056,7 @@ impl Project {
                 })
                 .await
                 .unwrap();
-            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
-                .await;
+            tree.read_with(cx, |tree, _| tree.scan_complete()).await;
         }
         project
     }
@@ -1110,8 +1109,7 @@ impl Project {
                 .await
                 .unwrap();
 
-            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
-                .await;
+            tree.read_with(cx, |tree, _| tree.scan_complete()).await;
         }
         project
     }
@@ -3403,7 +3401,7 @@ impl Project {
             let scans_complete = this
                 .read_with(cx, |this, cx| {
                     this.worktrees(cx)
-                        .map(|worktree| worktree.read(cx).as_local().scan_complete())
+                        .map(|worktree| worktree.read(cx).scan_complete())
                         .collect::<Vec<_>>()
                 })
                 .unwrap();

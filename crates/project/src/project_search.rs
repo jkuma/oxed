@@ -345,7 +345,7 @@ impl Search {
                 let include_ignored = query.include_ignored();
                 for worktree in worktrees {
                     let scan_complete =
-                        worktree.read_with(cx, |worktree, _| worktree.as_local().scan_complete());
+                        worktree.read_with(cx, |worktree, _| worktree.scan_complete());
                     {
                         let mut scan_complete = pin!(scan_complete);
                         if scan_complete.as_mut().now_or_never().is_none() {
@@ -355,8 +355,8 @@ impl Search {
                         }
                     }
 
-                    let (mut snapshot, worktree_settings) = worktree
-                        .read_with(cx, |this, _| (this.snapshot(), this.as_local().settings()));
+                    let (mut snapshot, worktree_settings) =
+                        worktree.read_with(cx, |this, _| (this.snapshot(), this.settings()));
                     if query.include_ignored() {
                         // Pre-fetch all of the ignored directories as they're going to be searched.
                         let mut entries_to_refresh = vec![];
@@ -371,10 +371,9 @@ impl Search {
                             }
                         }
                         let barrier = worktree.update(cx, |this, _| {
-                            let local = this.as_local_mut();
                             let barrier = entries_to_refresh
                                 .into_iter()
-                                .map(|path| local.add_path_prefix_to_scan(path).into_future())
+                                .map(|path| this.add_path_prefix_to_scan(path).into_future())
                                 .collect::<Vec<_>>();
                             Some(barrier)
                         });

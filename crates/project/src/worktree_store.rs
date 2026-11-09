@@ -480,8 +480,7 @@ impl WorktreeStore {
             copy.await?;
             new_worktree
                 .update(cx, |this, cx| {
-                    this.as_local_mut()
-                        .refresh_entry(new_project_path.path, None, cx)
+                    this.refresh_entry(new_project_path.path, None, cx)
                 })
                 .await
         })
@@ -520,7 +519,7 @@ impl WorktreeStore {
         };
 
         let fs = fs.clone();
-        let case_sensitive = new_worktree.read(cx).as_local().fs_is_case_sensitive();
+        let case_sensitive = new_worktree.read(cx).fs_is_case_sensitive();
 
         let do_rename = async move |fs: &dyn Fs, old_path: &Path, new_path: &Path, overwrite| {
             fs.rename(
@@ -570,12 +569,11 @@ impl WorktreeStore {
             rename.await?;
             Ok(new_worktree
                 .update(cx, |this, cx| {
-                    let local = this.as_local_mut();
                     if is_root_entry {
                         // We eagerly update `abs_path` and refresh this worktree.
                         // Otherwise, the FS watcher would do it on the `RootUpdated` event,
                         // but with a noticeable delay, so we handle it proactively.
-                        local.update_abs_path_and_refresh(
+                        this.update_abs_path_and_refresh(
                             Arc::<Path>::from(abs_new_path.as_path()),
                             cx,
                         );
@@ -583,10 +581,10 @@ impl WorktreeStore {
                     } else {
                         // First refresh the parent directory (in case it was newly created)
                         if let Some(parent) = new_project_path.path.parent() {
-                            let _ = local.refresh_entries_for_paths(vec![parent.into()]);
+                            let _ = this.refresh_entries_for_paths(vec![parent.into()]);
                         }
                         // Then refresh the new path
-                        local.refresh_entry(new_project_path.path.clone(), Some(old_entry.path), cx)
+                        this.refresh_entry(new_project_path.path.clone(), Some(old_entry.path), cx)
                     }
                 })
                 .await?

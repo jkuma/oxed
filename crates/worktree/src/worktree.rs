@@ -3,7 +3,6 @@ mod worktree_settings;
 
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use anyhow::{Context as _, Result};
-use clock::ReplicaId;
 use collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use encoding_rs::Encoding;
 use file_content::{
@@ -77,18 +76,24 @@ pub const FS_WATCH_LATENCY: Duration = Duration::from_millis(100);
 pub const ROOT_PATH_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 /// A set of local or remote files that are being opened as part of a project.
-/// Responsible for tracking related FS (for local)/collab (for remote) events and corresponding updates.
-/// Stores git repositories data and the diagnostics for the file(s).
+/// Tracks a directory or a single file on disk, with its git repositories, and keeps
+/// its entries up to date with file system events.
 ///
-/// Has an absolute path, and may be set to be visible in Zed UI or not.
-/// May correspond to a directory or a single file.
-/// Possible examples:
-/// * a drag and dropped file — may be added as an invisible, "ephemeral" entry to the current worktree
-/// * a directory opened in Zed — may be added as a visible entry to the current worktree
-///
-/// Uses [`Entry`] to track the state of each file/directory, can look up absolute paths for entries.
-pub enum Worktree {
-    Local(LocalWorktree),
+/// May be visible in the UI, like an opened directory, or invisible, like a dropped file.
+pub struct Worktree {
+    snapshot: LocalSnapshot,
+    scan_requests_tx: async_channel::Sender<ScanRequest>,
+    path_prefixes_to_scan_tx: async_channel::Sender<PathPrefixScanRequest>,
+    is_scanning: (watch::Sender<bool>, watch::Receiver<bool>),
+    snapshot_subscriptions: VecDeque<(usize, oneshot::Sender<()>)>,
+    _background_scanner_tasks: Vec<Task<()>>,
+    fs: Arc<dyn Fs>,
+    fs_case_sensitive: bool,
+    visible: bool,
+    next_entry_id: Arc<AtomicUsize>,
+    settings: WorktreeSettings,
+    scanning_enabled: bool,
+    force_defer_watch: bool,
 }
 
 /// An entry, created in the worktree.
@@ -122,22 +127,6 @@ impl fmt::Debug for LoadedBinaryFile {
             .field("content_bytes", &self.content.len())
             .finish()
     }
-}
-
-pub struct LocalWorktree {
-    snapshot: LocalSnapshot,
-    scan_requests_tx: async_channel::Sender<ScanRequest>,
-    path_prefixes_to_scan_tx: async_channel::Sender<PathPrefixScanRequest>,
-    is_scanning: (watch::Sender<bool>, watch::Receiver<bool>),
-    snapshot_subscriptions: VecDeque<(usize, oneshot::Sender<()>)>,
-    _background_scanner_tasks: Vec<Task<()>>,
-    fs: Arc<dyn Fs>,
-    fs_case_sensitive: bool,
-    visible: bool,
-    next_entry_id: Arc<AtomicUsize>,
-    settings: WorktreeSettings,
-    scanning_enabled: bool,
-    force_defer_watch: bool,
 }
 
 pub struct PathPrefixScanRequest {
@@ -513,7 +502,6 @@ impl Worktree {
 
             let settings = WorktreeSettings::get(settings_location, cx).clone();
             cx.observe_global::<SettingsStore>(move |this, cx| {
-                let Self::Local(this) = this;
                 let settings = WorktreeSettings::get(settings_location, cx).clone();
                 if this.settings != settings {
                     this.settings = settings;
@@ -549,7 +537,7 @@ impl Worktree {
 
             let (scan_requests_tx, scan_requests_rx) = async_channel::unbounded();
             let (path_prefixes_to_scan_tx, path_prefixes_to_scan_rx) = async_channel::unbounded();
-            let mut worktree = LocalWorktree {
+            let mut worktree = Worktree {
                 next_entry_id,
                 snapshot,
                 is_scanning: watch::channel_with(true),
@@ -565,18 +553,8 @@ impl Worktree {
                 force_defer_watch: false,
             };
             worktree.start_background_scanner(scan_requests_rx, path_prefixes_to_scan_rx, cx);
-            Worktree::Local(worktree)
+            worktree
         }))
-    }
-
-    pub fn as_local(&self) -> &LocalWorktree {
-        let Worktree::Local(worktree) = self;
-        worktree
-    }
-
-    pub fn as_local_mut(&mut self) -> &mut LocalWorktree {
-        let Worktree::Local(worktree) = self;
-        worktree
     }
 
     pub fn settings_location(&self, _: &Context<Self>) -> SettingsLocation<'static> {
@@ -587,39 +565,23 @@ impl Worktree {
     }
 
     pub fn snapshot(&self) -> Snapshot {
-        match self {
-            Worktree::Local(worktree) => worktree.snapshot.snapshot.clone(),
-        }
+        self.snapshot.snapshot.clone()
     }
 
     pub fn scan_id(&self) -> usize {
-        match self {
-            Worktree::Local(worktree) => worktree.snapshot.scan_id,
-        }
+        self.snapshot.scan_id
     }
 
     pub fn completed_scan_id(&self) -> usize {
-        match self {
-            Worktree::Local(worktree) => worktree.snapshot.completed_scan_id,
-        }
+        self.snapshot.completed_scan_id
     }
 
     pub fn is_visible(&self) -> bool {
-        match self {
-            Worktree::Local(worktree) => worktree.visible,
-        }
-    }
-
-    pub fn replica_id(&self) -> ReplicaId {
-        match self {
-            Worktree::Local(_) => ReplicaId::LOCAL,
-        }
+        self.visible
     }
 
     pub fn abs_path(&self) -> Arc<Path> {
-        match self {
-            Worktree::Local(worktree) => worktree.abs_path.clone(),
-        }
+        self.snapshot.abs_path.clone()
     }
 
     pub fn root_file(&self, cx: &Context<Self>) -> Option<Arc<File>> {
@@ -627,72 +589,13 @@ impl Worktree {
         Some(File::for_entry(entry.clone(), cx.entity()))
     }
 
-    pub fn wait_for_snapshot(
-        &mut self,
-        scan_id: usize,
-    ) -> impl Future<Output = Result<()>> + use<> {
-        match self {
-            Worktree::Local(this) => this.wait_for_snapshot(scan_id).boxed(),
-        }
-    }
-
-    pub fn load_file(&self, path: &RelPath, cx: &Context<Worktree>) -> Task<Result<LoadedFile>> {
-        match self {
-            Worktree::Local(this) => this.load_file(path, cx),
-        }
-    }
-
-    pub fn load_binary_file(
-        &self,
-        path: &RelPath,
-        cx: &Context<Worktree>,
-    ) -> Task<Result<LoadedBinaryFile>> {
-        match self {
-            Worktree::Local(this) => this.load_binary_file(path, cx),
-        }
-    }
-
-    pub fn write_file(
-        &self,
-        path: Arc<RelPath>,
-        text: Rope,
-        line_ending: LineEnding,
-        encoding: &'static Encoding,
-        has_bom: bool,
-        cx: &Context<Worktree>,
-    ) -> Task<Result<Arc<File>>> {
-        match self {
-            Worktree::Local(this) => {
-                this.write_file(path, text, line_ending, encoding, has_bom, cx)
-            }
-        }
-    }
-
-    pub fn create_entry(
-        &mut self,
-        path: Arc<RelPath>,
-        is_directory: bool,
-        content: Option<Vec<u8>>,
-        cx: &Context<Worktree>,
-    ) -> Task<Result<CreatedEntry>> {
-        match self {
-            Worktree::Local(this) => this.create_entry(path, is_directory, content, cx),
-        }
-    }
-
     pub fn trash_entry(
         &mut self,
         entry_id: ProjectEntryId,
         cx: &mut Context<Worktree>,
     ) -> Option<Task<Result<TrashId>>> {
-        let entry = match self {
-            Worktree::Local(this) => this.entry_for_id(entry_id),
-        }?
-        .clone();
-
-        let task = match self {
-            Worktree::Local(this) => this.trash_entry(entry.clone(), cx),
-        };
+        let entry = self.entry_for_id(entry_id)?.clone();
+        let task = self.trash_entry_on_disk(entry.clone(), cx);
 
         let mut ids = vec![entry_id];
         self.get_children_ids_recursive(&entry.path, &mut ids);
@@ -708,14 +611,8 @@ impl Worktree {
         entry_id: ProjectEntryId,
         cx: &mut Context<Worktree>,
     ) -> Option<Task<Result<()>>> {
-        let entry = match self {
-            Worktree::Local(this) => this.entry_for_id(entry_id),
-        }?
-        .clone();
-
-        let task = match self {
-            Worktree::Local(this) => this.delete_entry(entry.clone(), cx),
-        };
+        let entry = self.entry_for_id(entry_id)?.clone();
+        let task = self.delete_entry_on_disk(entry.clone(), cx);
 
         let mut ids = vec![entry_id];
         let path = entry.path;
@@ -728,52 +625,11 @@ impl Worktree {
         Some(task)
     }
 
-    pub fn restore_entry(
-        &mut self,
-        trash_id: TrashId,
-        cx: &mut Context<'_, Worktree>,
-    ) -> Task<Result<Entry>> {
-        match self {
-            Worktree::Local(this) => this.restore_entry(trash_id, cx),
-        }
-    }
-
     fn get_children_ids_recursive(&self, path: &RelPath, ids: &mut Vec<ProjectEntryId>) {
         let children_iter = self.child_entries(path);
         for child in children_iter {
             ids.push(child.id);
             self.get_children_ids_recursive(&child.path, ids);
-        }
-    }
-
-    pub fn copy_external_entries(
-        &mut self,
-        target_directory: Arc<RelPath>,
-        paths: Vec<Arc<Path>>,
-        cx: &Context<Worktree>,
-    ) -> Task<Result<Vec<ProjectEntryId>>> {
-        match self {
-            Worktree::Local(this) => this.copy_external_entries(target_directory, paths, cx),
-        }
-    }
-
-    pub fn expand_entry(
-        &mut self,
-        entry_id: ProjectEntryId,
-        cx: &Context<Worktree>,
-    ) -> Option<Task<Result<()>>> {
-        match self {
-            Worktree::Local(this) => this.expand_entry(entry_id, cx),
-        }
-    }
-
-    pub fn expand_all_for_entry(
-        &mut self,
-        entry_id: ProjectEntryId,
-        cx: &Context<Worktree>,
-    ) -> Option<Task<Result<()>>> {
-        match self {
-            Worktree::Local(this) => this.expand_all_for_entry(entry_id, cx),
         }
     }
 
@@ -808,7 +664,7 @@ impl Worktree {
     }
 }
 
-impl LocalWorktree {
+impl Worktree {
     pub fn fs(&self) -> &Arc<dyn Fs> {
         &self.fs
     }
@@ -850,7 +706,7 @@ impl LocalWorktree {
         path_prefixes_to_scan_rx: async_channel::Receiver<PathPrefixScanRequest>,
         cx: &Context<Worktree>,
     ) {
-        let snapshot = self.snapshot();
+        let snapshot = self.local_snapshot();
         let next_entry_id = self.next_entry_id.clone();
         let fs = self.fs.clone();
         let scanning_enabled = self.scanning_enabled;
@@ -906,32 +762,29 @@ impl LocalWorktree {
         });
         let scan_state_updater = cx.spawn(async move |this, cx| {
             while let Some((state, this)) = scan_states_rx.next().await.zip(this.upgrade()) {
-                this.update(cx, |this, cx| {
-                    let this = this.as_local_mut();
-                    match state {
-                        ScanState::Started => {
-                            *this.is_scanning.0.borrow_mut() = true;
-                        }
-                        ScanState::Updated {
-                            snapshot,
-                            changes,
-                            barrier,
-                            scanning,
-                        } => {
-                            *this.is_scanning.0.borrow_mut() = scanning;
-                            this.set_snapshot(snapshot, changes, cx);
-                            drop(barrier);
-                        }
-                        ScanState::RootUpdated { new_path } => {
-                            this.update_abs_path_and_refresh(new_path, cx);
-                        }
-                        ScanState::RootDeleted => {
-                            log::info!(
-                                "worktree root {} no longer exists, closing worktree",
-                                this.abs_path().display()
-                            );
-                            cx.emit(Event::Deleted);
-                        }
+                this.update(cx, |this, cx| match state {
+                    ScanState::Started => {
+                        *this.is_scanning.0.borrow_mut() = true;
+                    }
+                    ScanState::Updated {
+                        snapshot,
+                        changes,
+                        barrier,
+                        scanning,
+                    } => {
+                        *this.is_scanning.0.borrow_mut() = scanning;
+                        this.set_snapshot(snapshot, changes, cx);
+                        drop(barrier);
+                    }
+                    ScanState::RootUpdated { new_path } => {
+                        this.update_abs_path_and_refresh(new_path, cx);
+                    }
+                    ScanState::RootDeleted => {
+                        log::info!(
+                            "worktree root {} no longer exists, closing worktree",
+                            this.abs_path().display()
+                        );
+                        cx.emit(Event::Deleted);
                     }
                 });
             }
@@ -1140,7 +993,7 @@ impl LocalWorktree {
         }
     }
 
-    pub fn snapshot(&self) -> LocalSnapshot {
+    pub fn local_snapshot(&self) -> LocalSnapshot {
         self.snapshot.clone()
     }
 
@@ -1148,7 +1001,7 @@ impl LocalWorktree {
         self.settings.clone()
     }
 
-    fn load_binary_file(
+    pub fn load_binary_file(
         &self,
         path: &RelPath,
         cx: &Context<Worktree>,
@@ -1195,7 +1048,7 @@ impl LocalWorktree {
     }
 
     #[ztracing::instrument(skip_all)]
-    fn load_file(&self, path: &RelPath, cx: &Context<Worktree>) -> Task<Result<LoadedFile>> {
+    pub fn load_file(&self, path: &RelPath, cx: &Context<Worktree>) -> Task<Result<LoadedFile>> {
         let path = Arc::from(path);
         let abs_path = self.absolutize(&path);
         let fs = self.fs.clone();
@@ -1311,13 +1164,9 @@ impl LocalWorktree {
                     }
                     let refresh_full_path = lowest_ancestor.join(refresh_path);
 
-                    refreshes.push(this.as_local_mut().refresh_entry(
-                        refresh_full_path.into(),
-                        None,
-                        cx,
-                    ));
+                    refreshes.push(this.refresh_entry(refresh_full_path.into(), None, cx));
                 }
-                (this.as_local_mut().refresh_entry(path, None, cx), refreshes)
+                (this.refresh_entry(path, None, cx), refreshes)
             })?;
             for refresh in refreshes {
                 refresh.await.log_err();
@@ -1373,9 +1222,7 @@ impl LocalWorktree {
         cx.spawn(async move |this, cx| {
             write.await?;
             let entry = this
-                .update(cx, |this, cx| {
-                    this.as_local_mut().refresh_entry(path.clone(), None, cx)
-                })?
+                .update(cx, |this, cx| this.refresh_entry(path.clone(), None, cx))?
                 .await?;
             let worktree = this.upgrade().context("worktree dropped")?;
             if let Some(entry) = entry {
@@ -1405,7 +1252,7 @@ impl LocalWorktree {
         })
     }
 
-    pub fn trash_entry(&self, entry: Entry, cx: &Context<Worktree>) -> Task<Result<TrashId>> {
+    fn trash_entry_on_disk(&self, entry: Entry, cx: &Context<Worktree>) -> Task<Result<TrashId>> {
         let abs_path = self.absolutize(&entry.path);
         let fs = self.fs.clone();
 
@@ -1424,8 +1271,7 @@ impl LocalWorktree {
             };
 
             this.update(cx, |this, _| {
-                this.as_local_mut()
-                    .refresh_entries_for_paths(vec![entry.path])
+                this.refresh_entries_for_paths(vec![entry.path])
             })?
             .recv()
             .await;
@@ -1434,7 +1280,7 @@ impl LocalWorktree {
         })
     }
 
-    pub fn delete_entry(&self, entry: Entry, cx: &Context<Worktree>) -> Task<Result<()>> {
+    fn delete_entry_on_disk(&self, entry: Entry, cx: &Context<Worktree>) -> Task<Result<()>> {
         let abs_path = self.absolutize(&entry.path);
         let fs = self.fs.clone();
 
@@ -1453,8 +1299,7 @@ impl LocalWorktree {
             };
 
             this.update(cx, |this, _| {
-                this.as_local_mut()
-                    .refresh_entries_for_paths(vec![entry.path])
+                this.refresh_entries_for_paths(vec![entry.path])
             })?
             .recv()
             .await;
@@ -1469,7 +1314,7 @@ impl LocalWorktree {
         cx: &mut Context<'_, Worktree>,
     ) -> Task<Result<Entry>> {
         let fs = self.fs.clone();
-        let worktree_abs_path = self.abs_path().clone();
+        let worktree_abs_path = self.abs_path();
 
         cx.spawn(async move |this, cx| {
             let path_buf = fs.restore(trash_id).await?;
@@ -1479,9 +1324,7 @@ impl LocalWorktree {
             let path = Arc::from(RelPath::new(&path)?.as_ref());
 
             let entry = this
-                .update(cx, |this, cx| {
-                    this.as_local_mut().refresh_entry(path, None, cx)
-                })?
+                .update(cx, |this, cx| this.refresh_entry(path, None, cx))?
                 .await?
                 .context("Entry not found after restore")?;
 
@@ -1496,7 +1339,7 @@ impl LocalWorktree {
         cx: &Context<Worktree>,
     ) -> Task<Result<Vec<ProjectEntryId>>> {
         let target_directory = self.absolutize(&target_directory);
-        let worktree_path = self.abs_path().clone();
+        let worktree_path = self.abs_path();
         let fs = self.fs.clone();
         let paths = paths
             .into_iter()
@@ -1548,8 +1391,7 @@ impl LocalWorktree {
                 &this.upgrade().with_context(|| "Dropped worktree")?,
                 |this, _| {
                     anyhow::Ok::<postage::barrier::Receiver>(
-                        this.as_local()
-                            .refresh_entries_for_paths(paths_to_refresh.clone()),
+                        this.refresh_entries_for_paths(paths_to_refresh.clone()),
                     )
                 },
             )?;
@@ -1571,7 +1413,7 @@ impl LocalWorktree {
         })
     }
 
-    fn expand_entry(
+    pub fn expand_entry(
         &self,
         entry_id: ProjectEntryId,
         cx: &Context<Worktree>,
@@ -1584,7 +1426,7 @@ impl LocalWorktree {
         }))
     }
 
-    fn expand_all_for_entry(
+    pub fn expand_all_for_entry(
         &self,
         entry_id: ProjectEntryId,
         cx: &Context<Worktree>,
@@ -2710,16 +2552,6 @@ async fn build_gitignore_with_root(abs_path: &Path, root: &Path, fs: &dyn Fs) ->
 }
 
 impl Deref for Worktree {
-    type Target = Snapshot;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Worktree::Local(worktree) => &worktree.snapshot,
-        }
-    }
-}
-
-impl Deref for LocalWorktree {
     type Target = LocalSnapshot;
 
     fn deref(&self) -> &Self::Target {
@@ -2727,7 +2559,7 @@ impl Deref for LocalWorktree {
     }
 }
 
-impl fmt::Debug for LocalWorktree {
+impl fmt::Debug for Worktree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.snapshot.fmt(f)
     }
@@ -2819,14 +2651,14 @@ impl language::LocalFile for File {
     }
 
     fn load(&self, cx: &App) -> Task<Result<String>> {
-        let worktree = self.worktree.read(cx).as_local();
+        let worktree = self.worktree.read(cx);
         let abs_path = worktree.absolutize(&self.path);
         let fs = worktree.fs.clone();
         cx.background_spawn(async move { fs.load(&abs_path).await })
     }
 
     fn load_bytes(&self, cx: &App) -> Task<Result<Vec<u8>>> {
-        let worktree = self.worktree.read(cx).as_local();
+        let worktree = self.worktree.read(cx);
         let abs_path = worktree.absolutize(&self.path);
         let fs = worktree.fs.clone();
         cx.background_spawn(async move { fs.load_bytes(&abs_path).await })
@@ -5480,10 +5312,8 @@ impl WorktreeModelHandle for Entity<Worktree> {
         let file_name = "fs-event-sentinel";
 
         let tree = self.clone();
-        let (fs, root_path) = self.read_with(cx, |tree, _| {
-            let tree = tree.as_local();
-            (tree.fs.clone(), tree.abs_path.clone())
-        });
+        let (fs, root_path) =
+            self.read_with(cx, |tree, _| (tree.fs.clone(), tree.abs_path.clone()));
 
         async move {
             // Subscribe to events BEFORE creating the file to avoid race condition
@@ -5542,7 +5372,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
                 }
             }
 
-            cx.update(|cx| tree.read(cx).as_local().scan_complete())
+            cx.update(|cx| tree.read(cx).scan_complete())
                 .await;
         }
         .boxed_local()
@@ -5563,7 +5393,6 @@ impl WorktreeModelHandle for Entity<Worktree> {
 
         let tree = self.clone();
         let (fs, root_path, mut git_dir_scan_id) = self.read_with(cx, |tree, _| {
-            let tree = tree.as_local();
             let local_repo_entry = tree
                 .git_repositories
                 .values()
@@ -5577,7 +5406,6 @@ impl WorktreeModelHandle for Entity<Worktree> {
         });
 
         let scan_id_increased = |tree: &mut Worktree, git_dir_scan_id: &mut usize| {
-            let tree = tree.as_local();
             // let repository = tree.repositories.first().unwrap();
             let local_repo_entry = tree
                 .git_repositories
@@ -5634,7 +5462,7 @@ impl WorktreeModelHandle for Entity<Worktree> {
                 }
             }
 
-            cx.update(|cx| tree.read(cx).as_local().scan_complete())
+            cx.update(|cx| tree.read(cx).scan_complete())
                 .await;
         }
         .boxed_local()
@@ -6342,11 +6170,9 @@ mod tests {
             )
             .await
             .unwrap();
-            tree.read_with(cx, |tree, _| tree.as_local().scan_complete())
-                .await;
+            tree.read_with(cx, |tree, _| tree.scan_complete()).await;
             let (status_updates_tx, _status_updates_rx) = mpsc::unbounded();
             let scanner = tree.update(cx, |tree, cx| {
-                let tree = tree.as_local_mut();
                 tree._background_scanner_tasks.clear();
                 BackgroundScanner {
                     state: async_lock::Mutex::new(BackgroundScannerState {

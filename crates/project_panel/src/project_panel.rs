@@ -5160,7 +5160,7 @@ impl ProjectPanel {
                         .into_iter()
                         .map(|(worktree, leaf_path)| {
                             worktree.update(cx, |worktree, cx| {
-                                worktree.as_local_mut().refresh_entry(leaf_path, None, cx)
+                                worktree.refresh_entry(leaf_path, None, cx)
                             })
                         })
                         .collect();

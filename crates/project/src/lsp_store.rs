@@ -150,8 +150,8 @@ pub use semantic_tokens::{
 };
 
 pub use worktree::{
-    Entry, EntryKind, FS_WATCH_LATENCY, File, LocalWorktree, PathChange, ProjectEntryId,
-    UpdatedEntriesSet, UpdatedGitRepositoriesSet, Worktree, WorktreeId, WorktreeSettings,
+    Entry, EntryKind, FS_WATCH_LATENCY, File, PathChange, ProjectEntryId, UpdatedEntriesSet,
+    UpdatedGitRepositoriesSet, Worktree, WorktreeId, WorktreeSettings,
 };
 
 const SERVER_LAUNCHING_BEFORE_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -3785,11 +3785,7 @@ impl LocalLspStore {
                             return None;
                         }
                         target_worktree.update(cx, |worktree, cx| {
-                            Some(worktree.as_local().refresh_entry(
-                                target_rel_path,
-                                Some(source_rel_path),
-                                cx,
-                            ))
+                            Some(worktree.refresh_entry(target_rel_path, Some(source_rel_path), cx))
                         })
                     });
                     if let Some(refresh) = refresh {
@@ -4046,9 +4042,7 @@ impl LocalLspStore {
                     .or_default()
                     .add(registration_id, glob);
                 worktree.update(cx, |worktree, _| {
-                    worktree
-                        .as_local_mut()
-                        .add_path_prefix_to_scan(literal_prefix);
+                    worktree.add_path_prefix_to_scan(literal_prefix);
                 });
             }
 
@@ -11080,7 +11074,7 @@ async fn find_worktree_for_lsp_path(
                 let scans = worktree_store
                     .worktrees()
                     .map(|worktree| {
-                        let scan_complete = worktree.read(cx).as_local().scan_complete();
+                        let scan_complete = worktree.read(cx).scan_complete();
                         async move {
                             scan_complete.await;
                             worktree
@@ -11098,9 +11092,7 @@ async fn find_worktree_for_lsp_path(
             // immediately for worktrees that are not scanning.
             while let Some(worktree) = scans.next().await {
                 let relative_path = worktree.read_with(cx, |worktree, _| {
-                    worktree
-                        .as_local()
-                        .relative_path_for_external_abs_path(&canonical_path)
+                    worktree.relative_path_for_external_abs_path(&canonical_path)
                 });
                 if let Some(relative_path) = relative_path {
                     return Ok(Some((worktree, Arc::from(relative_path))));
@@ -11118,12 +11110,11 @@ async fn normalize_lsp_relative_path(
     cx: &mut AsyncApp,
 ) -> Result<Arc<RelPath>> {
     let Some((fs, snapshot, worktree_root)) = worktree.read_with(cx, |worktree, _| {
-        let local_worktree = worktree.as_local();
-        if local_worktree.fs_is_case_sensitive() {
+        if worktree.fs_is_case_sensitive() {
             return None;
         }
         Some((
-            local_worktree.fs().clone(),
+            worktree.fs().clone(),
             worktree.snapshot(),
             worktree.abs_path(),
         ))

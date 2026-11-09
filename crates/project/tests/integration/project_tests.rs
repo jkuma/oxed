@@ -6860,25 +6860,28 @@ async fn test_definition(cx: &mut gpui::TestAppContext) {
         assert_eq!(definition.target.range.to_offset(target_buffer), 9..10);
         assert_eq!(
             list_worktrees(&project, cx),
-            [("/dir/b.rs".as_ref(), true), ("/dir/a.rs".as_ref(), false),],
+            [
+                (PathBuf::from("/dir/b.rs"), true),
+                (PathBuf::from("/dir/a.rs"), false)
+            ],
         );
 
         drop(definition);
     });
     cx.update(|cx| {
-        assert_eq!(list_worktrees(&project, cx), [("/dir/b.rs".as_ref(), true)]);
+        assert_eq!(
+            list_worktrees(&project, cx),
+            [(PathBuf::from("/dir/b.rs"), true)]
+        );
     });
 
-    fn list_worktrees<'a>(project: &'a Entity<Project>, cx: &'a App) -> Vec<(&'a Path, bool)> {
+    fn list_worktrees(project: &Entity<Project>, cx: &App) -> Vec<(PathBuf, bool)> {
         project
             .read(cx)
             .worktrees(cx)
             .map(|worktree| {
                 let worktree = worktree.read(cx);
-                (
-                    worktree.as_local().abs_path().as_ref(),
-                    worktree.is_visible(),
-                )
+                (worktree.abs_path().to_path_buf(), worktree.is_visible())
             })
             .collect::<Vec<_>>()
     }
@@ -17313,7 +17316,7 @@ async fn test_git_events_after_project_excludes_dot_git(cx: &mut gpui::TestAppCo
             )
             .unwrap();
     });
-    cx.read(|cx| tree.read(cx).as_local().scan_complete()).await;
+    cx.read(|cx| tree.read(cx).scan_complete()).await;
     cx.executor().run_until_parked();
 
     cx.update(|cx| {
@@ -18998,8 +19001,7 @@ async fn test_rescan_with_gitignore(cx: &mut gpui::TestAppContext) {
     });
 
     tree.read_with(cx, |tree, _| {
-        tree.as_local()
-            .manually_refresh_entries_for_paths(vec![rel_path("ignored-dir").into()])
+        tree.manually_refresh_entries_for_paths(vec![rel_path("ignored-dir").into()])
     })
     .recv()
     .await;
