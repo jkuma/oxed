@@ -388,6 +388,8 @@ impl ExtensionStore {
             let reload_tx = this.reload_tx.clone();
             let installed_dir = this.installed_dir.clone();
             async move {
+                // A missing directory is only picked up by slow polling once it exists.
+                fs.create_dir(&installed_dir).await.log_err();
                 let (mut paths, _) = fs.watch(&installed_dir, FS_WATCH_LATENCY).await;
                 while let Some(events) = paths.next().await {
                     for event in events {
