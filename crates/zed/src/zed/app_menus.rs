@@ -251,12 +251,6 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                         url: "https://github.com/jkuma/oxed".into(),
                     },
                 ),
-                MenuItem::action(
-                    "Zed Documentation",
-                    super::OpenBrowser {
-                        url: "https://zed.dev/docs".into(),
-                    },
-                ),
             ],
         },
     ]

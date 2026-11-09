@@ -145,30 +145,15 @@ impl Render for MultibufferHint {
             .overflow_hidden()
             .child(
                 h_flex()
-                    .gap_0p5()
+                    .gap_2()
                     .child(
-                        h_flex()
-                            .gap_2()
-                            .child(
-                                Icon::new(IconName::Info)
-                                    .size(IconSize::XSmall)
-                                    .color(Color::Muted),
-                            )
-                            .child(Label::new(
-                                "Edit and save files directly in the results multibuffer!",
-                            )),
+                        Icon::new(IconName::Info)
+                            .size(IconSize::XSmall)
+                            .color(Color::Muted),
                     )
-                    .child(
-                        Button::new("open_docs", "Learn More")
-                            .end_icon(
-                                Icon::new(IconName::ArrowUpRight)
-                                    .size(IconSize::Small)
-                                    .color(Color::Muted),
-                            )
-                            .on_click(move |_event, _, cx| {
-                                cx.open_url("https://zed.dev/docs/multibuffers")
-                            }),
-                    ),
+                    .child(Label::new(
+                        "Edit and save files directly in the results multibuffer!",
+                    )),
             )
             .child(
                 IconButton::new("dismiss", IconName::Close)

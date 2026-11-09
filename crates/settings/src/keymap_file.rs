@@ -64,8 +64,7 @@ pub struct KeymapSection {
     /// Determines when these bindings are active. When just a name is provided, like `Editor` or
     /// `Workspace`, the bindings will be active in that context. Boolean expressions like `X && Y`,
     /// `X || Y`, `!X` are also supported. Some more complex logic including checking OS and the
-    /// current file extension are also supported - see [the
-    /// documentation](https://zed.dev/docs/key-bindings#contexts) for more details.
+    /// current file extension are also supported.
     #[serde(default)]
     pub context: String,
     /// Has no effect; accepted so keymaps written for other platforms still load.

@@ -74,9 +74,7 @@ use workspace::{
     open_new,
 };
 use workspace::{CloseProject, CloseWindow, with_active_or_new_workspace};
-use zed_actions::{About, OpenBrowser, OpenDocs, OpenSettingsFile, OpenZedUrl, Quit};
-
-const DOCS_URL: &str = "https://zed.dev/docs/";
+use zed_actions::{About, OpenBrowser, OpenSettingsFile, OpenZedUrl, Quit};
 
 actions!(
     zed,
@@ -430,14 +428,14 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     .detach();
 }
 
-#[allow(unused)]
+#[cfg(not(test))]
 fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Workspace>) {
     if let Err(e) = fs.start_native_watcher() {
         let message = format!(
             db::indoc! {r#"
             inotify_init returned {}
 
-            This may be due to system-wide limits on inotify instances. For troubleshooting see: https://zed.dev/docs/linux
+            This may be due to system-wide limits on inotify instances.
             "#},
             e
         );
@@ -445,15 +443,12 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
             PromptLevel::Critical,
             "Could not start inotify",
             Some(&message),
-            &["Troubleshoot and Quit"],
+            &["Quit"],
             cx,
         );
         cx.spawn(async move |_, cx| {
             if prompt.await == Ok(0) {
-                cx.update(|cx| {
-                    cx.open_url("https://zed.dev/docs/linux#could-not-start-inotify");
-                    cx.quit();
-                });
+                cx.update(|cx| cx.quit());
             }
         })
         .detach()
@@ -466,36 +461,27 @@ fn show_software_emulation_warning_if_needed(
     cx: &mut Context<Workspace>,
 ) {
     if specs.is_software_emulated && std::env::var("ZED_ALLOW_EMULATED_GPU").is_err() {
-        let (graphics_api, docs_url, open_url) = (
-            "Vulkan",
-            "https://zed.dev/docs/linux",
-            "https://zed.dev/docs/linux#zed-fails-to-open-windows",
-        );
         let message = format!(
             db::indoc! {r#"
-            Zed uses {} for rendering and requires a compatible GPU.
+            Oxed uses Vulkan for rendering and requires a compatible GPU.
 
             Currently you are using a software emulated GPU ({}) which
             will result in awful performance.
 
-            For troubleshooting see: {}
             Set ZED_ALLOW_EMULATED_GPU=1 env var to permanently override.
             "#},
-            graphics_api, specs.device_name, docs_url
+            specs.device_name
         );
         let prompt = window.prompt(
             PromptLevel::Critical,
             "Unsupported GPU",
             Some(&message),
-            &["Skip", "Troubleshoot and Quit"],
+            &["Skip", "Quit"],
             cx,
         );
         cx.spawn(async move |_, cx| {
             if prompt.await == Ok(1) {
-                cx.update(|cx| {
-                    cx.open_url(open_url);
-                    cx.quit();
-                });
+                cx.update(|cx| cx.quit());
             }
         })
         .detach()
@@ -544,7 +530,6 @@ fn register_actions(
     _: &mut Context<Workspace>,
 ) {
     workspace
-        .register_action(|_, _: &OpenDocs, _, cx| cx.open_url(DOCS_URL))
         .register_action(
             |workspace: &mut Workspace,
              _: &input_latency_ui::DumpInputLatencyHistogram,

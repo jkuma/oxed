@@ -232,7 +232,6 @@ pub struct LanguageAdditionSuggestion {
     pub languages: &'static [&'static str],
     pub title: &'static str,
     pub description: &'static str,
-    pub docs_url: &'static str,
     pub install_message: &'static str,
 }
 
@@ -262,7 +261,6 @@ const SUGGESTIONS_BY_LANGUAGE: &[LanguageAdditionSuggestion] = &[LanguageAdditio
     ],
     title: "Emmet is available for this file",
     description: "Emmet expands abbreviations such as `ul>li*3` into HTML and `m10` into CSS.",
-    docs_url: "https://zed.dev/docs/languages/emmet",
     install_message: "Install Emmet",
 }];
 

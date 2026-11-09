@@ -321,21 +321,10 @@ impl PickerDelegate for IconThemeSelectorDelegate {
             h_flex()
                 .p_2()
                 .w_full()
-                .justify_between()
+                .justify_end()
                 .gap_2()
                 .border_t_1()
                 .border_color(cx.theme().colors().border_variant)
-                .child(
-                    Button::new("docs", "View Icon Theme Docs")
-                        .end_icon(
-                            Icon::new(IconName::ArrowUpRight)
-                                .size(IconSize::Small)
-                                .color(Color::Muted),
-                        )
-                        .on_click(|_event, _window, cx| {
-                            cx.open_url("https://zed.dev/docs/icon-themes");
-                        }),
-                )
                 .child(
                     Button::new("more-icon-themes", "Install Icon Themes").on_click(
                         move |_event, window, cx| {

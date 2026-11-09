@@ -671,8 +671,6 @@ pub mod simple_message_notification {
         secondary_icon_color: Option<Color>,
         secondary_on_click: Option<Arc<dyn Fn(&mut Window, &mut Context<Self>)>>,
         secondary_menu_entries: Vec<(SharedString, Arc<dyn Fn(&mut Window, &mut Context<Self>)>)>,
-        more_info_message: Option<SharedString>,
-        more_info_url: Option<Arc<str>>,
         show_close_button: bool,
         show_suppress_button: bool,
         title: Option<SharedString>,
@@ -724,8 +722,6 @@ pub mod simple_message_notification {
                 secondary_icon_color: None,
                 secondary_on_click: None,
                 secondary_menu_entries: Vec::new(),
-                more_info_message: None,
-                more_info_url: None,
                 show_close_button: true,
                 show_suppress_button: true,
                 title: None,
@@ -866,22 +862,6 @@ pub mod simple_message_notification {
                     }))
                 })
                 .into_any_element()
-        }
-
-        pub fn more_info_message<S>(mut self, message: S) -> Self
-        where
-            S: Into<SharedString>,
-        {
-            self.more_info_message = Some(message.into());
-            self
-        }
-
-        pub fn more_info_url<S>(mut self, url: S) -> Self
-        where
-            S: Into<Arc<str>>,
-        {
-            self.more_info_url = Some(url.into());
-            self
         }
 
         pub fn dismiss(&mut self, cx: &mut Context<Self>) {
@@ -1086,9 +1066,7 @@ pub mod simple_message_notification {
                     )
                 });
 
-            let has_suffix = self.primary_message.is_some()
-                || self.secondary_message.is_some()
-                || self.more_info_message.is_some();
+            let has_suffix = self.primary_message.is_some() || self.secondary_message.is_some();
 
             let suffix = h_flex()
                 .gap_1()
@@ -1138,27 +1116,7 @@ pub mod simple_message_notification {
                             .style(SplitButtonStyle::Transparent)
                             .into_any_element()
                     }
-                }))
-                .child(
-                    h_flex().w_full().justify_end().children(
-                        self.more_info_message
-                            .iter()
-                            .zip(self.more_info_url.iter())
-                            .map(|(message, url)| {
-                                let url = url.clone();
-                                Button::new(message.clone(), message.clone())
-                                    .label_size(LabelSize::Small)
-                                    .end_icon(
-                                        Icon::new(IconName::ArrowUpRight)
-                                            .size(IconSize::Indicator)
-                                            .color(Color::Muted),
-                                    )
-                                    .on_click(cx.listener(move |_, _, _, cx| {
-                                        cx.open_url(&url);
-                                    }))
-                            }),
-                    ),
-                );
+                }));
 
             // Wrap the icon to vertically align with the first line of the primary
             // message (mirrors `ui::Callout`'s alignment pattern). The body, secondary

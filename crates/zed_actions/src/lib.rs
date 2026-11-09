@@ -59,8 +59,6 @@ actions!(
         Quit,
         /// Shows information about Zed.
         About,
-        /// Opens the documentation website.
-        OpenDocs,
         /// Views open source licenses.
         OpenLicenses,
         /// Opens the performance profiler.

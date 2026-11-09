@@ -1083,23 +1083,14 @@ impl ExtensionsPage {
         }
     }
 
-    fn render_feature_upsell_banner(
-        &self,
-        label: &'static str,
-        docs_url: &'static str,
-    ) -> impl IntoElement {
-        let docs_url_button = Button::new("open_docs", "View Documentation")
-            .end_icon(Icon::new(IconName::ArrowUpRight).size(IconSize::Small))
-            .on_click(move |_event, _window, cx| cx.open_url(docs_url));
-
+    fn render_feature_upsell_banner(&self, label: &'static str) -> impl IntoElement {
         div()
             .pt_4()
             .px_4()
             .child(
                 Banner::new()
                     .severity(Severity::Success)
-                    .child(Label::new(SharedString::new_static(label)).mt_0p5())
-                    .action_slot(docs_url_button),
+                    .child(Label::new(SharedString::new_static(label)).mt_0p5()),
             )
             .into_any_element()
     }
@@ -1108,59 +1099,43 @@ impl ExtensionsPage {
         v_flex().children(self.upsells.iter().map(|feature| match feature {
             Feature::ExtensionBasedpyright => self.render_feature_upsell_banner(
                 "Basedpyright (Python language server) support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/python#basedpyright",
             ),
             Feature::ExtensionRuff => self.render_feature_upsell_banner(
                 "Ruff (linter for Python) support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/python#code-formatting--linting",
             ),
-            Feature::ExtensionTailwind => self.render_feature_upsell_banner(
-                "Tailwind CSS support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/tailwindcss",
-            ),
+            Feature::ExtensionTailwind => {
+                self.render_feature_upsell_banner("Tailwind CSS support is built-in to Oxed!")
+            }
             Feature::ExtensionTy => self.render_feature_upsell_banner(
                 "Ty (Python language server) support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/python",
             ),
-            Feature::Git => self.render_feature_upsell_banner(
-                "Oxed comes with basic Git support.",
-                "https://zed.dev/docs/git",
-            ),
-            Feature::LanguageBash => self.render_feature_upsell_banner(
-                "Shell support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/bash",
-            ),
-            Feature::LanguageC => self.render_feature_upsell_banner(
-                "C support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/c",
-            ),
-            Feature::LanguageCpp => self.render_feature_upsell_banner(
-                "C++ support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/cpp",
-            ),
-            Feature::LanguageGo => self.render_feature_upsell_banner(
-                "Go support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/go",
-            ),
-            Feature::LanguagePython => self.render_feature_upsell_banner(
-                "Python support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/python",
-            ),
-            Feature::LanguageReact => self.render_feature_upsell_banner(
-                "React support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/typescript",
-            ),
-            Feature::LanguageRust => self.render_feature_upsell_banner(
-                "Rust support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/rust",
-            ),
-            Feature::LanguageTypescript => self.render_feature_upsell_banner(
-                "Typescript support is built-in to Oxed!",
-                "https://zed.dev/docs/languages/typescript",
-            ),
+            Feature::Git => self.render_feature_upsell_banner("Oxed comes with basic Git support."),
+            Feature::LanguageBash => {
+                self.render_feature_upsell_banner("Shell support is built-in to Oxed!")
+            }
+            Feature::LanguageC => {
+                self.render_feature_upsell_banner("C support is built-in to Oxed!")
+            }
+            Feature::LanguageCpp => {
+                self.render_feature_upsell_banner("C++ support is built-in to Oxed!")
+            }
+            Feature::LanguageGo => {
+                self.render_feature_upsell_banner("Go support is built-in to Oxed!")
+            }
+            Feature::LanguagePython => {
+                self.render_feature_upsell_banner("Python support is built-in to Oxed!")
+            }
+            Feature::LanguageReact => {
+                self.render_feature_upsell_banner("React support is built-in to Oxed!")
+            }
+            Feature::LanguageRust => {
+                self.render_feature_upsell_banner("Rust support is built-in to Oxed!")
+            }
+            Feature::LanguageTypescript => {
+                self.render_feature_upsell_banner("Typescript support is built-in to Oxed!")
+            }
             Feature::OpenIn => self.render_feature_upsell_banner(
                 "Oxed supports linking to a source line on GitHub and others.",
-                "https://zed.dev/docs/git#git-integrations",
             ),
         }))
     }

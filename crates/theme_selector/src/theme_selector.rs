@@ -534,21 +534,10 @@ impl PickerDelegate for ThemeSelectorDelegate {
             h_flex()
                 .p_2()
                 .w_full()
-                .justify_between()
+                .justify_end()
                 .gap_2()
                 .border_t_1()
                 .border_color(cx.theme().colors().border_variant)
-                .child(
-                    Button::new("docs", "View Theme Docs")
-                        .end_icon(
-                            Icon::new(IconName::ArrowUpRight)
-                                .size(IconSize::Small)
-                                .color(Color::Muted),
-                        )
-                        .on_click(cx.listener(|_, _, _, cx| {
-                            cx.open_url("https://zed.dev/docs/themes");
-                        })),
-                )
                 .child(
                     Button::new("more-themes", "Install Themes").on_click(cx.listener({
                         move |_, _, window, cx| {

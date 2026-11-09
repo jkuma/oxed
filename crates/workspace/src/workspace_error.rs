@@ -1,8 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use gpui::{Action, SharedString};
 use ui::{IconName, IconPosition};
-use zed_actions::OpenBrowser;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorSeverity {
@@ -94,22 +93,9 @@ impl ErrorAction {
         self
     }
 
-    /// Show `icon` at the end (right) of the action button label.
-    ///
-    /// Useful for actions that navigate the user elsewhere — for example the trailing
-    /// `⇗` produced by [`Self::link`].
-    pub fn with_end_icon(mut self, icon: IconName) -> Self {
-        self.icon = Some(ActionIcon::end(icon));
-        self
-    }
-
     pub fn with_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
         self.tooltip = Some(tooltip.into());
         self
-    }
-
-    pub fn link(label: impl Into<SharedString>, url: impl Into<Arc<str>>) -> Self {
-        Self::new(label, OpenBrowser { url: url.into() }).with_end_icon(IconName::ArrowUpRight)
     }
 }
 
@@ -196,9 +182,6 @@ impl WorkspaceError for PortalError {
     }
 
     fn primary_action(&self) -> ErrorAction {
-        ErrorAction::link(
-            "See docs",
-            "https://zed.dev/docs/linux#i-cant-open-any-files",
-        )
+        ErrorAction::dismiss()
     }
 }

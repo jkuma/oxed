@@ -139,9 +139,7 @@ fn fail_to_open_window_async(e: anyhow::Error, cx: &mut AsyncApp) {
 }
 
 fn fail_to_open_window(e: anyhow::Error, _cx: &mut App) {
-    eprintln!(
-        "Oxed failed to open a window: {e:?}. See https://zed.dev/docs/linux for troubleshooting steps."
-    );
+    eprintln!("Oxed failed to open a window: {e:?}.");
 
     // Maybe unify this with gpui::platform::linux::platform::ResultExt::notify_err(..)?
     use ashpd::desktop::notification::{Notification, NotificationProxy, Priority};
@@ -155,10 +153,7 @@ fn fail_to_open_window(e: anyhow::Error, _cx: &mut App) {
             .add_notification(
                 notification_id,
                 Notification::new("Oxed failed to launch")
-                    .body(Some(
-                        format!("{e:?}. See https://zed.dev/docs/linux for troubleshooting steps.")
-                            .as_str(),
-                    ))
+                    .body(Some(format!("{e:?}.").as_str()))
                     .priority(Priority::High)
                     .icon(ashpd::desktop::Icon::with_names(&[
                         "dialog-question-symbolic",
@@ -1119,7 +1114,7 @@ struct Args {
     /// Use `path:line:row` syntax to open a file at a specific location.
     /// Non-existing paths and directories will ignore `:line:row` suffix.
     ///
-    /// URLs can either be `file://` or `oxed://` scheme, or relative to <https://zed.dev>.
+    /// URLs can either be `file://` or `oxed://` scheme.
     paths_or_urls: Vec<String>,
 
     /// Pairs of file paths to diff. Can be specified multiple times.
