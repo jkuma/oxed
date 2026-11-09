@@ -6171,38 +6171,6 @@ fn version_control_page() -> SettingsPage {
         ]
     }
 
-    fn git_blame_view_section() -> [SettingsPageItem; 2] {
-        [
-            SettingsPageItem::SectionHeader("Git Blame View"),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Show Avatar",
-                description: "Show the avatar of the author of the commit.",
-                field: Box::new(SettingField {
-                    json_path: Some("git.blame.show_avatar"),
-                    pick: |settings_content| {
-                        settings_content
-                            .git
-                            .as_ref()?
-                            .blame
-                            .as_ref()?
-                            .show_avatar
-                            .as_ref()
-                    },
-                    write: |settings_content, value, _| {
-                        settings_content
-                            .git
-                            .get_or_insert_default()
-                            .blame
-                            .get_or_insert_default()
-                            .show_avatar = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-        ]
-    }
-
     fn branch_picker_section() -> [SettingsPageItem; 2] {
         [
             SettingsPageItem::SectionHeader("Branch Picker"),
@@ -6340,7 +6308,6 @@ fn version_control_page() -> SettingsPage {
             git_integration_section(),
             git_gutter_section(),
             inline_git_blame_section(),
-            git_blame_view_section(),
             branch_picker_section(),
             file_diff_section(),
             git_hunks_section(),

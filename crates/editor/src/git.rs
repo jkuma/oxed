@@ -334,6 +334,14 @@ impl Editor {
             .update(cx, |buffer, cx| buffer.expand_diff_hunks(ranges, cx))
     }
 
+    pub(crate) fn git_blame_menu_label(&self) -> &'static str {
+        if self.show_git_blame_gutter {
+            "Close Annotations"
+        } else {
+            "Annotate with Git Blame"
+        }
+    }
+
     pub fn toggle_git_blame(
         &mut self,
         _: &::git::Blame,

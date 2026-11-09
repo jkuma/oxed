@@ -6967,17 +6967,17 @@ fn render_blame_entry(
     cx: &mut App,
 ) -> Option<AnyElement> {
     let index: u32 = blame_entry.sha.into();
-    let mut sha_color = cx.theme().players().color_for_participant(index).cursor;
+    let mut commit_color = cx.theme().players().color_for_participant(index).cursor;
 
     // If the last color we used is the same as the one we get for this line, but
     // the commit SHAs are different, then we try again to get a different color.
     if let Some((color, sha)) = *last_used_color
         && sha != blame_entry.sha
-        && color == sha_color
+        && color == commit_color
     {
-        sha_color = cx.theme().players().color_for_participant(index + 1).cursor;
+        commit_color = cx.theme().players().color_for_participant(index + 1).cursor;
     }
-    last_used_color.replace((sha_color, blame_entry.sha));
+    last_used_color.replace((commit_color, blame_entry.sha));
 
     let blame = blame.read(cx);
     let details = blame.details_for_entry(buffer, &blame_entry);
@@ -6992,7 +6992,7 @@ fn render_blame_entry(
         workspace.downgrade(),
         editor,
         ix,
-        sha_color,
+        commit_color,
         window,
         cx,
     )

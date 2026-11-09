@@ -228,6 +228,8 @@ pub fn deploy_context_menu(
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
             });
 
+        let git_blame_label = editor.git_blame_menu_label();
+
         ui::ContextMenu::build(window, cx, |menu, _window, _cx| {
             let builder = menu
                 .on_blur_subscription(Subscription::new(|| {}))
@@ -291,7 +293,8 @@ pub fn deploy_context_menu(
                     !has_git_repo,
                     "View File History",
                     Box::new(git::FileHistory),
-                );
+                )
+                .action_disabled_when(!has_git_repo, git_blame_label, Box::new(git::Blame));
             match focus {
                 Some(focus) => builder.context(focus),
                 None => builder,

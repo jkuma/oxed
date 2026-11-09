@@ -475,8 +475,6 @@ pub struct GitSettings {
     ///
     /// Default: on
     pub inline_blame: Option<InlineBlameSettings>,
-    /// Git blame settings.
-    pub blame: Option<BlameSettings>,
     /// Which information to show in the branch picker.
     ///
     /// Default: on
@@ -616,16 +614,6 @@ pub struct InlineBlameSettings {
     ///
     /// Default: false
     pub show_commit_summary: Option<bool>,
-}
-
-#[with_fallible_options]
-#[derive(Clone, Copy, Debug, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom)]
-#[serde(rename_all = "snake_case")]
-pub struct BlameSettings {
-    /// Whether to show the avatar of the author of the commit.
-    ///
-    /// Default: true
-    pub show_avatar: Option<bool>,
 }
 
 #[with_fallible_options]

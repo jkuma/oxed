@@ -3927,11 +3927,7 @@ impl Editor {
             .summary_for_anchor::<Point>(&anchor)
             .row;
 
-        let git_blame_msg = if self.show_git_blame_gutter {
-            "Close Git Blame"
-        } else {
-            "Open Git Blame"
-        };
+        let git_blame_msg = self.git_blame_menu_label();
 
         let bookmark = self.bookmark_at_row(row, window, cx);
 
@@ -10769,11 +10765,10 @@ impl EditorSnapshot {
                 self.git_blame_gutter_max_author_length
                     .map(|max_author_length| {
                         let renderer = cx.global::<GlobalBlameRenderer>().0.clone();
-                        const MAX_RELATIVE_TIMESTAMP: &str = "2 years, 11 months ago";
+                        const BLAME_DATE: &str = "dd/mm/yyyy";
 
-                        let max_char_count = max_author_length.min(renderer.max_author_length())
-                            + ::git::SHORT_SHA_LENGTH
-                            + MAX_RELATIVE_TIMESTAMP.len();
+                        let max_char_count =
+                            max_author_length.min(renderer.max_author_length()) + BLAME_DATE.len();
 
                         ch_advance * max_char_count
                             + renderer.blame_entry_non_text_width(window, cx)

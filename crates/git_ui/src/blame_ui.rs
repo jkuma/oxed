@@ -29,7 +29,8 @@ use workspace::{Workspace, notifications::NotifyTaskExt as _};
 const GIT_BLAME_MAX_AUTHOR_CHARS_DISPLAYED: usize = 20;
 const GIT_BLAME_GUTTER_MARGIN: Rems = rems(0.5);
 const GIT_BLAME_GUTTER_GAP: Rems = rems(0.5);
-const GIT_BLAME_AVATAR_SIZE: Rems = rems(1.);
+const GIT_BLAME_GUTTER_PADDING: Rems = rems(0.25);
+const GIT_BLAME_BACKGROUND_OPACITY: f32 = 0.2;
 
 pub struct GitBlameRenderer;
 
@@ -136,17 +137,11 @@ impl BlameRenderer for GitBlameRenderer {
         GIT_BLAME_MAX_AUTHOR_CHARS_DISPLAYED
     }
 
-    fn blame_entry_non_text_width(&self, window: &Window, cx: &App) -> Pixels {
-        let show_avatar = ProjectSettings::get_global(cx).git.blame.show_avatar;
-        let gap_count = if show_avatar { 3. } else { 2. };
-        let width = GIT_BLAME_GUTTER_MARGIN.to_pixels(window.rem_size())
-            + GIT_BLAME_GUTTER_GAP.to_pixels(window.rem_size()) * gap_count;
-
-        if show_avatar {
-            width + CommitAvatar::rendered_size(GIT_BLAME_AVATAR_SIZE, window)
-        } else {
-            width
-        }
+    fn blame_entry_non_text_width(&self, window: &Window, _: &App) -> Pixels {
+        let rem_size = window.rem_size();
+        GIT_BLAME_GUTTER_MARGIN.to_pixels(rem_size)
+            + GIT_BLAME_GUTTER_GAP.to_pixels(rem_size)
+            + GIT_BLAME_GUTTER_PADDING.to_pixels(rem_size) * 2.
     }
 
     fn render_blame_entry(
@@ -159,40 +154,17 @@ impl BlameRenderer for GitBlameRenderer {
         workspace: WeakEntity<Workspace>,
         editor: Entity<Editor>,
         ix: usize,
-        sha_color: Hsla,
-        window: &mut Window,
+        commit_color: Hsla,
+        _window: &mut Window,
         cx: &mut App,
     ) -> Option<AnyElement> {
-        let relative_timestamp = blame_entry_relative_timestamp(&blame_entry);
-        let short_commit_id = blame_entry.sha.display_short();
+        let date = blame_entry_gutter_date(&blame_entry);
         let author_name = blame_entry.author.as_deref().unwrap_or("<no name>");
         let name = util::truncate_and_trailoff(author_name, GIT_BLAME_MAX_AUTHOR_CHARS_DISPLAYED);
         let is_highlighted = editor
             .read(cx)
             .blame()
             .is_some_and(|blame| blame.read(cx).highlighted_sha() == Some(blame_entry.sha));
-
-        let avatar = if ProjectSettings::get_global(cx).git.blame.show_avatar {
-            let author_email = blame_entry.author_mail.as_ref().map(|email| {
-                SharedString::from(
-                    email
-                        .trim_start_matches('<')
-                        .trim_end_matches('>')
-                        .to_string(),
-                )
-            });
-            Some(
-                CommitAvatar::new(
-                    &blame_entry.sha.to_string().into(),
-                    author_email,
-                    details.as_ref().and_then(|it| it.remote.as_ref()),
-                )
-                .size(GIT_BLAME_AVATAR_SIZE)
-                .render(window, cx),
-            )
-        } else {
-            None
-        };
 
         Some(
             div()
@@ -201,22 +173,17 @@ impl BlameRenderer for GitBlameRenderer {
                     h_flex()
                         .id(("blame", ix))
                         .w_full()
-                        .gap_2()
-                        .justify_between()
+                        .px(GIT_BLAME_GUTTER_PADDING)
+                        .gap(GIT_BLAME_GUTTER_GAP)
                         .font(style.font())
                         .line_height(style.line_height)
-                        .text_color(cx.theme().status().hint)
+                        .text_color(cx.theme().colors().text_muted)
+                        .bg(commit_color.opacity(GIT_BLAME_BACKGROUND_OPACITY))
                         .when(is_highlighted, |this| {
                             this.bg(cx.theme().colors().element_selected)
                         })
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(div().text_color(sha_color).child(short_commit_id))
-                                .children(avatar)
-                                .child(name),
-                        )
-                        .child(relative_timestamp)
+                        .child(date)
+                        .child(name)
                         .hover(|style| style.bg(cx.theme().colors().element_hover))
                         .cursor_pointer()
                         .on_mouse_down(MouseButton::Right, {
@@ -758,6 +725,27 @@ fn existing_blame_editor(
         })
 }
 
+fn blame_entry_gutter_date(blame_entry: &BlameEntry) -> String {
+    match blame_entry.author_offset_date_time() {
+        Ok(timestamp) => {
+            let local_offset =
+                time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
+            format_gutter_date(timestamp, local_offset)
+        }
+        Err(_) => "--/--/----".to_string(),
+    }
+}
+
+fn format_gutter_date(timestamp: OffsetDateTime, local_offset: time::UtcOffset) -> String {
+    let date = timestamp.to_offset(local_offset).date();
+    format!(
+        "{:02}/{:02}/{}",
+        date.day(),
+        u8::from(date.month()),
+        date.year()
+    )
+}
+
 fn blame_entry_relative_timestamp(blame_entry: &BlameEntry) -> String {
     match blame_entry.author_offset_date_time() {
         Ok(timestamp) => {
@@ -771,5 +759,23 @@ fn blame_entry_relative_timestamp(blame_entry: &BlameEntry) -> String {
             )
         }
         Err(_) => "Error parsing date".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_gutter_date;
+    use time::{OffsetDateTime, UtcOffset};
+
+    #[test]
+    fn test_gutter_date_uses_the_local_day() {
+        // 2024-11-07 23:30 UTC
+        let timestamp = OffsetDateTime::from_unix_timestamp(1_731_022_200).unwrap();
+
+        assert_eq!(format_gutter_date(timestamp, UtcOffset::UTC), "07/11/2024");
+        assert_eq!(
+            format_gutter_date(timestamp, UtcOffset::from_hms(1, 0, 0).unwrap()),
+            "08/11/2024"
+        );
     }
 }
