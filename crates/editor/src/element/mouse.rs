@@ -191,7 +191,6 @@ impl EditorElement {
                     hint_glyph,
                     Some(event.position),
                     modifiers.secondary(),
-                    modifiers.shift,
                     window,
                     cx,
                 );

@@ -180,6 +180,12 @@ fn handle_definition_locations(
     }
     let project = workspace.read(cx).project().read(cx);
     let matches = build_location_matches(&action.locations, project, cx);
+    if matches.is_empty() && action.kind == GotoDefinitionKind::Implementation {
+        workspace.update(cx, |workspace, cx| {
+            show_no_results_toast(workspace, LspPickerKind::Implementation, cx)
+        });
+        return;
+    }
     if matches.len() < 2 {
         cx.propagate();
         return;
@@ -274,23 +280,19 @@ async fn run_picker_matches(
 }
 
 fn show_no_results_toast(
-    workspace: &WeakEntity<Workspace>,
+    workspace: &mut Workspace,
     kind: LspPickerKind,
-    cx: &mut AsyncWindowContext,
+    cx: &mut Context<Workspace>,
 ) {
-    workspace
-        .update(cx, |workspace, cx| {
-            struct NoLspResults;
-            workspace.show_toast(
-                Toast::new(
-                    NotificationId::unique::<NoLspResults>(),
-                    kind.empty_message(),
-                )
-                .autohide(),
-                cx,
-            );
-        })
-        .log_err();
+    struct NoLspResults;
+    workspace.show_toast(
+        Toast::new(
+            NotificationId::unique::<NoLspResults>(),
+            kind.empty_message(),
+        )
+        .autohide(),
+        cx,
+    );
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -427,7 +429,11 @@ impl LspLocationsPicker {
             }
 
             if matches.is_empty() {
-                show_no_results_toast(&workspace, invoked_kind, cx);
+                workspace
+                    .update(cx, |workspace, cx| {
+                        show_no_results_toast(workspace, invoked_kind, cx)
+                    })
+                    .log_err();
                 return;
             }
 
@@ -1101,11 +1107,9 @@ mod tests {
         cx.update(crate::init);
         for results in [OpenResultsIn::Picker, OpenResultsIn::MultiBuffer] {
             for shift in [false, true] {
-                for split in [false, true] {
-                    assert_cmd_click(cx, None, shift, false, results, split, false).await;
-                }
+                assert_cmd_click(cx, None, shift, false, results, false).await;
             }
-            assert_cmd_click(cx, None, false, false, results, false, true).await;
+            assert_cmd_click(cx, None, false, false, results, true).await;
         }
     }
 
@@ -1114,11 +1118,9 @@ mod tests {
         cx.update(crate::init);
         for results in [OpenResultsIn::Picker, OpenResultsIn::MultiBuffer] {
             for shift in [false, true] {
-                for split in [false, true] {
-                    assert_cmd_click(cx, Some(shift), shift, false, results, split, false).await;
-                }
+                assert_cmd_click(cx, Some(shift), shift, false, results, false).await;
                 for pending in [false, true] {
-                    assert_cmd_click(cx, Some(!shift), shift, pending, results, false, false).await;
+                    assert_cmd_click(cx, Some(!shift), shift, pending, results, false).await;
                 }
             }
         }
@@ -1293,7 +1295,6 @@ mod tests {
         shift: bool,
         pending: bool,
         results: OpenResultsIn,
-        split: bool,
         disabled: bool,
     ) {
         let mut cx = rust_cx(
@@ -1306,7 +1307,7 @@ mod tests {
         )
         .await;
         let scenario = format!(
-            "hover={hover:?}, shift={shift}, pending={pending}, results={results:?}, split={split}, disabled={disabled}"
+            "hover={hover:?}, shift={shift}, pending={pending}, results={results:?}, disabled={disabled}"
         );
         cx.update_global::<settings::SettingsStore, _>(|settings, cx| {
             settings.update_user_settings(cx, |settings| {
@@ -1371,7 +1372,6 @@ mod tests {
         }
         let modifiers = Modifiers {
             shift,
-            alt: split,
             ..Modifiers::secondary_key()
         };
         let mut expected_requests = Vec::new();
@@ -1415,7 +1415,7 @@ mod tests {
             Point::new(3, start)..Point::new(3, end),
         ];
         cx.update_workspace(|workspace, _, cx| {
-            assert_eq!(workspace.panes().len(), 1 + usize::from(split));
+            assert_eq!(workspace.panes().len(), 1);
             let active = workspace.active_item_as::<Editor>(cx).expect("editor");
             if disabled {
                 assert!(picker.is_none());
@@ -1423,7 +1423,7 @@ mod tests {
                 assert_eq!(workspace.items(cx).count(), 1);
                 return;
             }
-            let actual_ranges = if results == OpenResultsIn::Picker && !split {
+            let actual_ranges = if results == OpenResultsIn::Picker {
                 let picker = picker.expect("locations picker");
                 let delegate = &picker.read(cx).picker.read(cx).delegate;
                 let title_prefix = match shift {
@@ -1709,6 +1709,121 @@ mod tests {
             bounds.size.width >= minimum,
             "popup is {:?} wide, expected at least {minimum:?}",
             bounds.size.width
+        );
+    }
+
+    /// Ctrl+Alt+clicks `abc` while the server reports `targets` as its
+    /// implementations, and returns the LSP methods it was asked for.
+    async fn implementation_click(
+        cx: &mut TestAppContext,
+        results: OpenResultsIn,
+        targets: &'static [(u32, u32, u32)],
+    ) -> (EditorLspTestContext, Arc<Mutex<Vec<&'static str>>>) {
+        cx.update(crate::init);
+        let mut cx = rust_cx(
+            lsp::ServerCapabilities {
+                definition_provider: Some(lsp::OneOf::Left(true)),
+                implementation_provider: Some(lsp::ImplementationProviderCapability::Simple(true)),
+                references_provider: Some(lsp::OneOf::Left(true)),
+                ..Default::default()
+            },
+            cx,
+        )
+        .await;
+        cx.update_global::<settings::SettingsStore, _>(|settings, cx| {
+            settings.update_user_settings(cx, |settings| {
+                settings.editor.lsp_results_location = Some(results);
+            });
+        });
+        cx.set_state(SOURCE);
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        cx.lsp
+            .set_request_handler::<lsp::request::GotoImplementation, _, _>({
+                let requests = requests.clone();
+                move |params, _| {
+                    requests.lock().expect("requests").push("implementation");
+                    let uri = params.text_document_position_params.text_document.uri;
+                    async move {
+                        Ok(Some(lsp::GotoDefinitionResponse::Array(references(
+                            uri, targets,
+                        ))))
+                    }
+                }
+            });
+        cx.lsp
+            .set_request_handler::<lsp::request::References, _, _>({
+                let requests = requests.clone();
+                move |_, _| {
+                    requests.lock().expect("requests").push("references");
+                    async move { Ok(Some(Vec::new())) }
+                }
+            });
+        let position = cx
+            .editor(|editor, _, cx| editor.pixel_position_of_cursor(cx))
+            .expect("click pixel");
+        let modifiers = Modifiers {
+            alt: true,
+            ..Modifiers::secondary_key()
+        };
+        cx.simulate_mouse_move(position, None, modifiers);
+        cx.simulate_click(position, modifiers);
+        cx.run_until_parked();
+        (cx, requests)
+    }
+
+    #[gpui::test]
+    async fn test_ctrl_alt_click_opens_implementations(cx: &mut TestAppContext) {
+        let (mut cx, requests) =
+            implementation_click(cx, OpenResultsIn::Picker, &[(0, 3, 7), (2, 14, 17)]).await;
+
+        assert_eq!(*requests.lock().expect("requests"), ["implementation"]);
+        let picker = active_picker(&mut cx).expect("implementations popup");
+        cx.update(|_window, cx| {
+            assert_eq!(
+                picker.read(cx).picker.read(cx).delegate.title.as_ref(),
+                "Implementations of abc (2)"
+            );
+        });
+    }
+
+    #[gpui::test]
+    async fn test_ctrl_alt_click_jumps_to_a_single_implementation(cx: &mut TestAppContext) {
+        let (mut cx, _) = implementation_click(cx, OpenResultsIn::Picker, &[(2, 14, 17)]).await;
+
+        assert!(active_picker(&mut cx).is_none());
+        cx.update_editor(|editor, _, cx| {
+            let snapshot = editor.display_snapshot(cx);
+            assert_eq!(editor.selections.newest::<Point>(&snapshot).head().row, 2);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_ctrl_alt_click_without_implementations_shows_toast(cx: &mut TestAppContext) {
+        let (mut cx, requests) = implementation_click(cx, OpenResultsIn::Picker, &[]).await;
+
+        assert_only_implementation_requests(&requests);
+        assert!(active_picker(&mut cx).is_none());
+        cx.update_workspace(|workspace, _, _| {
+            assert_eq!(workspace.notification_ids().len(), 1);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_ctrl_alt_click_without_implementations_opens_no_tab(cx: &mut TestAppContext) {
+        let (mut cx, requests) = implementation_click(cx, OpenResultsIn::MultiBuffer, &[]).await;
+
+        assert_only_implementation_requests(&requests);
+        assert!(active_picker(&mut cx).is_none());
+        cx.update_workspace(|workspace, _, cx| {
+            assert_eq!(workspace.items(cx).count(), 1);
+        });
+    }
+
+    fn assert_only_implementation_requests(requests: &Mutex<Vec<&'static str>>) {
+        let requests = requests.lock().expect("requests").clone();
+        assert!(
+            !requests.is_empty() && requests.iter().all(|method| *method == "implementation"),
+            "no implementation must not fall back to the usages: {requests:?}"
         );
     }
 }

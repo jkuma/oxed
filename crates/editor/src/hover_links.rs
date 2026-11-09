@@ -202,7 +202,8 @@ impl Editor {
                         .anchor_before(point.to_offset(&snapshot.display_snapshot, Bias::Left)),
                 );
 
-                show_link_definition(modifiers.shift, self, trigger_point, snapshot, window, cx);
+                let kind = Self::link_kind(&modifiers, cx);
+                show_link_definition(kind, self, trigger_point, snapshot, window, cx);
             }
             _ => {
                 self.update_inlay_link_and_hover_points(
@@ -210,11 +211,21 @@ impl Editor {
                     hint_glyph,
                     mouse_position,
                     hovered_link_modifier,
-                    modifiers.shift,
                     window,
                     cx,
                 );
             }
+        }
+    }
+
+    /// Shift targets the type, the second modifier the implementations.
+    fn link_kind(modifiers: &Modifiers, cx: &mut Context<Self>) -> GotoDefinitionKind {
+        if modifiers.shift {
+            GotoDefinitionKind::Type
+        } else if Self::is_alt_pressed(modifiers, cx) {
+            GotoDefinitionKind::Implementation
+        } else {
+            GotoDefinitionKind::Symbol
         }
     }
 
@@ -230,12 +241,7 @@ impl Editor {
         window: &mut Window,
         cx: &mut Context<Editor>,
     ) {
-        let kind = if modifiers.shift {
-            GotoDefinitionKind::Type
-        } else {
-            GotoDefinitionKind::Symbol
-        };
-        let split = Self::is_alt_pressed(&modifiers, cx);
+        let kind = Self::link_kind(&modifiers, cx);
         let snapshot = self.snapshot(window, cx);
         let position = snapshot
             .buffer_snapshot()
@@ -322,14 +328,13 @@ impl Editor {
                                 matches!(link, HoverLink::Url(_) | HoverLink::File(_))
                             });
                         }
-                        editor
-                            .reveal_clicked_links(kind, links, position, origin, split, window, cx);
+                        editor.reveal_clicked_links(kind, links, position, origin, window, cx);
                     })
                     .ok();
             })
             .detach();
         } else {
-            self.reveal_clicked_links(kind, links, position, origin, split, window, cx);
+            self.reveal_clicked_links(kind, links, position, origin, window, cx);
         }
     }
 
@@ -364,7 +369,7 @@ impl Editor {
                 })
             })
             .collect::<Vec<_>>();
-        self.open_clicked_links(action.kind, links, action.origin.clone(), false, window, cx);
+        self.open_clicked_links(action.kind, links, action.origin.clone(), window, cx);
     }
 
     pub fn scroll_hover(
@@ -397,12 +402,10 @@ impl Editor {
         links: Vec<HoverLink>,
         position: Anchor,
         origin: Option<NavigationEntry>,
-        split: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !split
-            && self.lsp_data_enabled()
+        if self.lsp_data_enabled()
             && self.workspace().is_some()
             && EditorSettings::get_global(cx).lsp_results_location == OpenResultsIn::Picker
             && links.iter().all(|link| matches!(link, HoverLink::Text(_)))
@@ -435,7 +438,7 @@ impl Editor {
                 }
             });
         } else {
-            self.open_clicked_links(kind, links, origin, split, window, cx);
+            self.open_clicked_links(kind, links, origin, window, cx);
         }
     }
 
@@ -444,13 +447,16 @@ impl Editor {
         kind: GotoDefinitionKind,
         links: Vec<HoverLink>,
         origin: Option<NavigationEntry>,
-        split: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let navigation = self.navigate_to_hover_links(Some(kind), links, origin, split, window, cx);
+        let navigation = self.navigate_to_hover_links(Some(kind), links, origin, false, window, cx);
         cx.spawn_in(window, async move |editor, cx| {
             if navigation.await.log_err().unwrap_or(Navigated::No) == Navigated::Yes {
+                return;
+            }
+            // Without implementations, the usages would be misleading.
+            if kind == GotoDefinitionKind::Implementation {
                 return;
             }
             let focus_handle = editor
@@ -475,18 +481,13 @@ impl Editor {
 }
 
 pub fn show_link_definition(
-    shift_held: bool,
+    preferred_kind: GotoDefinitionKind,
     editor: &mut Editor,
     trigger_point: TriggerPoint,
     snapshot: &EditorSnapshot,
     window: &mut Window,
     cx: &mut Context<Editor>,
 ) {
-    let preferred_kind = match trigger_point {
-        TriggerPoint::Text(_) if !shift_held => GotoDefinitionKind::Symbol,
-        _ => GotoDefinitionKind::Type,
-    };
-
     let (mut hovered_link_state, is_cached) =
         if let Some(existing) = editor.hovered_link_state.take() {
             (existing, true)
@@ -1216,7 +1217,7 @@ mod tests {
     use language::{
         Capability, FakeLspAdapter, Point, language_settings::InlayHintKind, rust_lang,
     };
-    use lsp::request::{GotoDefinition, GotoTypeDefinition, References};
+    use lsp::request::{GotoDefinition, GotoImplementation, GotoTypeDefinition, References};
     use multi_buffer::{MultiBufferOffset, PathKey};
     use parking_lot::Mutex;
     use settings::InlayHintSettingsContent;
@@ -1337,6 +1338,68 @@ mod tests {
 
         cx.simulate_click(screen_coord.unwrap(), modifiers);
 
+        cx.assert_editor_state(indoc! {"
+            struct «Aˇ»;
+            let variable = A;
+        "});
+    }
+
+    #[gpui::test]
+    async fn test_hover_implementation_links(cx: &mut gpui::TestAppContext) {
+        init_test(cx, |_| {});
+
+        let mut cx = EditorLspTestContext::new_rust(
+            lsp::ServerCapabilities {
+                implementation_provider: Some(lsp::ImplementationProviderCapability::Simple(true)),
+                ..Default::default()
+            },
+            cx,
+        )
+        .await;
+
+        cx.set_state(indoc! {"
+            struct A;
+            let vˇariable = A;
+        "});
+        let screen_coord = cx
+            .editor(|editor, _, cx| editor.pixel_position_of_cursor(cx))
+            .expect("cursor position");
+        let symbol_range = cx.lsp_range(indoc! {"
+            struct A;
+            let «variable» = A;
+        "});
+        let target_range = cx.lsp_range(indoc! {"
+            struct «A»;
+            let variable = A;
+        "});
+        let mut requests =
+            cx.set_request_handler::<GotoImplementation, _, _>(move |url, _, _| async move {
+                Ok(Some(lsp::GotoDefinitionResponse::Link(vec![
+                    lsp::LocationLink {
+                        origin_selection_range: Some(symbol_range),
+                        target_uri: url.clone(),
+                        target_range,
+                        target_selection_range: target_range,
+                    },
+                ])))
+            });
+
+        let modifiers = Modifiers {
+            alt: true,
+            ..Modifiers::secondary_key()
+        };
+        cx.simulate_mouse_move(screen_coord, None, modifiers);
+        requests.next().await;
+        cx.run_until_parked();
+        cx.assert_editor_text_highlights(
+            HighlightKey::HoveredLinkState,
+            indoc! {"
+            struct A;
+            let «variable» = A;
+        "},
+        );
+
+        cx.simulate_click(screen_coord, modifiers);
         cx.assert_editor_state(indoc! {"
             struct «Aˇ»;
             let variable = A;
@@ -3376,7 +3439,6 @@ mod tests {
                     links.to_vec(),
                     position,
                     origin,
-                    false,
                     window,
                     cx,
                 );

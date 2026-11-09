@@ -2781,7 +2781,6 @@ mod tests {
                     Some(hover_position),
                     None,
                     true,
-                    false,
                     window,
                     cx,
                 );

@@ -29,7 +29,8 @@ use ui::{Context, Window};
 
 use super::{Inlay, InlayId};
 use crate::{
-    AcceptInlayHint, DisplayPoint, Editor, EditorSnapshot, ToggleInlayHints, debounce_value,
+    AcceptInlayHint, DisplayPoint, Editor, EditorSnapshot, GotoDefinitionKind, ToggleInlayHints,
+    debounce_value,
     display_map::{DisplayMap, DisplaySnapshot},
     hover_links::{InlayHighlight, TriggerPoint, show_link_definition},
     hover_popover::{self, InlayHover},
@@ -427,7 +428,6 @@ impl Editor {
         hint_glyph: Option<DisplayPoint>,
         mouse_position: Option<gpui::Point<Pixels>>,
         secondary_held: bool,
-        shift_held: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -464,8 +464,7 @@ impl Editor {
                                  window: &mut Window,
                                  cx: &mut Context<Self>,
                                  cached_hint: InlayHint,
-                                 secondary_held: bool,
-                                 shift_held: bool|
+                                 secondary_held: bool|
               -> Option<Task<()>> {
             let snapshot = editor.snapshot(window, cx);
             if snapshot.scroll_position() != scroll_position
@@ -584,7 +583,7 @@ impl Editor {
                         {
                             go_to_definition_updated = true;
                             show_link_definition(
-                                shift_held,
+                                GotoDefinitionKind::Type,
                                 editor,
                                 TriggerPoint::InlayHint(highlight, location, language_server_id),
                                 &snapshot,
@@ -616,9 +615,7 @@ impl Editor {
             hover_task
         };
         self.hover_state.hint_hover_task = match resolved_hint {
-            ResolvedHint::Resolved(hint) => {
-                update_hover(self, window, cx, hint, secondary_held, shift_held)
-            }
+            ResolvedHint::Resolved(hint) => update_hover(self, window, cx, hint, secondary_held),
             ResolvedHint::Resolving(task) => Some(cx.spawn_in(window, async move |editor, cx| {
                 let Some(hint) = task.await else {
                     return;
@@ -627,7 +624,7 @@ impl Editor {
                     .update_in(cx, |editor, window, cx| {
                         let modifiers = window.modifiers();
                         let secondary_held = Editor::is_cmd_or_ctrl_pressed(&modifiers, cx);
-                        update_hover(editor, window, cx, hint, secondary_held, modifiers.shift)
+                        update_hover(editor, window, cx, hint, secondary_held)
                     })
                     .ok()
                     .flatten()
