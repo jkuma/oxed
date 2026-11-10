@@ -164,8 +164,13 @@ def range_commits(base, target):
 
 
 def pr_number(subject):
-    match = re.search(r"\(#(\d+)\)\s*$", subject)
+    """The original pull request, also for cherry-picks titled `… (#A) (cherry-pick …) (#B)`."""
+    match = re.search(r"\(#(\d+)\)", subject)
     return int(match.group(1)) if match else None
+
+
+def clean_title(subject):
+    return re.sub(r"\s*\((?:#\d+|cherry-pick[^)]*)\)", "", subject).strip()
 
 
 def guess_kind(subject):
@@ -405,7 +410,7 @@ def cmd_port(args):
         print("conflicts to resolve: " + ", ".join(conflicts))
     report_lint()
     pr = pr_number(subject)
-    title = re.sub(r"\s*\(#\d+\)\s*$", "", subject)
+    title = clean_title(subject)
     reference = f"Ported from zed-industries/zed@{sha[:10]}" + (f" (#{pr})." if pr else ".")
     print(f"\ncommit message:\n{title}\n\n{reference}")
     if result.returncode != 0 and not conflicts:

@@ -42,7 +42,7 @@ python3 .claude/skills/zed-upstream/scripts/upstream.py <command>
    1. `port <sha>`. It refuses to run on a dirty working tree.
    2. Resolve the conflicts and adapt the code to the rules below, stage the result, then run `lint`. Handle every finding: `port` cannot see added lines inside unresolved conflicts.
    3. Redo upstream `Cargo.lock` changes with `cargo update -p <crate>@<old> --precise <new>`, only for crates in the Oxed lock. Never apply lock hunks.
-   4. Run `cargo check -p <crate> --tests`, `cargo clippy --no-deps -p <crate>` and `cargo test -p <crate>` on every touched crate.
+   4. Run `cargo check -p <crate> --tests` and `cargo clippy --no-deps -p <crate> --tests` on every touched crate. Run the full tests of small crates, and for large ones (`editor`, `project`, `workspace`, `gpui`) the tests the commit adds or changes plus the related ones (for example `cargo test -p editor --lib completion`). The full suites run at the end of the batch.
    5. Commit. The title is the upstream title without the PR number. The body is `Ported from zed-industries/zed@<sha> (#<PR>).`, then one line per part left out (for example "The macOS part is left out."), then the usual attribution trailer. Never amend.
    6. `record <sha> ported <oxed commit>`, then `rm -rf target/debug/incremental`.
 
