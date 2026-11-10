@@ -12,6 +12,27 @@
       "reason": "touches only code absent from Oxed (agent_servers)",
       "title": "agent_servers: Keep ACP v2 subagent traffic sent before a session/new response (#66096)"
     },
+    "03efd49220ba06703d04f9c4732fdf814f9c523c": {
+      "decision": "ported",
+      "oxed_commit": "ba0ace9",
+      "pr": 65531,
+      "reason": "",
+      "title": "ui: Keep project action shortcuts inside their buttons (#65531)"
+    },
+    "08104dc649e2e92e94eb38e23bda969a3a72cb3a": {
+      "decision": "ported",
+      "oxed_commit": "3d6ffab",
+      "pr": 66016,
+      "reason": "",
+      "title": "git_ui: Add missing tooltips to Git Graph commit details (#66016)"
+    },
+    "08cbb88a152c3751a43e853425a70e9f631a5918": {
+      "decision": "ported",
+      "oxed_commit": "19846f0",
+      "pr": 66132,
+      "reason": "",
+      "title": "git_ui: Fix git graph lagging when toggling commit details panel (#66132)"
+    },
     "0a39cdb4f3ec57bcd930202924b713c0a9253b13": {
       "decision": "removed",
       "pr": 65917,
@@ -37,6 +58,20 @@
       "reason": "",
       "title": "project_panel: Explain when a move fails because the destination already exists (#64344)"
     },
+    "1563b405f9e28197e002feb70ff29b2ca7db3aa7": {
+      "decision": "ported",
+      "oxed_commit": "e46a5da",
+      "pr": 65253,
+      "reason": "",
+      "title": "project: Honor document selectors of didChange and didSave registrations (#65253)"
+    },
+    "18512de483e4ed89633071c044ede7680098dfea": {
+      "decision": "ported",
+      "oxed_commit": "2501c72",
+      "pr": 66017,
+      "reason": "",
+      "title": "ui: Fix scrollbar settings not applying to open scrollbars (#66017)"
+    },
     "1e1f5d7628ffe1c99fb169fc03489e52007d15d4": {
       "decision": "removed",
       "pr": 64439,
@@ -55,12 +90,26 @@
       "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
       "title": "agent: Number ACP tool call location lines from 1 (#66110)"
     },
+    "2a74c8dff6902b7d02038050f5672a0989b18f94": {
+      "decision": "ported",
+      "oxed_commit": "31b5b5f",
+      "pr": 66152,
+      "reason": "",
+      "title": "gpui: Remove unused hash-based text layout cache (#66152)"
+    },
     "2afec34882c99f95c3ec4b9848eec26b697e0ab7": {
       "decision": "ported",
       "oxed_commit": "5309455",
       "pr": 65795,
       "reason": "",
       "title": "Prevent existing tabs on move from emitting `AddItem` on reordering (#65795)"
+    },
+    "2c335b81dc94d109bfcf05e8e54aba208837b33a": {
+      "decision": "ported",
+      "oxed_commit": "06c76f6",
+      "pr": 64562,
+      "reason": "",
+      "title": "Use tree-sitter-go fork (#64562)"
     },
     "2d6c664dc25cb3f9ef4e3bdb5885d4268ae5e4f9": {
       "decision": "removed",
@@ -102,6 +151,13 @@
       "pr": 66157,
       "reason": "",
       "title": "Protect against solargraph LSP violations (#66157)"
+    },
+    "3c2f782514632c9f95d6d88911367d2336e116f1": {
+      "decision": "ported",
+      "oxed_commit": "a4ff021",
+      "pr": 47296,
+      "reason": "",
+      "title": "git_panel: Add error treatment when trying to push from an outdated branch (#47296)"
     },
     "3dbf6a8101b0032e5c3e9061bdc756086d971b31": {
       "decision": "ported",
@@ -153,6 +209,13 @@
       "reason": "touches only code absent from Oxed (google_ai, language_models, open_ai, opencode)",
       "title": "Preserve transport errors in Google and OpenAI Responses streams (#65940)"
     },
+    "57c7b10ece671185a8863515667ee5248c6f0d53": {
+      "decision": "ported",
+      "oxed_commit": "239dfd3",
+      "pr": 66180,
+      "reason": "",
+      "title": "git_ui: Avoid cloning repository snapshot when rendering Git graph (#66180)"
+    },
     "5e8998a2a704a16e56ea8540bdd77079a480ea09": {
       "decision": "removed",
       "pr": 66245,
@@ -191,11 +254,25 @@
       "reason": "touches only code absent from Oxed (vim)",
       "title": "vim: Fix Helix surround add crashing on adjacent selections (#66107)"
     },
+    "772a8a91006db1c44171545cb7ba2d4c23d3e4cb": {
+      "decision": "ported",
+      "oxed_commit": "230b656",
+      "pr": 66147,
+      "reason": "",
+      "title": "gpui: Remove synchronization from window text layout (#66147)"
+    },
     "78f5a535a3b4f7f3a095bf258aa210d673d93279": {
       "decision": "removed",
       "pr": 66093,
       "reason": "touches only code absent from Oxed (agent_ui)",
       "title": "agent_ui: Keep inline review on the root thread when subagents appear (#66093)"
+    },
+    "96b617fa3798fa48f9aa6c33503d212a6bc97a8c": {
+      "decision": "ported",
+      "oxed_commit": "9089166",
+      "pr": 65972,
+      "reason": "",
+      "title": "Cleanup history items for deleted entries (#65972)"
     },
     "979cd3fdf02ffa39131b33507cbd7375a68910fd": {
       "decision": "removed",
@@ -226,6 +303,13 @@
       "pr": 66078,
       "reason": "touches only code absent from Oxed (agent_servers)",
       "title": "agent_servers: Offer ACP v1 subagents behind acp-beta (#66078)"
+    },
+    "a72cb6a214e022fd2b4d40a3922c995eb310b099": {
+      "decision": "ported",
+      "oxed_commit": "e15c9ad",
+      "pr": 66173,
+      "reason": "",
+      "title": "workspace: Keep focus on menus and pickers with focus follows mouse (#66173)"
     },
     "a8acb01f21c9b53cbdb66e41a26e148419e581a8": {
       "decision": "removed",
@@ -294,6 +378,13 @@
       "reason": "touches only code absent from Oxed (gpui_macos)",
       "title": "gpui_macos: Migrate display bindings to objc2 (#65714)"
     },
+    "cc23f35a7ded9d5ba62930629d96095b7bee7364": {
+      "decision": "ported",
+      "oxed_commit": "c8b6eb7",
+      "pr": 65660,
+      "reason": "",
+      "title": "Remove deleted files from file finder's history items (#65660)"
+    },
     "cd1255fba14a3387f25951aca9c0e16369ce8c76": {
       "decision": "removed",
       "pr": 65930,
@@ -337,6 +428,27 @@
       "pr": 66474,
       "reason": "",
       "title": "Do not panic on wrong grammar results (#66474) (cherry-pick to preview) (#66480)"
+    },
+    "e0f4f28001da631f4e37f2155bbc7f43a652a37e": {
+      "decision": "ported",
+      "oxed_commit": "34a4aa2",
+      "pr": 66066,
+      "reason": "",
+      "title": "ui: Make submenus steadier and more reliable (#66066)"
+    },
+    "e4a3732b94eb0881e1d954201ed41ffd2abf18f6": {
+      "decision": "ported",
+      "oxed_commit": "0f17317",
+      "pr": 66206,
+      "reason": "",
+      "title": "gpui: Fix text system reference cycle through pooled line wrappers (#66206)"
+    },
+    "e645f02245118c865b36e002ecec8c46b277852b": {
+      "decision": "ported",
+      "oxed_commit": "b9d41da",
+      "pr": 66143,
+      "reason": "",
+      "title": "askpass: Skip the GPG wrapper when GPG is missing (#66143)"
     },
     "e80af525755c5500763df78f85c3b5e2c24eb117": {
       "decision": "ported",
