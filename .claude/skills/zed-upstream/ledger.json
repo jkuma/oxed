@@ -30,6 +30,13 @@
       "reason": "only workspace manifests besides code absent from Oxed (gpui_macos)",
       "title": "gpui_macos: Migrate window and appearance bindings to objc2 (#65933)"
     },
+    "11262f92560d33af9197af39296cc495cd2cebde": {
+      "decision": "ported",
+      "oxed_commit": "5a1bb75",
+      "pr": 64344,
+      "reason": "",
+      "title": "project_panel: Explain when a move fails because the destination already exists (#64344)"
+    },
     "1e1f5d7628ffe1c99fb169fc03489e52007d15d4": {
       "decision": "removed",
       "pr": 64439,
@@ -48,17 +55,73 @@
       "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
       "title": "agent: Number ACP tool call location lines from 1 (#66110)"
     },
+    "2afec34882c99f95c3ec4b9848eec26b697e0ab7": {
+      "decision": "ported",
+      "oxed_commit": "5309455",
+      "pr": 65795,
+      "reason": "",
+      "title": "Prevent existing tabs on move from emitting `AddItem` on reordering (#65795)"
+    },
     "2d6c664dc25cb3f9ef4e3bdb5885d4268ae5e4f9": {
       "decision": "removed",
       "pr": 65934,
       "reason": "touches only code absent from Oxed (gpui_macos)",
       "title": "gpui_macos: Cache the main-thread marker per thread (#65934)"
     },
+    "32558ab9d53140e9ef8ae324610e42204e162fee": {
+      "decision": "ported",
+      "oxed_commit": "7b04e14",
+      "pr": 65829,
+      "reason": "",
+      "title": "multi_buffer: Fix word diff ranges for collapsed hunks (#65829)"
+    },
+    "3318784374bc5061fbc76dbe42d4e8e24195a8de": {
+      "decision": "ported",
+      "oxed_commit": "edecbc6",
+      "pr": 66161,
+      "reason": "",
+      "title": " workspace: Fix docks ignoring focus_follows_mouse changes until restart (#66161)"
+    },
+    "3389d87577312c126faa3bcbf79951babd6161d7": {
+      "decision": "ported",
+      "oxed_commit": "a6836e2",
+      "pr": 65852,
+      "reason": "",
+      "title": "Cache resolved fonts (#65852)"
+    },
+    "340c703bb281da5a699f9a4f22381b99e8cf7e5c": {
+      "decision": "ported",
+      "oxed_commit": "2677816",
+      "pr": 60894,
+      "reason": "",
+      "title": "project_panel: Preserve clipboard contents when duplicating entries (#60894)"
+    },
+    "37faef81f74fc1bb08be9939c4cffc8ede6ced2f": {
+      "decision": "ported",
+      "oxed_commit": "bbfcb7e",
+      "pr": 66157,
+      "reason": "",
+      "title": "Protect against solargraph LSP violations (#66157)"
+    },
+    "3dbf6a8101b0032e5c3e9061bdc756086d971b31": {
+      "decision": "ported",
+      "oxed_commit": "a359419",
+      "pr": 65280,
+      "reason": "",
+      "title": "Fix npm-backed language server setup in pnpm and Yarn projects (#65280)"
+    },
     "42c4caa474da0ef6be7b2696c00974adfb1679b9": {
       "decision": "removed",
       "pr": 64744,
       "reason": "only workspace manifests besides code absent from Oxed (remote)",
       "title": "remote: Stop URL-encoding SSH usernames (#64744)"
+    },
+    "4d7b2d05ea693e4a5d406fc3d41573f8000b7004": {
+      "decision": "ported",
+      "oxed_commit": "faa6710",
+      "pr": 56003,
+      "reason": "",
+      "title": "language: Refresh diagnostic endpoints on every seek (#56003)"
     },
     "4f862ffbc6efa25303fc843547f60f4fe8929c2f": {
       "decision": "removed",
@@ -101,6 +164,20 @@
       "pr": 66038,
       "reason": "touches only code absent from Oxed (language_models, open_ai, x_ai_subscribed)",
       "title": "open_ai: Preserve typed chat completion stream errors (#66038)"
+    },
+    "60919b0248d66bda6cbc8ef9e73c4db40275c857": {
+      "decision": "ported",
+      "oxed_commit": "4703c34",
+      "pr": 66167,
+      "reason": "",
+      "title": "workspace: Don't let focus follows mouse steal focus from single-line inputs (#66167)"
+    },
+    "63089a6ebed996034e9e52ed205a75d5ba814684": {
+      "decision": "ported",
+      "oxed_commit": "abc9028",
+      "pr": 65939,
+      "reason": "",
+      "title": "worktree: Clean up watches when symlinks disappear during scanning (#65939)"
     },
     "6744a21e2d56b6011f4d520e2efd9c485d55e280": {
       "decision": "removed",
@@ -180,6 +257,13 @@
       "reason": "touches only code absent from Oxed (agent_servers)",
       "title": "agent_servers: Order ACP v1 load responses and treat replayed subagent state as history (#66064)"
     },
+    "b7d50b95e8db53607438ef6f5c29d55b7b38f852": {
+      "decision": "ported",
+      "oxed_commit": "0411d2e",
+      "pr": 65968,
+      "reason": "",
+      "title": "Warn only for explicitly requested fonts (#65968)"
+    },
     "bed9563afc7af5363821f5547f7766c77c57e497": {
       "decision": "removed",
       "pr": 66166,
@@ -216,6 +300,13 @@
       "reason": "touches only code absent from Oxed (.config, .github, script)",
       "title": "Automate cleanup of non-responsive  PRs (#65930)"
     },
+    "d27ad54dd6173760121f9b2ca8f435f82159e072": {
+      "decision": "ported",
+      "oxed_commit": "2b9563c",
+      "pr": 65769,
+      "reason": "",
+      "title": "Fix on-type formatting using a stale position when autoindent is pending (#65769)"
+    },
     "d444083f7f5751866a3f9370cc0d18e5212026f8": {
       "decision": "removed",
       "pr": 66421,
@@ -240,6 +331,20 @@
       "reason": "touches only code absent from Oxed (acp_thread, agent_ui)",
       "title": "agent_ui: Show ACP subagents as inline cards (#66040)"
     },
+    "e0e784e40c7cd735f5a0b8b693b3eca939a7c129": {
+      "decision": "ported",
+      "oxed_commit": "babad39",
+      "pr": 66474,
+      "reason": "",
+      "title": "Do not panic on wrong grammar results (#66474) (cherry-pick to preview) (#66480)"
+    },
+    "e80af525755c5500763df78f85c3b5e2c24eb117": {
+      "decision": "ported",
+      "oxed_commit": "c0b0c8a",
+      "pr": 65856,
+      "reason": "",
+      "title": "Preserve LSP message order (#65856)"
+    },
     "e83f1c949512bab023f2f82446ffb4b0e4173fef": {
       "decision": "removed",
       "pr": 65713,
@@ -257,6 +362,13 @@
       "pr": 66028,
       "reason": "touches only code absent from Oxed (acp_thread, agent_servers, agent_ui)",
       "title": "acp_thread: Show ACP session messages in the transcript (#66028)"
+    },
+    "ec86047d67acd6fddd81392f44ed6ebcc6e7f531": {
+      "decision": "ported",
+      "oxed_commit": "4d8dfb5",
+      "pr": 55294,
+      "reason": "",
+      "title": "git: Reflect external stash renames (#55294)"
     },
     "f1ccf949d59bc0cc8ec05a4366be4dcb8262aaf8": {
       "decision": "removed",
