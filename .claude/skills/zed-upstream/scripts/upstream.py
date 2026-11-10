@@ -376,7 +376,9 @@ def cmd_lint(_args):
 def cmd_port(args):
     if not args:
         sys.exit("usage: upstream.py port <sha>")
-    if oxed("status", "--porcelain").stdout.strip():
+    # The ledger collects decisions during a batch and is committed at its end.
+    ledger = str(LEDGER_PATH.relative_to(oxed_root()))
+    if oxed("status", "--porcelain", "--", ".", f":!{ledger}").stdout.strip():
         sys.exit("error: the Oxed working tree is not clean; commit or stash first")
     sha, subject, files = commit_info(args[0])
     tree = OxedTree()
