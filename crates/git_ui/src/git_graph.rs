@@ -2953,7 +2953,6 @@ impl GitGraph {
 
         let head_branch_name: Option<SharedString> = repository
             .read(cx)
-            .snapshot()
             .branch
             .as_ref()
             .map(|branch| SharedString::from(branch.name().to_string()));
@@ -3805,7 +3804,6 @@ impl GitGraph {
 
         let head_branch_name: Option<SharedString> = self.get_repository(cx).and_then(|repo| {
             repo.read(cx)
-                .snapshot()
                 .branch
                 .as_ref()
                 .map(|branch| SharedString::from(branch.name().to_string()))
