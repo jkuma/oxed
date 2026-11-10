@@ -1,0 +1,295 @@
+{
+  "commits": {
+    "02a04e06e239b7bb56740bc66b68572f22b67f2c": {
+      "decision": "removed",
+      "pr": 66061,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers)",
+      "title": "agent_servers: Treat replayed ACP v2 subagent state as history (#66061)"
+    },
+    "035e6ac2f35815287d3439d0e99cc714d2e5de11": {
+      "decision": "removed",
+      "pr": 66096,
+      "reason": "touches only code absent from Oxed (agent_servers)",
+      "title": "agent_servers: Keep ACP v2 subagent traffic sent before a session/new response (#66096)"
+    },
+    "0a39cdb4f3ec57bcd930202924b713c0a9253b13": {
+      "decision": "removed",
+      "pr": 65917,
+      "reason": "touches only code absent from Oxed (gpui)",
+      "title": "gpui: Fix window_positioning example on non-primary displays (#65917)"
+    },
+    "0a9eb81e6cedf7330491b0a6ca5d593af6abbe13": {
+      "decision": "removed",
+      "pr": 65715,
+      "reason": "only workspace manifests besides code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Migrate keyboard and event bindings to objc2 (#65715)"
+    },
+    "10cfb459449a65c8fee7d390794d6f3d5098e9f7": {
+      "decision": "removed",
+      "pr": 65933,
+      "reason": "only workspace manifests besides code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Migrate window and appearance bindings to objc2 (#65933)"
+    },
+    "1e1f5d7628ffe1c99fb169fc03489e52007d15d4": {
+      "decision": "removed",
+      "pr": 64439,
+      "reason": "touches only code absent from Oxed (acp_thread)",
+      "title": "Run sandboxed Linux terminals non-interactively (#64439)"
+    },
+    "2214d0a92e811457115b737293f8bec0332a8791": {
+      "decision": "removed",
+      "pr": 66025,
+      "reason": "touches only code absent from Oxed (dap_adapters)",
+      "title": "debugger: Fix auto-updates for Delve (#66025)"
+    },
+    "23973bd49f282846d2d285374d8b81c4d2a36a4b": {
+      "decision": "removed",
+      "pr": 66110,
+      "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
+      "title": "agent: Number ACP tool call location lines from 1 (#66110)"
+    },
+    "2d6c664dc25cb3f9ef4e3bdb5885d4268ae5e4f9": {
+      "decision": "removed",
+      "pr": 65934,
+      "reason": "touches only code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Cache the main-thread marker per thread (#65934)"
+    },
+    "42c4caa474da0ef6be7b2696c00974adfb1679b9": {
+      "decision": "removed",
+      "pr": 64744,
+      "reason": "only workspace manifests besides code absent from Oxed (remote)",
+      "title": "remote: Stop URL-encoding SSH usernames (#64744)"
+    },
+    "4f862ffbc6efa25303fc843547f60f4fe8929c2f": {
+      "decision": "removed",
+      "pr": 66024,
+      "reason": "touches only code absent from Oxed (.factory, .github, script, tooling)",
+      "title": "Cleanup unused workflows and script files (#66024)"
+    },
+    "50304070c283519f2f2338b45671af26374025fe": {
+      "decision": "removed",
+      "pr": 65492,
+      "reason": "touches only code absent from Oxed (vim)",
+      "title": "helix: Return to normal mode after pasting in select mode (#65492)"
+    },
+    "536ec0ea9d08b347e0f1a03902b86705505d8ffd": {
+      "decision": "removed",
+      "pr": 66059,
+      "reason": "touches only code absent from Oxed (agent_servers)",
+      "title": "agent_servers: Refuse config changes and reopening for ACP v2 subagents (#66059)"
+    },
+    "566f893ee3b52eae87957ee6ba0edea89b7783b1": {
+      "decision": "removed",
+      "pr": 65938,
+      "reason": "touches only code absent from Oxed (open_ai)",
+      "title": "open_ai: Handle Responses reasoning text events (#65938)"
+    },
+    "574df448ea9cb9c22df1a5e887a4c6755e7e09ce": {
+      "decision": "removed",
+      "pr": 65940,
+      "reason": "touches only code absent from Oxed (google_ai, language_models, open_ai, opencode)",
+      "title": "Preserve transport errors in Google and OpenAI Responses streams (#65940)"
+    },
+    "5e8998a2a704a16e56ea8540bdd77079a480ea09": {
+      "decision": "removed",
+      "pr": 66245,
+      "reason": "only workspace manifests besides code absent from Oxed (acp_thread, acp_tools, agent, agent_servers, agent_ui)",
+      "title": "Update agent-client-protocol to 3.6.0 (schema 1.13) (#66245)"
+    },
+    "604a0ff023ec719045bbdafa46d1e384e907ba7b": {
+      "decision": "removed",
+      "pr": 66038,
+      "reason": "touches only code absent from Oxed (language_models, open_ai, x_ai_subscribed)",
+      "title": "open_ai: Preserve typed chat completion stream errors (#66038)"
+    },
+    "6744a21e2d56b6011f4d520e2efd9c485d55e280": {
+      "decision": "removed",
+      "pr": 65976,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers, agent_ui)",
+      "title": "agent_servers: Route ACP subagent associations to child threads (#65976)"
+    },
+    "6b985a8b264165f2bf4cd04a8be1cdb40286ebe5": {
+      "decision": "removed",
+      "pr": 66107,
+      "reason": "touches only code absent from Oxed (vim)",
+      "title": "vim: Fix Helix surround add crashing on adjacent selections (#66107)"
+    },
+    "78f5a535a3b4f7f3a095bf258aa210d673d93279": {
+      "decision": "removed",
+      "pr": 66093,
+      "reason": "touches only code absent from Oxed (agent_ui)",
+      "title": "agent_ui: Keep inline review on the root thread when subagents appear (#66093)"
+    },
+    "979cd3fdf02ffa39131b33507cbd7375a68910fd": {
+      "decision": "removed",
+      "pr": 66159,
+      "reason": "touches only code absent from Oxed (gpui_windows)",
+      "title": "gpui: Keep Unicode separators on one line on Windows (#66159)"
+    },
+    "9b9e7b814a4169fad595b96e08e8a6b98933db35": {
+      "decision": "removed",
+      "pr": 65935,
+      "reason": "touches only code absent from Oxed (tooling)",
+      "title": "xtask: Forbid legacy Objective-C dependencies (#65935)"
+    },
+    "9e65fc768247565e1d74b1c80ff40e9327549356": {
+      "decision": "removed",
+      "pr": 65444,
+      "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
+      "title": "agent: Materialize tool-call diffs lazily, on first view (#65444)"
+    },
+    "9f305aaf88370e8ca39c702242186e3d8f97ecca": {
+      "decision": "removed",
+      "pr": 66042,
+      "reason": "touches only code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Handle null open and save panels (#66042)"
+    },
+    "a5c4ca8bf6c4717a328a4a61b42d6d1d38949bcc": {
+      "decision": "removed",
+      "pr": 66078,
+      "reason": "touches only code absent from Oxed (agent_servers)",
+      "title": "agent_servers: Offer ACP v1 subagents behind acp-beta (#66078)"
+    },
+    "a8acb01f21c9b53cbdb66e41a26e148419e581a8": {
+      "decision": "removed",
+      "pr": 66058,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers, agent_ui)",
+      "title": "agent_ui: Show read-only ACP subagent configuration (#66058)"
+    },
+    "abd9b3cbd2b11292358d740b9c6ab3eae7d1ab36": {
+      "decision": "removed",
+      "pr": 66060,
+      "reason": "touches only code absent from Oxed (gpui_apple)",
+      "title": "gpui_apple: Distinguish missing creds from a cancelled prompt (#66060)"
+    },
+    "ad8a62df82118cc380942739a2187ed1f9f6f15d": {
+      "decision": "removed",
+      "pr": 66098,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers)",
+      "title": "agent_servers: Treat replayed ACP subagent outcomes as history too (#66098)"
+    },
+    "af4948a164b957959738f71a6ff82fe325b18ba6": {
+      "decision": "removed",
+      "pr": 66088,
+      "reason": "touches only code absent from Oxed (agent_servers)",
+      "title": "agent_servers: Fix ACP v2 subagent config being hidden instead of read-only (#66088)"
+    },
+    "b0cac499da46ae6f4936d7899ca206150464cb4c": {
+      "decision": "removed",
+      "pr": 66064,
+      "reason": "touches only code absent from Oxed (agent_servers)",
+      "title": "agent_servers: Order ACP v1 load responses and treat replayed subagent state as history (#66064)"
+    },
+    "bed9563afc7af5363821f5547f7766c77c57e497": {
+      "decision": "removed",
+      "pr": 66166,
+      "reason": "touches only code absent from Oxed (gpui_apple)",
+      "title": "gpui_apple: Keep the checkout path out of compiled Metal shaders (#66166)"
+    },
+    "c07b87624c970170ffc2c89545a5854bf55b6800": {
+      "decision": "removed",
+      "pr": 66057,
+      "reason": "touches only code absent from Oxed (acp_thread)",
+      "title": "acp_thread: Follow the subagents RFD when ACP subagents are cancelled (#66057)"
+    },
+    "c5efa10dddf57e31f1f501da9d53cd1eda07030a": {
+      "decision": "removed",
+      "pr": 66092,
+      "reason": "touches only code absent from Oxed (acp_thread)",
+      "title": "acp_thread: Use a subagent's latest run for its titlebar status (#66092)"
+    },
+    "c8995a085a99979172a9613c7f02489cdfbde19f": {
+      "decision": "removed",
+      "pr": 66095,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers, agent_ui)",
+      "title": "agent_ui: Don't load tool-call-referenced sessions where the subagents RFD applies (#66095)"
+    },
+    "cb1937a8e7222edbacd6682e00568a5bed3e8949": {
+      "decision": "removed",
+      "pr": 65714,
+      "reason": "touches only code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Migrate display bindings to objc2 (#65714)"
+    },
+    "cd1255fba14a3387f25951aca9c0e16369ce8c76": {
+      "decision": "removed",
+      "pr": 65930,
+      "reason": "touches only code absent from Oxed (.config, .github, script)",
+      "title": "Automate cleanup of non-responsive  PRs (#65930)"
+    },
+    "d444083f7f5751866a3f9370cc0d18e5212026f8": {
+      "decision": "removed",
+      "pr": 66421,
+      "reason": "touches only code absent from Oxed (.config, docs)",
+      "title": "docs: Load c15t from the hosted CDN (#66413) (cherry-pick to preview) (#66421)"
+    },
+    "d814ad6efdc4556b9445ce7a0683be447dcce293": {
+      "decision": "skipped",
+      "pr": 65929,
+      "reason": "Zed version bump; Oxed versions independently",
+      "title": "Bump Zed to v1.27.0 (#65929)"
+    },
+    "d86aa6e6b9f52046fb299ab57ec884b300190813": {
+      "decision": "removed",
+      "pr": 65932,
+      "reason": "only workspace manifests besides code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Migrate application and menu bindings to objc2 (#65932)"
+    },
+    "d93bf740852672fb299fcbdba3af1d5fd0253e92": {
+      "decision": "removed",
+      "pr": 66040,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_ui)",
+      "title": "agent_ui: Show ACP subagents as inline cards (#66040)"
+    },
+    "e83f1c949512bab023f2f82446ffb4b0e4173fef": {
+      "decision": "removed",
+      "pr": 65713,
+      "reason": "touches only code absent from Oxed (gpui_macos)",
+      "title": "gpui_macos: Migrate clipboard bindings to objc2 (#65713)"
+    },
+    "e841324d0d6e7bafcf2048a8595f9a7dde84662f": {
+      "decision": "removed",
+      "pr": 66019,
+      "reason": "touches only code absent from Oxed (.github)",
+      "title": "Remove unused GitHub action files (#66019)"
+    },
+    "e96ffb0fd3cc43ec56dcff421146f5e823b13841": {
+      "decision": "removed",
+      "pr": 66028,
+      "reason": "touches only code absent from Oxed (acp_thread, agent_servers, agent_ui)",
+      "title": "acp_thread: Show ACP session messages in the transcript (#66028)"
+    },
+    "f1ccf949d59bc0cc8ec05a4366be4dcb8262aaf8": {
+      "decision": "removed",
+      "pr": 65975,
+      "reason": "touches only code absent from Oxed (gpui_apple, gpui_ios, gpui_macos)",
+      "title": "gpui_ios: Reuse the cached main-thread marker (#65975)"
+    },
+    "f95eddfb8796daeff2f66b3ae6db4ab76e6fdda1": {
+      "decision": "removed",
+      "pr": 66491,
+      "reason": "touches only code absent from Oxed (vim)",
+      "title": "Fix Vim visual-block hang at wrapped EOF (#66118) (cherry-pick to preview) (#66491)"
+    },
+    "faf8f0b6980205ca2659af174790a212ae3c416a": {
+      "decision": "removed",
+      "pr": 64171,
+      "reason": "touches only code absent from Oxed (language_models)",
+      "title": "language_models: Log and record model-fetch failures instead of discarding them (#64171)"
+    },
+    "fd2aedc47199338d00fb51fa39786270f2c4574e": {
+      "decision": "removed",
+      "pr": 65982,
+      "reason": "only workspace manifests besides code absent from Oxed (acp_thread, agent_servers)",
+      "title": "agent_servers: Update ACP SDK to 3.5.0 (#65982)"
+    },
+    "fda552edce4ab52373ebaaff168bd7417bd8010b": {
+      "decision": "removed",
+      "pr": 66015,
+      "reason": "touches only code absent from Oxed (agent)",
+      "title": "agent: Fix reading the entire threads database after every thread save (#66015)"
+    }
+  },
+  "fork_base": "v1.26.2",
+  "reviewed_up_to": "v1.26.2",
+  "upstream": "https://github.com/zed-industries/zed"
+}
