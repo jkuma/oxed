@@ -118,7 +118,7 @@ pub struct Buffer {
     language: Option<Arc<Language>>,
     content_language_detection_enabled: bool,
     autoindent_requests: Vec<Arc<AutoindentRequest>>,
-    wait_for_autoindent_txs: Vec<oneshot::Sender<()>>,
+    wait_for_autoindent_txs: Vec<oneshot::Sender<Option<clock::Lamport>>>,
     pending_autoindent: Option<Task<()>>,
     sync_parse_timeout: Option<Duration>,
     syntax_map: Mutex<SyntaxMap>,
@@ -2027,7 +2027,7 @@ impl Buffer {
         } else {
             self.autoindent_requests.clear();
             for tx in self.wait_for_autoindent_txs.drain(..) {
-                tx.send(()).ok();
+                tx.send(None).ok();
             }
         }
     }
@@ -2218,9 +2218,7 @@ impl Buffer {
         cx: &mut Context<Self>,
     ) {
         self.autoindent_requests.clear();
-        for tx in self.wait_for_autoindent_txs.drain(..) {
-            tx.send(()).ok();
-        }
+        let wait_for_autoindent_txs = mem::take(&mut self.wait_for_autoindent_txs);
 
         let edits: Vec<_> = indent_sizes
             .into_iter()
@@ -2231,9 +2229,12 @@ impl Buffer {
             .collect();
 
         let preserve_preview = self.preserve_preview();
-        self.edit(edits, None, cx);
+        let edit_id = self.edit(edits, None, cx);
         if preserve_preview {
             self.refresh_preview();
+        }
+        for tx in wait_for_autoindent_txs {
+            tx.send(edit_id).ok();
         }
     }
 
@@ -2643,7 +2644,10 @@ impl Buffer {
         self.text.give_up_waiting();
     }
 
-    pub fn wait_for_autoindent_applied(&mut self) -> Option<oneshot::Receiver<()>> {
+    /// Resolves with the id of the edit that applied the pending autoindent, if it changed anything.
+    pub fn wait_for_autoindent_applied(
+        &mut self,
+    ) -> Option<oneshot::Receiver<Option<clock::Lamport>>> {
         let mut rx = None;
         if !self.autoindent_requests.is_empty() {
             let channel = oneshot::channel();
