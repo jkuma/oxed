@@ -22,6 +22,7 @@ python3 .claude/skills/zed-upstream/scripts/upstream.py <command>
 | `triage <tag> --out <dir>` | Classifies every commit between `reviewed_up_to` and `<tag>`, records the automatic decisions, writes a Markdown and JSON report of the candidates in `<dir>`. |
 | `show <sha>` | Prints an upstream commit limited to the files Oxed still has, and lists the others. |
 | `port <sha>` | Applies an upstream commit to a clean Oxed working tree with a 3-way merge, then reports conflicts, `Cargo.lock` changes and lines that break the fork rules. |
+| `lint` | Checks the staged and unstaged changes against the fork rules again, once the conflicts are resolved. |
 | `record <sha> <decision> [oxed commit or reason]` | Records `ported`, `skipped`, `deferred`, `removed` or `already-applied`. |
 | `advance <tag>` | Marks `<tag>` as reviewed once every commit up to it has a decision. |
 
@@ -39,7 +40,7 @@ python3 .claude/skills/zed-upstream/scripts/upstream.py <command>
 4. **Let the user choose.** Present the candidates grouped by area (LSP, editor, project, git, UI, dependencies…). Give each one its PR number, its title, one sentence on what it changes and your recommendation. Port nothing before the user has chosen. Record what the user rejects with `record <sha> skipped "<reason>"`, and what they postpone with `deferred`.
 5. **Port the chosen commits** in the order of the report, one at a time:
    1. `port <sha>`. It refuses to run on a dirty working tree.
-   2. Resolve the conflicts and adapt the code to the rules below. Handle every "review before committing" finding.
+   2. Resolve the conflicts and adapt the code to the rules below, stage the result, then run `lint`. Handle every finding: `port` cannot see added lines inside unresolved conflicts.
    3. Redo upstream `Cargo.lock` changes with `cargo update -p <crate>@<old> --precise <new>`, only for crates in the Oxed lock. Never apply lock hunks.
    4. Run `cargo check -p <crate> --tests`, `cargo clippy --no-deps -p <crate>` and `cargo test -p <crate>` on every touched crate.
    5. Commit. The title is the upstream title without the PR number. The body is `Ported from zed-industries/zed@<sha> (#<PR>).`, then one line per part left out (for example "The macOS part is left out."), then the usual attribution trailer. Never amend.

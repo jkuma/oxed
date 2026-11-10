@@ -6,6 +6,7 @@ Usage: upstream.py <command> [args]
   triage <tag> [--out DIR]  classify the commits between the reviewed tag and <tag>
   show <sha>                print an upstream commit limited to files Oxed still has
   port <sha>                apply an upstream commit to the Oxed working tree
+  lint                      check the staged and unstaged changes against the fork rules
   record <sha> <decision> [oxed commit | reason]
   advance <tag>             mark <tag> as reviewed once every commit has a decision
 
@@ -357,6 +358,21 @@ def lint_added_lines(diff):
     return findings
 
 
+def report_lint():
+    findings = lint_added_lines(oxed("diff", "--cached").stdout + "\n" + oxed("diff").stdout)
+    if findings:
+        print("review before committing (fork rules):")
+        print("\n".join(findings))
+    return findings
+
+
+def cmd_lint(_args):
+    if oxed("diff", "--name-only", "--diff-filter=U").stdout.strip():
+        sys.exit("error: resolve and stage the conflicts first")
+    if not report_lint():
+        print("no fork rule findings")
+
+
 def cmd_port(args):
     if not args:
         sys.exit("usage: upstream.py port <sha>")
@@ -385,10 +401,7 @@ def cmd_port(args):
     conflicts = oxed("diff", "--name-only", "--diff-filter=U").stdout.split()
     if conflicts:
         print("conflicts to resolve: " + ", ".join(conflicts))
-    findings = lint_added_lines(oxed("diff", "--cached").stdout + "\n" + oxed("diff").stdout)
-    if findings:
-        print("review before committing (fork rules):")
-        print("\n".join(findings))
+    report_lint()
     pr = pr_number(subject)
     title = re.sub(r"\s*\(#\d+\)\s*$", "", subject)
     reference = f"Ported from zed-industries/zed@{sha[:10]}" + (f" (#{pr})." if pr else ".")
@@ -440,6 +453,7 @@ COMMANDS = {
     "triage": cmd_triage,
     "show": cmd_show,
     "port": cmd_port,
+    "lint": cmd_lint,
     "record": cmd_record,
     "advance": cmd_advance,
 }
