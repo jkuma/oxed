@@ -341,6 +341,13 @@
       "reason": "touches only code absent from Oxed (agent_servers)",
       "title": "agent_servers: Order ACP v1 load responses and treat replayed subagent state as history (#66064)"
     },
+    "b488c4e81451f2042d5f47d93f6158732ac28212": {
+      "decision": "ported",
+      "oxed_commit": "d92318e",
+      "pr": 65950,
+      "reason": "",
+      "title": "gpui: Update Taffy 0.13 to 0.15 (#65950)"
+    },
     "b7d50b95e8db53607438ef6f5c29d55b7b38f852": {
       "decision": "ported",
       "oxed_commit": "0411d2e",
