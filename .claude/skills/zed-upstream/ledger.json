@@ -518,6 +518,13 @@
       "pr": 66015,
       "reason": "touches only code absent from Oxed (agent)",
       "title": "agent: Fix reading the entire threads database after every thread save (#66015)"
+    },
+    "fdcb1981103408e63fff5ef47c8ae2f9995262ad": {
+      "decision": "ported",
+      "oxed_commit": "79e9da1",
+      "pr": 63477,
+      "reason": "",
+      "title": "gpui: Smooth frame pacing in macOS Low Power Mode (#63477)"
     }
   },
   "fork_base": "v1.26.2",
