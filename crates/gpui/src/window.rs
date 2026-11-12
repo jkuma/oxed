@@ -147,6 +147,16 @@ enum FrameRateLimit {
     Thermal,
 }
 
+const SIXTY_FPS_INTERVAL: Duration = Duration::from_micros(16667);
+const FRAME_INTERVAL_TOLERANCE: Duration = Duration::from_millis(1);
+
+/// Frame requests can arrive a fraction of a millisecond before the target
+/// interval; accepting them keeps an even divisor of the refresh rate instead
+/// of waiting for one more refresh.
+fn frame_request_arrived_too_early(elapsed: Duration, minimum_interval: Duration) -> bool {
+    elapsed < minimum_interval.saturating_sub(FRAME_INTERVAL_TOLERANCE)
+}
+
 #[derive(Clone)]
 pub(crate) struct WindowInvalidator {
     inner: Rc<RefCell<WindowInvalidatorInner>>,
@@ -1797,7 +1807,7 @@ impl Window {
                 } else if !active.get() && !input_rate_tracker.borrow_mut().is_high_rate() {
                     inactive_frame_interval.map(|interval| (interval, FrameRateLimit::Inactive))
                 } else if let Some(ThermalState::Critical | ThermalState::Serious) = thermal_state {
-                    Some((Duration::from_micros(16667), FrameRateLimit::Thermal))
+                    Some((SIXTY_FPS_INTERVAL, FrameRateLimit::Thermal))
                 } else {
                     None
                 };
@@ -1806,7 +1816,10 @@ impl Window {
                 #[cfg_attr(not(feature = "profiler"), expect(unused_variables))]
                 if let Some((min_interval, limit)) = min_frame_interval {
                     if let Some(last_frame) = last_frame_time.get()
-                        && now.duration_since(last_frame) < min_interval
+                        && frame_request_arrived_too_early(
+                            now.duration_since(last_frame),
+                            min_interval,
+                        )
                     {
                         // Don't lose a pending forced render to throttling.
                         deferred_force_render |= force_render;
@@ -7988,6 +8001,30 @@ mod tests {
                 Empty
             }
         }
+    }
+
+    #[test]
+    fn frame_throttle_accepts_timestamp_rounding() {
+        assert!(!super::frame_request_arrived_too_early(
+            Duration::from_micros(16_666),
+            super::SIXTY_FPS_INTERVAL,
+        ));
+        assert!(!super::frame_request_arrived_too_early(
+            Duration::from_micros(33_332),
+            Duration::from_micros(33_333),
+        ));
+    }
+
+    #[test]
+    fn frame_throttle_rejects_an_extra_display_refresh() {
+        assert!(super::frame_request_arrived_too_early(
+            Duration::from_micros(8_333),
+            super::SIXTY_FPS_INTERVAL,
+        ));
+        assert!(super::frame_request_arrived_too_early(
+            Duration::from_micros(16_666),
+            Duration::from_micros(33_333),
+        ));
     }
 
     struct EmptyView;
