@@ -28,9 +28,9 @@ use futures::channel::oneshot::Canceled;
 use git::Oid;
 use git::commit::ParsedCommitMessage;
 use git::repository::{
-    Branch, CommitData, CommitDetails, CommitOptions, FetchOptions, GitCommitTemplate,
-    InitialGraphCommitData, LogOrder, LogSource, PushOptions, Remote, RemoteCommandOutput,
-    ResetMode, Upstream, UpstreamTracking,
+    Branch, CommitData, CommitDetails, CommitOptions, ConflictSide, FetchOptions,
+    GitCommitTemplate, InitialGraphCommitData, LogOrder, LogSource, PushOptions, Remote,
+    RemoteCommandOutput, ResetMode, Upstream, UpstreamTracking,
 };
 use git::stash::GitStash;
 use git::status::{DiffStat, StageStatus};
@@ -2906,6 +2906,111 @@ impl GitPanel {
             })
             .detach_and_log_err(cx);
         }
+    }
+
+    fn selected_conflicted_paths(&self) -> Vec<RepoPath> {
+        self.effective_status_entries()
+            .into_iter()
+            .filter(|entry| entry.status.is_conflicted())
+            .map(|entry| entry.repo_path)
+            .collect()
+    }
+
+    fn accept_yours(&mut self, _: &git::AcceptYours, _: &mut Window, cx: &mut Context<Self>) {
+        self.accept_conflict_side(ConflictSide::Ours, cx);
+    }
+
+    fn accept_theirs(&mut self, _: &git::AcceptTheirs, _: &mut Window, cx: &mut Context<Self>) {
+        self.accept_conflict_side(ConflictSide::Theirs, cx);
+    }
+
+    fn accept_conflict_side(&mut self, side: ConflictSide, cx: &mut Context<Self>) {
+        let paths = self.selected_conflicted_paths();
+        if paths.is_empty() {
+            return;
+        }
+        let Some(repository) = self.active_repository.clone() else {
+            return;
+        };
+        let task = repository.update(cx, |repository, cx| {
+            repository.checkout_conflict_side(paths, side, cx)
+        });
+        cx.spawn(async move |this, cx| {
+            if let Err(error) = task.await {
+                this.update(cx, |this, cx| this.show_error_toast("checkout", error, cx))?;
+            }
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn resolve_conflicts_automatically(
+        &mut self,
+        _: &git::ResolveConflictsAutomatically,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let paths = self.selected_conflicted_paths();
+        let Some(repository) = self.active_repository.clone() else {
+            return;
+        };
+        let tasks = repository.update(cx, |repository, cx| {
+            paths
+                .into_iter()
+                .map(|path| {
+                    let task = repository.resolve_conflicts_automatically(path.clone(), cx);
+                    (path, task)
+                })
+                .collect::<Vec<_>>()
+        });
+        if tasks.is_empty() {
+            return;
+        }
+        cx.spawn(async move |this, cx| {
+            let mut resolved_paths = Vec::new();
+            let mut conflicts = 0;
+            let mut resolved = 0;
+            for (path, task) in tasks {
+                match task.await {
+                    Ok(resolution) => {
+                        conflicts += resolution.conflicts;
+                        resolved += resolution.resolved;
+                        resolved_paths.push(path);
+                    }
+                    Err(error) => {
+                        this.update(cx, |this, cx| {
+                            this.show_error_toast("resolve conflicts", error, cx)
+                        })?;
+                    }
+                }
+            }
+            let target = match resolved_paths.as_slice() {
+                [] => return anyhow::Ok(()),
+                [path] => path.as_unix_str().to_string(),
+                paths => format!("{} files", paths.len()),
+            };
+            let message = format!("Resolved {resolved} of {conflicts} conflicts in {target}");
+            this.update(cx, |this, cx| this.show_status_message(message, cx))?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn show_status_message(&self, message: String, cx: &mut App) {
+        let Some(workspace) = self.workspace.upgrade() else {
+            return;
+        };
+        workspace.update(cx, |workspace, cx| {
+            let status_toast = StatusToast::new(message, cx, |this, _| {
+                this.icon(
+                    Icon::new(IconName::GitBranch)
+                        .size(IconSize::Small)
+                        .color(Color::Muted),
+                )
+                .dismiss_button(true)
+            });
+            workspace.toggle_status_toast(status_toast, cx);
+        });
     }
 
     fn revert_entries(
@@ -7804,6 +7909,7 @@ impl GitPanel {
         all_created: bool,
         all_trashed: bool,
         all_deleted: bool,
+        all_conflicted: bool,
         file_count: usize,
         target_kind: SelectionTargetKind,
         window: &mut Window,
@@ -7866,6 +7972,16 @@ impl GitPanel {
         ContextMenu::build(window, cx, |context_menu, _, _| {
             context_menu
                 .context(self.focus_handle.clone())
+                .when(all_conflicted, |context_menu| {
+                    context_menu
+                        .action("Accept Yours", git::AcceptYours.boxed_clone())
+                        .action("Accept Theirs", git::AcceptTheirs.boxed_clone())
+                        .action(
+                            "Resolve Automatically",
+                            git::ResolveConflictsAutomatically.boxed_clone(),
+                        )
+                        .separator()
+                })
                 .action(stage_title, ToggleStaged.boxed_clone())
                 .action(restore_title, RestoreFile::default().boxed_clone())
                 .separator()
@@ -7933,6 +8049,7 @@ impl GitPanel {
 
         let all_created = entries.iter().all(|entry| entry.status.is_created());
         let all_deleted = entries.iter().all(|entry| entry.status.is_deleted());
+        let all_conflicted = entries.iter().all(|entry| entry.status.is_conflicted());
         let will_unstage = self.should_unstage(target_kind, &entries, cx);
         let discard_targets = self.discard_targets();
         let all_trashed = discard_targets.iter().all(DiscardTarget::is_trashed);
@@ -7943,6 +8060,7 @@ impl GitPanel {
                 all_created,
                 all_trashed,
                 all_deleted,
+                all_conflicted,
                 entries.len(),
                 target_kind,
                 window,
@@ -8748,6 +8866,9 @@ impl Render for GitPanel {
                     .on_action(cx.listener(Self::revert_selected))
                     .on_action(cx.listener(Self::add_to_gitignore))
                     .on_action(cx.listener(Self::add_to_git_info_exclude))
+                    .on_action(cx.listener(Self::accept_yours))
+                    .on_action(cx.listener(Self::accept_theirs))
+                    .on_action(cx.listener(Self::resolve_conflicts_automatically))
                     .on_action(cx.listener(Self::clean_all))
                     .on_action(cx.listener(Self::stash_all))
                     .on_action(cx.listener(Self::stash_tracked))
@@ -10585,6 +10706,106 @@ mod tests {
             assert_eq!(
                 panel.selected_entry,
                 panel.entry_by_path_in_section(&repo_path("partial.rs"), Section::Unstaged)
+            );
+        });
+    }
+
+    #[gpui::test]
+    async fn test_conflict_resolution_actions(cx: &mut TestAppContext) {
+        init_test(cx);
+        let fs = FakeFs::new(cx.background_executor.clone());
+        fs.insert_tree(
+            "/project",
+            json!({
+                ".git": {},
+                "accepted.rs": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n",
+                "merged.rs": "<<<<<<< HEAD\nlet a = 10;\nlet b = 2;\n=======\nlet a = 1;\nlet b = 20;\n>>>>>>> branch\n",
+            }),
+        )
+        .await;
+        fs.set_merge_conflicts_for_repo(
+            "/project/.git".as_ref(),
+            &[
+                (
+                    "accepted.rs",
+                    project::FakeConflictStages {
+                        base: Some(b"base\n".to_vec()),
+                        ours: Some(b"ours\n".to_vec()),
+                        theirs: Some(b"theirs\n".to_vec()),
+                    },
+                ),
+                (
+                    "merged.rs",
+                    project::FakeConflictStages {
+                        base: Some(b"let a = 1;\nlet b = 2;\n".to_vec()),
+                        ours: Some(b"let a = 10;\nlet b = 2;\n".to_vec()),
+                        theirs: Some(b"let a = 1;\nlet b = 20;\n".to_vec()),
+                    },
+                ),
+            ],
+        );
+
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .unwrap();
+        let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
+        cx.read(|cx| {
+            project
+                .read(cx)
+                .worktrees(cx)
+                .next()
+                .unwrap()
+                .read(cx)
+                .scan_complete()
+        })
+        .await;
+        cx.executor().run_until_parked();
+
+        let panel = workspace.update_in(&mut cx, GitPanel::new);
+        await_git_panel_entries(&panel, &mut cx).await;
+        let select = |path: &str, panel: &mut GitPanel| {
+            panel.selected_entry = panel.entries.iter().position(|entry| {
+                entry
+                    .status_entry()
+                    .is_some_and(|entry| entry.repo_path == repo_path(path))
+            });
+        };
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            select("merged.rs", panel);
+            panel.resolve_conflicts_automatically(&git::ResolveConflictsAutomatically, window, cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            fs.load("/project/merged.rs".as_ref()).await.unwrap(),
+            "let a = 10;\nlet b = 20;\n"
+        );
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            select("accepted.rs", panel);
+            panel.accept_theirs(&git::AcceptTheirs, window, cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            fs.load("/project/accepted.rs".as_ref()).await.unwrap(),
+            "theirs\n"
+        );
+        await_git_panel_entries(&panel, &mut cx).await;
+        panel.read_with(&cx, |panel, _| {
+            let conflicted = panel
+                .entries
+                .iter()
+                .filter_map(GitListEntry::status_entry)
+                .filter(|entry| entry.status.is_conflicted())
+                .map(|entry| entry.repo_path.as_unix_str().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                conflicted,
+                ["merged.rs"],
+                "resolving automatically leaves staging to the user"
             );
         });
     }

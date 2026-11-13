@@ -141,6 +141,13 @@ actions!(
         AddToGitignore,
         /// Adds a file to the repository's .git/info/exclude.
         AddToGitInfoExclude,
+        /// Resolves the selected conflicted files with your version.
+        AcceptYours,
+        /// Resolves the selected conflicted files with their version.
+        AcceptTheirs,
+        /// Merges the selected conflicted files again and resolves the conflicts that merge
+        /// strategies can.
+        ResolveConflictsAutomatically,
         /// Copies the current branch name to the clipboard.
         CopyBranchName,
         /// Creates a tag at HEAD.
