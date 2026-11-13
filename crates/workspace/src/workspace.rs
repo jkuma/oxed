@@ -1954,6 +1954,7 @@ impl Workspace {
                 .map(|ws| !ws.paths.is_empty())
                 .unwrap_or(false);
 
+            let all_paths_resolved = project_paths.iter().all(|(_, path)| path.is_some());
             let opened_items = window
                 .update(cx, |_, window, cx| {
                     workspace.update(cx, |_workspace: &mut Workspace, cx| {
@@ -1962,6 +1963,16 @@ impl Workspace {
                 })?
                 .await
                 .unwrap_or_default();
+
+            if all_paths_resolved
+                && !opened_items.is_empty()
+                && opened_items.iter().all(Option::is_none)
+                && let Ok(task) = window.update(cx, |_, window, cx| {
+                    workspace.update(cx, |workspace, cx| workspace.open_readme(window, cx))
+                })
+            {
+                task.await;
+            }
 
             // Restore default dock state for empty workspaces
             // Only restore if:
@@ -3510,7 +3521,7 @@ impl Workspace {
 
         // Sort the paths to ensure we add worktrees for parents before their children.
         abs_paths.sort_unstable();
-        cx.spawn_in(window, async move |this, cx| {
+        cx.spawn_in(window, async move |workspace, cx| {
             let mut tasks = Vec::with_capacity(abs_paths.len());
 
             for abs_path in &abs_paths {
@@ -3529,16 +3540,16 @@ impl Workspace {
                     },
                 };
                 let project_path = match visible {
-                    Some(visible) => match this
-                        .update(cx, |this, cx| {
+                    Some(visible) => match workspace
+                        .update(cx, |workspace, cx| {
                             Workspace::project_path_for_path(
-                                this.project.clone(),
+                                workspace.project.clone(),
                                 abs_path,
                                 visible,
                                 cx,
                             )
                         })
-                        .log_err()
+                        .ok()
                     {
                         Some(project_path) => project_path.await.log_err(),
                         None => None,
@@ -3546,7 +3557,7 @@ impl Workspace {
                     None => None,
                 };
 
-                let this = this.clone();
+                let workspace = workspace.clone();
                 let abs_path: Arc<Path> = Path::new(&abs_path).into();
                 let fs = fs.clone();
                 let pane = pane.clone();
@@ -3571,17 +3582,18 @@ impl Workspace {
                         None
                     } else {
                         Some(
-                            this.update_in(cx, |this, window, cx| {
-                                this.open_path(
-                                    project_path,
-                                    pane,
-                                    options.focus.unwrap_or(true),
-                                    window,
-                                    cx,
-                                )
-                            })
-                            .ok()?
-                            .await,
+                            workspace
+                                .update_in(cx, |workspace, window, cx| {
+                                    workspace.open_path(
+                                        project_path,
+                                        pane,
+                                        options.focus.unwrap_or(true),
+                                        window,
+                                        cx,
+                                    )
+                                })
+                                .ok()?
+                                .await,
                         )
                     }
                 });
@@ -3621,7 +3633,7 @@ impl Workspace {
                         OpenVisible::OnlyDirectories => winner_is_dir,
                     };
 
-                    let Some(worktree_task) = this
+                    let Some(worktree_task) = workspace
                         .update(cx, |workspace, cx| {
                             workspace.project.update(cx, |project, cx| {
                                 project.find_or_create_worktree(
@@ -3640,7 +3652,7 @@ impl Workspace {
                         break 'emit_winner;
                     };
 
-                    let Ok(Some(entry_id)) = this.update(cx, |_, cx| {
+                    let Ok(Some(entry_id)) = workspace.update(cx, |_, cx| {
                         let worktree = worktree.read(cx);
                         let worktree_abs_path = worktree.abs_path();
                         let entry = if winner_abs_path.as_ref() == worktree_abs_path.as_ref() {
@@ -3659,12 +3671,13 @@ impl Workspace {
                         break 'emit_winner;
                     };
 
-                    this.update(cx, |workspace, cx| {
-                        workspace.project.update(cx, |_, cx| {
-                            cx.emit(project::Event::ActiveEntryChanged(Some(entry_id)));
-                        });
-                    })
-                    .ok();
+                    workspace
+                        .update(cx, |workspace, cx| {
+                            workspace.project.update(cx, |_, cx| {
+                                cx.emit(project::Event::ActiveEntryChanged(Some(entry_id)));
+                            });
+                        })
+                        .ok();
                 }
             }
 
@@ -4743,6 +4756,94 @@ impl Workspace {
                 })
             })
             .map(|option| option.context("pane was dropped"))?
+        })
+    }
+
+    fn open_readme(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<()> {
+        if WorkspaceSettings::get_global(cx).on_new_window != settings::OnNewWindow::Readme
+            || self.items(cx).next().is_some()
+        {
+            return Task::ready(());
+        }
+
+        let project = self.project.clone();
+        let mut candidates = Vec::new();
+        for worktree in project.read(cx).visible_worktrees(cx) {
+            let worktree = worktree.read(cx);
+            for file_name in [
+                "README.md",
+                "readme.md",
+                "Readme.md",
+                "README",
+                "readme",
+                "Readme",
+                "README.txt",
+                "readme.txt",
+                "Readme.txt",
+            ] {
+                let Some(path) = RelPath::from_unix_str(file_name).ok() else {
+                    continue;
+                };
+                let metadata = project
+                    .read(cx)
+                    .resolve_abs_path(&worktree.absolutize(path).to_string_lossy(), cx);
+                let path = ProjectPath {
+                    worktree_id: worktree.id(),
+                    path: Arc::from(path),
+                };
+                candidates.push((path, metadata));
+            }
+        }
+        let pane = self.active_pane().downgrade();
+        cx.spawn_in(window, async move |workspace, cx| {
+            for (path, metadata) in candidates {
+                if !metadata.await.is_some_and(|metadata| metadata.is_file()) {
+                    continue;
+                }
+                let worktree_id = path.worktree_id;
+                let Ok(Some(task)) = workspace.update_in(cx, |workspace, window, cx| {
+                    if WorkspaceSettings::get_global(cx).on_new_window
+                        != settings::OnNewWindow::Readme
+                        || workspace.items(cx).next().is_some()
+                        || project.read(cx).worktree_for_id(worktree_id, cx).is_none()
+                        || pane.upgrade().is_none()
+                    {
+                        return None;
+                    }
+                    Some(workspace.load_path(path.clone(), window, cx))
+                }) else {
+                    return;
+                };
+                let (entry_id, build_item) = match task.await {
+                    Ok(loaded) => loaded,
+                    Err(error) => {
+                        log::debug!("Skipping README candidate {path:?}: {error:#}");
+                        continue;
+                    }
+                };
+                workspace
+                    .update_in(cx, |workspace, window, cx| {
+                        if WorkspaceSettings::get_global(cx).on_new_window
+                            != settings::OnNewWindow::Readme
+                            || workspace.items(cx).next().is_some()
+                            || project.read(cx).worktree_for_id(worktree_id, cx).is_none()
+                        {
+                            return;
+                        }
+                        let Some(pane) = pane.upgrade() else {
+                            return;
+                        };
+                        let focus_item = workspace.owns_window_chrome();
+                        pane.update(cx, |pane, cx| {
+                            pane.open_item(
+                                entry_id, path, focus_item, true, true, None, window, cx,
+                                build_item,
+                            );
+                        });
+                    })
+                    .ok();
+                return;
+            }
         })
     }
 
@@ -8604,7 +8705,7 @@ pub fn open_workspace_by_id(
         window
             .update(cx, |_, window, cx| {
                 workspace.update(cx, |_workspace, cx| {
-                    open_items(Some(serialized_workspace), vec![], window, cx)
+                    open_items(Some(serialized_workspace), Vec::new(), window, cx)
                 })
             })?
             .await?;
