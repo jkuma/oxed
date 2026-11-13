@@ -54,9 +54,15 @@ install_oxed() {
     ln -sf "$app_dir/bin/oxed" "$HOME/.local/bin/oxed"
 
     # Absolute paths keep the menu entry working when ~/.local/bin is not on PATH.
+    icons_dir="$app_dir/share/icons/hicolor"
     for desktop_file in "$app_dir"/share/applications/*.desktop; do
+        icon_name="$(sed -n 's/^Icon=//p' "$desktop_file")"
+        icon="$icons_dir/scalable/apps/$icon_name.svg"
+        if [ ! -f "$icon" ]; then
+            icon="$icons_dir/512x512/apps/$icon_name.png"
+        fi
         sed -e "s|Exec=oxed|Exec=$app_dir/bin/oxed|" \
-            -e "s|^Icon=\(.*\)$|Icon=$app_dir/share/icons/hicolor/512x512/apps/\1.png|" \
+            -e "s|^Icon=.*|Icon=$icon|" \
             "$desktop_file" > "$applications_dir/$(basename "$desktop_file")"
     done
     refresh_applications_menu "$applications_dir"

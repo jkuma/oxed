@@ -11,10 +11,10 @@ version="$(script/get-crate-version zed)"
 target_dir="${CARGO_TARGET_DIR:-target}"
 
 case "$channel" in
-    stable) suffix=""; app_name="Oxed"; app_id="dev.jkuma.Oxed" ;;
-    preview) suffix="-preview"; app_name="Oxed Preview"; app_id="dev.jkuma.Oxed-Preview" ;;
-    nightly) suffix="-nightly"; app_name="Oxed Nightly"; app_id="dev.jkuma.Oxed-Nightly" ;;
-    dev) suffix="-dev"; app_name="Oxed Dev"; app_id="dev.jkuma.Oxed-Dev" ;;
+    stable) suffix=""; app_name="Oxed"; app_id="dev.jkuma.Oxed"; svg_icon="oxed-icon.svg" ;;
+    preview) suffix="-preview"; app_name="Oxed Preview"; app_id="dev.jkuma.Oxed-Preview"; svg_icon="oxed-icon.svg" ;;
+    nightly) suffix="-nightly"; app_name="Oxed Nightly"; app_id="dev.jkuma.Oxed-Nightly"; svg_icon="oxed-icon.svg" ;;
+    dev) suffix="-dev"; app_name="Oxed Dev"; app_id="dev.jkuma.Oxed-Dev"; svg_icon="oxed-icon-dev.svg" ;;
     *) echo "unknown release channel: $channel" >&2; exit 1 ;;
 esac
 
@@ -32,9 +32,11 @@ mkdir -p "${app_dir}/bin" "${app_dir}/libexec"
 strip --strip-unneeded -o "${app_dir}/libexec/oxed-editor" "${target_dir}/release/oxed"
 strip --strip-debug -o "${app_dir}/bin/oxed" "${target_dir}/release/cli"
 
-mkdir -p "${app_dir}/share/icons/hicolor/512x512/apps" "${app_dir}/share/icons/hicolor/1024x1024/apps"
+mkdir -p "${app_dir}/share/icons/hicolor/512x512/apps" "${app_dir}/share/icons/hicolor/1024x1024/apps" \
+    "${app_dir}/share/icons/hicolor/scalable/apps"
 cp "crates/zed/resources/app-icon${suffix}.png" "${app_dir}/share/icons/hicolor/512x512/apps/oxed.png"
 cp "crates/zed/resources/app-icon${suffix}@2x.png" "${app_dir}/share/icons/hicolor/1024x1024/apps/oxed.png"
+cp "crates/zed/resources/${svg_icon}" "${app_dir}/share/icons/hicolor/scalable/apps/oxed.svg"
 
 mkdir -p "${app_dir}/share/applications"
 APP_NAME="$app_name" APP_ID="$app_id" APP_CLI="oxed" APP_ICON="oxed" \
