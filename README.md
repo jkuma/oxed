@@ -9,6 +9,18 @@ Oxed is a minimal, LSP-first code editor written in Rust. It is a fork of [Zed](
 
 Oxed ships **without** AI features, account sign-in or collaboration, an integrated terminal, tasks, a debugger, telemetry, crash reporting, auto-update, or remote development.
 
+## Installing
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jkuma/oxed/main/script/install.sh | sh
+```
+
+The script installs the latest release into `~/.local/oxed.app`, links the `oxed` command into `~/.local/bin` and adds Oxed to the applications menu. Run it again to update Oxed. The release relies on the system's libraries: the script lists any that are missing.
+
+- `curl … | OXED_VERSION=0.2.0 sh` installs a given release.
+- `OXED_BUNDLE_PATH=target/release/oxed-linux-x86_64.tar.gz script/install.sh` installs a bundle built locally.
+- `curl … | sh -s -- --uninstall` removes Oxed and keeps its settings and data.
+
 ## Building
 
 Oxed runs on Linux only. Install the system dependencies listed in `script/linux`, then:
