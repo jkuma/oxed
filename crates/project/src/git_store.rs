@@ -483,6 +483,7 @@ pub struct RepositoryId(pub u64);
 pub struct MergeDetails {
     pub merge_heads_by_conflicted_path: TreeMap<RepoPath, Vec<Option<SharedString>>>,
     pub message: Option<SharedString>,
+    pub rebasing: bool,
 }
 
 #[derive(Clone)]
@@ -3893,10 +3894,7 @@ impl RepositorySnapshot {
     /// During a rebase, ours is the branch being rebased onto and theirs is the commit being
     /// replayed.
     pub fn is_rebasing(&self) -> bool {
-        self.merge
-            .merge_heads_by_conflicted_path
-            .values()
-            .any(|heads| heads.get(REBASE_HEAD_INDEX).is_some_and(Option::is_some))
+        self.merge.rebasing
     }
 
     pub fn has_conflict(&self, repo_path: &RepoPath) -> bool {
@@ -3921,17 +3919,6 @@ impl RepositorySnapshot {
     }
 }
 
-/// The refs git writes while an operation stops on conflicts, in the order in which their
-/// commits are recorded for each conflicted path.
-const OPERATION_HEADS: [&str; 5] = [
-    "MERGE_HEAD",
-    "CHERRY_PICK_HEAD",
-    "REBASE_HEAD",
-    "REVERT_HEAD",
-    "APPLY_HEAD",
-];
-const REBASE_HEAD_INDEX: usize = 2;
-
 impl MergeDetails {
     async fn update(
         &mut self,
@@ -3940,8 +3927,15 @@ impl MergeDetails {
     ) -> bool {
         log::debug!("load merge details");
         self.message = backend.merge_message().await.map(SharedString::from);
+        self.rebasing = backend.rebase_in_progress().await;
         let heads = backend
-            .revparse_batch(OPERATION_HEADS.map(String::from).to_vec())
+            .revparse_batch(vec![
+                "MERGE_HEAD".into(),
+                "CHERRY_PICK_HEAD".into(),
+                "REBASE_HEAD".into(),
+                "REVERT_HEAD".into(),
+                "APPLY_HEAD".into(),
+            ])
             .await
             .log_err()
             .unwrap_or_default()

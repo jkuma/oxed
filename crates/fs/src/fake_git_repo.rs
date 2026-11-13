@@ -608,6 +608,11 @@ impl GitRepository for FakeGitRepository {
         async move { None }.boxed()
     }
 
+    fn rebase_in_progress(&self) -> BoxFuture<'_, bool> {
+        let path = self.repository_dir_path.join(git::REBASE_MERGE_DIR);
+        async move { self.fs.is_dir(&path).await }.boxed()
+    }
+
     fn status(&self, path_prefixes: &[RepoPath]) -> Task<Result<GitStatus>> {
         let workdir_path = self.dot_git_path.parent().unwrap();
 

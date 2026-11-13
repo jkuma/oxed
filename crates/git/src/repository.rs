@@ -830,6 +830,9 @@ pub trait GitRepository: Send + Sync {
 
     fn merge_message(&self) -> BoxFuture<'_, Option<String>>;
 
+    /// Whether a rebase stopped in this worktree, for instance on conflicts.
+    fn rebase_in_progress(&self) -> BoxFuture<'_, bool>;
+
     fn status(&self, path_prefixes: &[RepoPath]) -> Task<Result<GitStatus>>;
     fn diff_tree(&self, request: DiffTreeType) -> BoxFuture<'_, Result<TreeDiff>>;
 
@@ -1941,6 +1944,18 @@ impl GitRepository for RealGitRepository {
         let path = self.path().join("MERGE_MSG");
         self.executor
             .spawn(async move { std::fs::read_to_string(&path).ok() })
+            .boxed()
+    }
+
+    fn rebase_in_progress(&self) -> BoxFuture<'_, bool> {
+        let git_dir = self.path();
+        self.executor
+            .spawn(async move {
+                let rebase_apply = git_dir.join(crate::REBASE_APPLY_DIR);
+                // `git am` uses the same directory, marked with `applying`.
+                git_dir.join(crate::REBASE_MERGE_DIR).is_dir()
+                    || (rebase_apply.is_dir() && !rebase_apply.join("applying").exists())
+            })
             .boxed()
     }
 
@@ -5984,6 +5999,43 @@ mod tests {
             fs::read_to_string(path.join("modified.txt")).unwrap(),
             "a\nours\n"
         );
+    }
+
+    #[gpui::test]
+    #[allow(clippy::disallowed_methods)]
+    async fn test_rebase_in_progress(cx: &mut TestAppContext) {
+        disable_git_global_config();
+        cx.executor().allow_parking();
+
+        let repo_dir = tempfile::tempdir().unwrap();
+        let path = repo_dir.path();
+        git_init_repo(path);
+        fs::write(path.join("file.txt"), "base\n").unwrap();
+        git_command(path, ["add", "."]);
+        git_command(path, ["commit", "-m", "base"]);
+        git_command(path, ["checkout", "-b", "feature"]);
+        fs::write(path.join("file.txt"), "feature\n").unwrap();
+        git_command(path, ["commit", "-am", "feature"]);
+        git_command(path, ["checkout", "main"]);
+        fs::write(path.join("file.txt"), "main\n").unwrap();
+        git_command(path, ["commit", "-am", "main"]);
+        git_command(path, ["checkout", "feature"]);
+        let rebase = std::process::Command::new("git")
+            .args(["rebase", "main"])
+            .current_dir(path)
+            .envs(test_commit_envs())
+            .output()
+            .unwrap();
+        assert!(!rebase.status.success(), "the rebase should conflict");
+
+        let repo =
+            RealGitRepository::new(&path.join(".git"), Some("git".into()), cx.executor()).unwrap();
+        assert!(repo.rebase_in_progress().await);
+
+        // Git leaves REBASE_HEAD behind once the rebase is done.
+        git_command(path, ["add", "file.txt"]);
+        git_command(path, ["-c", "core.editor=true", "rebase", "--continue"]);
+        assert!(!repo.rebase_in_progress().await);
     }
 
     #[gpui::test]

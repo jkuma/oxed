@@ -10731,11 +10731,15 @@ mod tests {
             }),
         )
         .await;
+        // Git leaves REBASE_HEAD behind once a rebase is done.
+        fs.with_git_state("/project/.git".as_ref(), true, |state| {
+            state.refs.insert("REBASE_HEAD".into(), "def".into());
+        })
+        .unwrap();
         if rebasing {
-            fs.with_git_state("/project/.git".as_ref(), true, |state| {
-                state.refs.insert("REBASE_HEAD".into(), "def".into());
-            })
-            .unwrap();
+            fs.create_dir("/project/.git/rebase-merge".as_ref())
+                .await
+                .unwrap();
         }
         fs.set_merge_conflicts_for_repo(
             "/project/.git".as_ref(),
