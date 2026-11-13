@@ -11,20 +11,6 @@ pub enum ChunkKind {
     Conflict,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Strategy {
-    /// The sides differ only in trailing whitespace or line endings.
-    Whitespace,
-    /// The sides changed different words of the conflicting lines.
-    Words,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Resolution {
-    pub strategy: Strategy,
-    pub text: String,
-}
-
 /// A changed region, as line ranges in each revision.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chunk {
@@ -32,8 +18,8 @@ pub struct Chunk {
     pub ours: Range<u32>,
     pub theirs: Range<u32>,
     pub kind: ChunkKind,
-    /// Set on conflicts that a strategy resolved.
-    pub resolution: Option<Resolution>,
+    /// The text of a conflict that a strategy resolved.
+    pub resolution: Option<String>,
 }
 
 impl Chunk {
@@ -104,9 +90,9 @@ pub fn merge_texts(base: Option<&str>, ours: &str, theirs: &str) -> MergeDocumen
     match base {
         Some(base) => {
             let chunks = merge_tokens(
-                sources::lines(base),
-                sources::lines(ours),
-                sources::lines(theirs),
+                &sources::lines(base).collect::<Vec<_>>(),
+                &sources::lines(ours).collect::<Vec<_>>(),
+                &sources::lines(theirs).collect::<Vec<_>>(),
                 Tokens::Lines,
             );
             MergeDocument {
@@ -186,7 +172,7 @@ impl MergeDocument {
                 ChunkKind::OursOnly | ChunkKind::BothSame => output.push_str(self.ours_text(chunk)),
                 ChunkKind::TheirsOnly => output.push_str(self.theirs_text(chunk)),
                 ChunkKind::Conflict => match &chunk.resolution {
-                    Some(resolution) => output.push_str(&resolution.text),
+                    Some(resolution) => output.push_str(resolution),
                     None => {
                         push_marker(&mut output, "<<<<<<<", labels.ours, newline);
                         push_section(&mut output, self.ours_text(chunk), newline);
@@ -243,46 +229,44 @@ pub fn resolve_whitespace(document: &mut MergeDocument) {
         if !chunk.is_unresolved_conflict() {
             continue;
         }
+        let base_text = base.lines(chunk.base.clone());
         let ours_text = ours.lines(chunk.ours.clone());
         let theirs_text = theirs.lines(chunk.theirs.clone());
-        let normalized_base = without_trailing_whitespace(base.lines(chunk.base.clone()));
-        let normalized_ours = without_trailing_whitespace(ours_text);
-        let normalized_theirs = without_trailing_whitespace(theirs_text);
-        let text = if normalized_ours == normalized_theirs {
+        let text = if same_ignoring_trailing_whitespace(ours_text, theirs_text) {
             ours_text
-        } else if *has_base && normalized_ours == normalized_base {
+        } else if *has_base && same_ignoring_trailing_whitespace(ours_text, base_text) {
             theirs_text
-        } else if *has_base && normalized_theirs == normalized_base {
+        } else if *has_base && same_ignoring_trailing_whitespace(theirs_text, base_text) {
             ours_text
         } else {
             continue;
         };
-        chunk.resolution = Some(Resolution {
-            strategy: Strategy::Whitespace,
-            text: text.to_string(),
-        });
+        chunk.resolution = Some(text.to_string());
     }
 }
 
-fn without_trailing_whitespace(text: &str) -> String {
-    let mut normalized = String::with_capacity(text.len());
-    for line in text.split_inclusive('\n') {
-        normalized.push_str(line.trim_end_matches(['\n', '\r', ' ', '\t']));
-        normalized.push('\n');
+fn same_ignoring_trailing_whitespace(left: &str, right: &str) -> bool {
+    fn lines(text: &str) -> impl Iterator<Item = &str> {
+        text.lines()
+            .map(|line| line.trim_end_matches([' ', '\t', '\r']))
     }
-    normalized
+    lines(left).eq(lines(right))
 }
 
 /// Resolves conflicts in which the sides changed different words: the conflicting lines are
-/// merged again word by word, and the conflict is resolved if no words conflict.
+/// merged again word by word, and the conflict is resolved if no words conflict. Without a
+/// base, nothing tells which side changed a word, so nothing is resolved.
 pub fn resolve_words(document: &mut MergeDocument) {
     let MergeDocument {
         base,
         ours,
         theirs,
+        has_base,
         chunks,
-        ..
     } = document;
+    if !*has_base {
+        return;
+    }
     for chunk in chunks.iter_mut() {
         if !chunk.is_unresolved_conflict() {
             continue;
@@ -290,18 +274,8 @@ pub fn resolve_words(document: &mut MergeDocument) {
         let base_words = words(base.lines(chunk.base.clone()));
         let ours_words = words(ours.lines(chunk.ours.clone()));
         let theirs_words = words(theirs.lines(chunk.theirs.clone()));
-        let word_chunks = merge_tokens(
-            base_words.iter().copied(),
-            ours_words.iter().copied(),
-            theirs_words.iter().copied(),
-            Tokens::Words,
-        );
-        if let Some(text) = assemble(&base_words, &ours_words, &theirs_words, &word_chunks) {
-            chunk.resolution = Some(Resolution {
-                strategy: Strategy::Words,
-                text,
-            });
-        }
+        let word_chunks = merge_tokens(&base_words, &ours_words, &theirs_words, Tokens::Words);
+        chunk.resolution = assemble(&base_words, &ours_words, &theirs_words, &word_chunks);
     }
 }
 
@@ -314,6 +288,11 @@ enum WordClass {
 }
 
 impl WordClass {
+    fn is_punctuation(word: &str) -> bool {
+        word.chars()
+            .all(|character| Self::of(character) == Self::Punctuation)
+    }
+
     fn of(character: char) -> Self {
         if character == '\n' {
             Self::Newline
@@ -349,8 +328,11 @@ fn words(text: &str) -> Vec<&str> {
     words
 }
 
+fn indices(range: &Range<u32>) -> Range<usize> {
+    range.start as usize..range.end as usize
+}
+
 fn assemble(base: &[&str], ours: &[&str], theirs: &[&str], chunks: &[Chunk]) -> Option<String> {
-    let range = |range: &Range<u32>| range.start as usize..range.end as usize;
     let mut text = String::new();
     let mut base_index = 0;
     for chunk in chunks {
@@ -360,8 +342,8 @@ fn assemble(base: &[&str], ours: &[&str], theirs: &[&str], chunks: &[Chunk]) -> 
                 .copied(),
         );
         let words = match chunk.kind {
-            ChunkKind::OursOnly | ChunkKind::BothSame => ours.get(range(&chunk.ours))?,
-            ChunkKind::TheirsOnly => theirs.get(range(&chunk.theirs))?,
+            ChunkKind::OursOnly | ChunkKind::BothSame => ours.get(indices(&chunk.ours))?,
+            ChunkKind::TheirsOnly => theirs.get(indices(&chunk.theirs))?,
             ChunkKind::Conflict => return None,
         };
         text.extend(words.iter().copied());
@@ -386,44 +368,41 @@ fn hunks(input: &InternedInput<&str>, tokens: Tokens) -> Vec<Hunk> {
     diff.hunks().collect()
 }
 
-fn merge_tokens<'a>(
-    base: impl Iterator<Item = &'a str>,
-    ours: impl Iterator<Item = &'a str>,
-    theirs: impl Iterator<Item = &'a str>,
-    tokens: Tokens,
-) -> Vec<Chunk> {
+fn merge_tokens(base: &[&str], ours: &[&str], theirs: &[&str], tokens: Tokens) -> Vec<Chunk> {
     let mut input = InternedInput::default();
-    input.update_before(base);
-    input.update_after(ours);
+    input.update_before(base.iter().copied());
+    input.update_after(ours.iter().copied());
     let ours_hunks = hunks(&input, tokens);
-    let ours_tokens = std::mem::take(&mut input.after);
-    input.update_after(theirs);
+    input.update_after(theirs.iter().copied());
     let theirs_hunks = hunks(&input, tokens);
-    let theirs_tokens = &input.after;
-    diff3(&ours_hunks, &theirs_hunks, |ours_range, theirs_range| {
-        let ours_range = ours_range.start as usize..ours_range.end as usize;
-        let theirs_range = theirs_range.start as usize..theirs_range.end as usize;
-        ours_tokens.get(ours_range) == theirs_tokens.get(theirs_range)
-    })
-}
-
-/// A base position and the side position it corresponds to, where the side is unchanged.
-#[derive(Clone, Copy, Default)]
-struct SyncPoint {
-    base: u32,
-    side: u32,
+    let separated = |gap: Range<u32>| match tokens {
+        Tokens::Lines => !gap.is_empty(),
+        // Words separated only by punctuation, as in `1.2`, can form a single value.
+        Tokens::Words => base
+            .get(indices(&gap))
+            .is_some_and(|gap| gap.iter().any(|word| !WordClass::is_punctuation(word))),
+    };
+    diff3(
+        &ours_hunks,
+        &theirs_hunks,
+        separated,
+        |ours_range, theirs_range| {
+            ours.get(indices(ours_range)) == theirs.get(indices(theirs_range))
+        },
+    )
 }
 
 fn diff3(
     ours: &[Hunk],
     theirs: &[Hunk],
+    separated: impl Fn(Range<u32>) -> bool,
     same_change: impl Fn(&Range<u32>, &Range<u32>) -> bool,
 ) -> Vec<Chunk> {
     let mut chunks = Vec::new();
     let mut ours_index = 0;
     let mut theirs_index = 0;
-    let mut ours_sync = SyncPoint::default();
-    let mut theirs_sync = SyncPoint::default();
+    let mut ours_offset = 0;
+    let mut theirs_offset = 0;
     loop {
         let start = match (ours.get(ours_index), theirs.get(theirs_index)) {
             (None, None) => break,
@@ -436,13 +415,16 @@ fn diff3(
         let first_ours = ours_index;
         let first_theirs = theirs_index;
         loop {
+            let touches = |hunk: &Hunk| {
+                hunk.before.start <= base.end || !separated(base.end..hunk.before.start)
+            };
             if let Some(hunk) = ours.get(ours_index)
-                && hunk.before.start <= base.end
+                && touches(hunk)
             {
                 base.end = base.end.max(hunk.before.end);
                 ours_index += 1;
             } else if let Some(hunk) = theirs.get(theirs_index)
-                && hunk.before.start <= base.end
+                && touches(hunk)
             {
                 base.end = base.end.max(hunk.before.end);
                 theirs_index += 1;
@@ -452,8 +434,8 @@ fn diff3(
         }
         let ours_hunks = &ours[first_ours..ours_index];
         let theirs_hunks = &theirs[first_theirs..theirs_index];
-        let ours_range = side_range(ours_hunks, &base, &mut ours_sync);
-        let theirs_range = side_range(theirs_hunks, &base, &mut theirs_sync);
+        let ours_range = side_range(ours_hunks, &base, &mut ours_offset);
+        let theirs_range = side_range(theirs_hunks, &base, &mut theirs_offset);
         let kind = if ours_hunks.is_empty() {
             ChunkKind::TheirsOnly
         } else if theirs_hunks.is_empty() {
@@ -474,22 +456,15 @@ fn diff3(
     chunks
 }
 
-fn side_range(hunks: &[Hunk], base: &Range<u32>, sync: &mut SyncPoint) -> Range<u32> {
-    match (hunks.first(), hunks.last()) {
-        (Some(first), Some(last)) => {
-            let start = first.after.start - (first.before.start - base.start);
-            let end = last.after.end + (base.end - last.before.end);
-            *sync = SyncPoint {
-                base: last.before.end,
-                side: last.after.end,
-            };
-            start..end
-        }
-        _ => {
-            let start = sync.side + (base.start - sync.base);
-            start..start + (base.end - base.start)
-        }
-    }
+/// Maps a chunk's base range to a side, where `offset` is the side's line position minus the
+/// base's in the unchanged lines before the chunk.
+fn side_range(hunks: &[Hunk], base: &Range<u32>, offset: &mut i64) -> Range<u32> {
+    let start = i64::from(base.start) + *offset;
+    *offset += hunks
+        .iter()
+        .map(|hunk| hunk.after.len() as i64 - hunk.before.len() as i64)
+        .sum::<i64>();
+    start as u32..(i64::from(base.end) + *offset) as u32
 }
 
 #[cfg(test)]
@@ -695,13 +670,6 @@ mod tests {
         );
         resolve_words(&mut document);
         assert_eq!(document.conflict_count(), 0);
-        assert_eq!(
-            document.chunks()[0]
-                .resolution
-                .as_ref()
-                .map(|resolution| resolution.strategy),
-            Some(Strategy::Words)
-        );
         assert_eq!(document.render(&LABELS), "let y = foo(a, b);\n");
 
         let mut document =
@@ -720,6 +688,31 @@ mod tests {
         let mut document = merge_texts(Some("a b\n"), "a x b\n", "a y b\n");
         resolve_words(&mut document);
         assert_eq!(document.conflict_count(), 1, "insertions at the same point");
+
+        for (base, ours, theirs) in [
+            (
+                "version = \"1.2\"\n",
+                "version = \"1.3\"\n",
+                "version = \"2.2\"\n",
+            ),
+            ("timeout = 1.5\n", "timeout = 2.5\n", "timeout = 1.75\n"),
+        ] {
+            let mut document = merge_texts(Some(base), ours, theirs);
+            resolve_words(&mut document);
+            assert_eq!(
+                document.conflict_count(),
+                1,
+                "words separated only by punctuation in {base:?}"
+            );
+        }
+
+        let mut document = merge_texts(None, "a\n", "a\nb\n");
+        resolve_words(&mut document);
+        assert_eq!(
+            document.conflict_count(),
+            1,
+            "nothing is resolved without a base"
+        );
     }
 
     #[test]
