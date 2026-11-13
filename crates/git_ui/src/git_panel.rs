@@ -2932,6 +2932,12 @@ impl GitPanel {
         let Some(repository) = self.active_repository.clone() else {
             return;
         };
+        // During a rebase, your commit is git's theirs.
+        let side = match (repository.read(cx).is_rebasing(), side) {
+            (true, ConflictSide::Ours) => ConflictSide::Theirs,
+            (true, ConflictSide::Theirs) => ConflictSide::Ours,
+            (false, side) => side,
+        };
         let task = repository.update(cx, |repository, cx| {
             repository.checkout_conflict_side(paths, side, cx)
         });
@@ -2947,7 +2953,7 @@ impl GitPanel {
     fn resolve_conflicts_automatically(
         &mut self,
         _: &git::ResolveConflictsAutomatically,
-        _: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let paths = self.selected_conflicted_paths();
@@ -2957,17 +2963,33 @@ impl GitPanel {
         let Some(repository) = self.active_repository.clone() else {
             return;
         };
-        let tasks = repository.update(cx, |repository, cx| {
-            paths
+        let Some(workspace) = self.workspace.upgrade() else {
+            return;
+        };
+        let project_paths = paths
+            .iter()
+            .filter_map(|path| repository.read(cx).repo_path_to_project_path(path, cx))
+            .collect::<Vec<_>>();
+        // The editors keep the result and its undo history until the user saves it.
+        let opened_editors = workspace.update(cx, |workspace, cx| {
+            project_paths
                 .into_iter()
-                .map(|path| {
-                    let task = repository.resolve_conflicts_automatically(path.clone(), cx);
-                    (path, task)
-                })
+                .map(|project_path| workspace.open_path(project_path, None, true, window, cx))
                 .collect::<Vec<_>>()
         });
-        let workspace = self.workspace.clone();
         cx.spawn(async move |_, cx| {
+            for opened_editor in opened_editors {
+                opened_editor.await.log_err();
+            }
+            let tasks = repository.update(cx, |repository, cx| {
+                paths
+                    .into_iter()
+                    .map(|path| {
+                        let task = repository.resolve_conflicts_automatically(path.clone(), cx);
+                        (path, task)
+                    })
+                    .collect::<Vec<_>>()
+            });
             let mut messages = Vec::new();
             for (path, task) in tasks {
                 let path = path.as_unix_str();
@@ -2983,7 +3005,8 @@ impl GitPanel {
                 let toast =
                     StatusToast::new(messages.join("\n"), cx, |this, _| this.dismiss_button(true));
                 workspace.toggle_status_toast(toast, cx);
-            })
+            });
+            anyhow::Ok(())
         })
         .detach_and_log_err(cx);
     }
@@ -10685,8 +10708,18 @@ mod tests {
         });
     }
 
-    #[gpui::test]
-    async fn test_conflict_resolution_actions(cx: &mut TestAppContext) {
+    const CONFLICTED_MERGED_RS: &str =
+        "<<<<<<< HEAD\nlet a = 1;\n=======\nlet a = 10;  \n>>>>>>> branch\nlet b = 2;\n";
+
+    async fn open_conflicted_project(
+        rebasing: bool,
+        cx: &mut TestAppContext,
+    ) -> (
+        Arc<FakeFs>,
+        Entity<Workspace>,
+        Entity<GitPanel>,
+        VisualTestContext,
+    ) {
         init_test(cx);
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(
@@ -10694,10 +10727,16 @@ mod tests {
             json!({
                 ".git": {},
                 "accepted.rs": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n",
-                "merged.rs": "<<<<<<< HEAD\nlet a = 10;\nlet b = 2;\n=======\nlet a = 1;\nlet b = 20;\n>>>>>>> branch\n",
+                "merged.rs": CONFLICTED_MERGED_RS,
             }),
         )
         .await;
+        if rebasing {
+            fs.with_git_state("/project/.git".as_ref(), true, |state| {
+                state.refs.insert("REBASE_HEAD".into(), "def".into());
+            })
+            .unwrap();
+        }
         fs.set_merge_conflicts_for_repo(
             "/project/.git".as_ref(),
             &[
@@ -10712,9 +10751,9 @@ mod tests {
                 (
                     "merged.rs",
                     project::FakeConflictStages {
-                        base: Some(b"let a = 1;\nlet b = 2;\n".to_vec()),
-                        ours: Some(b"let a = 10;\nlet b = 2;\n".to_vec()),
-                        theirs: Some(b"let a = 1;\nlet b = 20;\n".to_vec()),
+                        base: Some(b"let a = 1;  \nlet b = 2;\n".to_vec()),
+                        ours: Some(b"let a = 1;\nlet b = 2;\n".to_vec()),
+                        theirs: Some(b"let a = 10;  \nlet b = 2;\n".to_vec()),
                     },
                 ),
             ],
@@ -10738,29 +10777,45 @@ mod tests {
         })
         .await;
         cx.executor().run_until_parked();
-
         let panel = workspace.update_in(&mut cx, GitPanel::new);
         await_git_panel_entries(&panel, &mut cx).await;
-        let select = |path: &str, panel: &mut GitPanel| {
-            panel.selected_entry = panel.entries.iter().position(|entry| {
-                entry
-                    .status_entry()
-                    .is_some_and(|entry| entry.repo_path == repo_path(path))
-            });
-        };
+        (fs, workspace, panel, cx)
+    }
+
+    fn select_entry(path: &str, panel: &mut GitPanel) {
+        panel.selected_entry = panel.entries.iter().position(|entry| {
+            entry
+                .status_entry()
+                .is_some_and(|entry| entry.repo_path == repo_path(path))
+        });
+    }
+
+    #[gpui::test]
+    async fn test_conflict_resolution_actions(cx: &mut TestAppContext) {
+        let (fs, workspace, panel, mut cx) = open_conflicted_project(false, cx).await;
 
         panel.update_in(&mut cx, |panel, window, cx| {
-            select("merged.rs", panel);
+            select_entry("merged.rs", panel);
             panel.resolve_conflicts_automatically(&git::ResolveConflictsAutomatically, window, cx);
         });
         cx.run_until_parked();
+        let editor = workspace
+            .update(&mut cx, |workspace, cx| {
+                workspace.active_item_as::<editor::Editor>(cx)
+            })
+            .expect("the resolved file is open");
+        assert_eq!(
+            editor.read_with(&cx, |editor, cx| editor.text(cx)),
+            "let a = 10;  \nlet b = 2;\n"
+        );
         assert_eq!(
             fs.load("/project/merged.rs".as_ref()).await.unwrap(),
-            "let a = 10;\nlet b = 20;\n"
+            CONFLICTED_MERGED_RS,
+            "the result is left for the user to review and save"
         );
 
         panel.update_in(&mut cx, |panel, window, cx| {
-            select("accepted.rs", panel);
+            select_entry("accepted.rs", panel);
             panel.accept_theirs(&git::AcceptTheirs, window, cx);
         });
         cx.run_until_parked();
@@ -10777,12 +10832,23 @@ mod tests {
                 .filter(|entry| entry.status.is_conflicted())
                 .map(|entry| entry.repo_path.as_unix_str().to_string())
                 .collect::<Vec<_>>();
-            assert_eq!(
-                conflicted,
-                ["merged.rs"],
-                "resolving automatically leaves staging to the user"
-            );
+            assert_eq!(conflicted, ["merged.rs"]);
         });
+    }
+
+    #[gpui::test]
+    async fn test_accept_yours_during_rebase(cx: &mut TestAppContext) {
+        let (fs, _workspace, panel, mut cx) = open_conflicted_project(true, cx).await;
+        panel.update_in(&mut cx, |panel, window, cx| {
+            select_entry("accepted.rs", panel);
+            panel.accept_yours(&git::AcceptYours, window, cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            fs.load("/project/accepted.rs".as_ref()).await.unwrap(),
+            "theirs\n",
+            "your commit is git's theirs during a rebase"
+        );
     }
 
     #[gpui::test]

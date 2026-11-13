@@ -145,8 +145,8 @@ actions!(
         AcceptYours,
         /// Resolves the selected conflicted files with their version.
         AcceptTheirs,
-        /// Merges the selected conflicted files again and resolves the conflicts that merge
-        /// strategies can.
+        /// Merges the selected conflicted files again and opens them with the conflicts that
+        /// merge strategies resolved, for review before saving.
         ResolveConflictsAutomatically,
         /// Copies the current branch name to the clipboard.
         CopyBranchName,

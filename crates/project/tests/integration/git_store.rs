@@ -2532,10 +2532,10 @@ mod conflict_resolution_tests {
         cx: &mut TestAppContext,
     ) {
         cx.update(|cx| settings::init(cx));
-        let base = "x = 1\ny = 2\n\nvalue = 1\n";
-        let ours = "x = 10\ny = 2\n\nvalue = 2\n";
-        let theirs = "x = 1\ny = 20\n\nvalue = 3\n";
-        let conflicted = "<<<<<<< HEAD\nx = 10\ny = 2\n=======\nx = 1\ny = 20\n>>>>>>> feature\n\n\
+        let base = "x = 1  \ny = 2\n\nvalue = 1\n";
+        let ours = "x = 1\ny = 2\n\nvalue = 2\n";
+        let theirs = "x = 10  \ny = 2\n\nvalue = 3\n";
+        let conflicted = "<<<<<<< HEAD\nx = 1\n=======\nx = 10  \n>>>>>>> feature\ny = 2\n\n\
                           <<<<<<< HEAD\nvalue = 2\n=======\nvalue = 3\n>>>>>>> feature\n";
         let fs = FakeFs::new(executor);
         fs.insert_tree(
@@ -2597,6 +2597,12 @@ mod conflict_resolution_tests {
             }
         );
 
+        let buffer = project
+            .update(cx, |project, cx| {
+                project.open_local_buffer("/project/settings.txt", cx)
+            })
+            .await
+            .expect("open buffer");
         let resolution = repository
             .update(cx, |repository, cx| {
                 repository.resolve_conflicts_automatically(repo_path("settings.txt"), cx)
@@ -2610,44 +2616,25 @@ mod conflict_resolution_tests {
                 remaining: 1,
             }
         );
-        let resolution = repository
+        assert_eq!(
+            buffer.read_with(cx, |buffer, _| buffer.text()),
+            "x = 10  \ny = 2\n\n<<<<<<< HEAD\nvalue = 2\n=======\nvalue = 3\n>>>>>>> feature\n"
+        );
+        assert_eq!(
+            fs.load(Path::new("/project/settings.txt")).await.unwrap(),
+            conflicted,
+            "the result is left for the user to review and save"
+        );
+        cx.run_until_parked();
+        assert!(is_conflicted("settings.txt", cx));
+
+        let error = repository
             .update(cx, |repository, cx| {
                 repository.resolve_conflicts_automatically(repo_path("settings.txt"), cx)
             })
             .await
-            .expect("resolve conflicts again");
-        assert_eq!(
-            resolution,
-            AutomaticResolution {
-                resolved: 1,
-                remaining: 1,
-            }
-        );
-        assert_eq!(
-            fs.load(Path::new("/project/settings.txt")).await.unwrap(),
-            "x = 10\ny = 20\n\n<<<<<<< HEAD\nvalue = 2\n=======\nvalue = 3\n>>>>>>> feature\n"
-        );
-        cx.run_until_parked();
-        assert!(
-            is_conflicted("settings.txt", cx),
-            "resolving automatically does not stage the file"
-        );
-
-        let error = repository
-            .update(cx, |repository, cx| {
-                repository.resolve_conflicts_automatically(repo_path("deleted.txt"), cx)
-            })
-            .await
-            .expect_err("a side deleted the file");
-        assert!(error.to_string().contains("deleted on one side"), "{error}");
-
-        let buffer = project
-            .update(cx, |project, cx| {
-                project.open_local_buffer("/project/settings.txt", cx)
-            })
-            .await
-            .expect("open buffer");
-        buffer.update(cx, |buffer, cx| buffer.edit([(0..0, "edited ")], None, cx));
+            .expect_err("the buffer has unsaved edits");
+        assert!(error.to_string().contains("save or discard"), "{error}");
         let error = repository
             .update(cx, |repository, cx| {
                 repository.checkout_conflict_side(
@@ -2660,6 +2647,15 @@ mod conflict_resolution_tests {
             .expect_err("the buffer has unsaved edits");
         assert!(error.to_string().contains("save or discard"), "{error}");
         buffer.update(cx, |buffer, cx| buffer.undo(cx));
+        assert_eq!(buffer.read_with(cx, |buffer, _| buffer.text()), conflicted);
+
+        let error = repository
+            .update(cx, |repository, cx| {
+                repository.resolve_conflicts_automatically(repo_path("deleted.txt"), cx)
+            })
+            .await
+            .expect_err("a side deleted the file");
+        assert!(error.to_string().contains("deleted on one side"), "{error}");
 
         repository
             .update(cx, |repository, cx| {

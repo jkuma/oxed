@@ -3890,6 +3890,15 @@ impl RepositorySnapshot {
             .contains_key(repo_path)
     }
 
+    /// During a rebase, ours is the branch being rebased onto and theirs is the commit being
+    /// replayed.
+    pub fn is_rebasing(&self) -> bool {
+        self.merge
+            .merge_heads_by_conflicted_path
+            .values()
+            .any(|heads| heads.get(REBASE_HEAD_INDEX).is_some_and(Option::is_some))
+    }
+
     pub fn has_conflict(&self, repo_path: &RepoPath) -> bool {
         let had_conflict_on_last_merge_head_change = self
             .merge
@@ -3912,6 +3921,17 @@ impl RepositorySnapshot {
     }
 }
 
+/// The refs git writes while an operation stops on conflicts, in the order in which their
+/// commits are recorded for each conflicted path.
+const OPERATION_HEADS: [&str; 5] = [
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REBASE_HEAD",
+    "REVERT_HEAD",
+    "APPLY_HEAD",
+];
+const REBASE_HEAD_INDEX: usize = 2;
+
 impl MergeDetails {
     async fn update(
         &mut self,
@@ -3921,13 +3941,7 @@ impl MergeDetails {
         log::debug!("load merge details");
         self.message = backend.merge_message().await.map(SharedString::from);
         let heads = backend
-            .revparse_batch(vec![
-                "MERGE_HEAD".into(),
-                "CHERRY_PICK_HEAD".into(),
-                "REBASE_HEAD".into(),
-                "REVERT_HEAD".into(),
-                "APPLY_HEAD".into(),
-            ])
+            .revparse_batch(OPERATION_HEADS.map(String::from).to_vec())
             .await
             .log_err()
             .unwrap_or_default()
@@ -4577,8 +4591,8 @@ impl Repository {
             .is_some_and(|buffer| buffer.read(cx).has_unsaved_edits())
     }
 
-    /// Merges the base, ours and theirs versions of a conflicted path again, resolves what the
-    /// merge strategies can, and saves the result. The path stays conflicted until it is staged.
+    /// Merges the base, ours and theirs versions of a conflicted path again, and applies what
+    /// the merge strategies resolve to the path's buffer as a single edit, without saving it.
     pub fn resolve_conflicts_automatically(
         &mut self,
         path: RepoPath,
@@ -4632,7 +4646,6 @@ impl Repository {
                     let mut document = merge::merge_texts(base.as_deref(), &ours, &theirs);
                     let conflicts = document.conflict_count();
                     merge::resolve_whitespace(&mut document);
-                    merge::resolve_words(&mut document);
                     let remaining = document.conflict_count();
                     let resolution = AutomaticResolution {
                         resolved: conflicts - remaining,
@@ -4656,9 +4669,6 @@ impl Repository {
                 buffer.apply_diff(diff, cx);
                 buffer.set_line_ending(line_ending, cx);
             });
-            buffer_store
-                .update(cx, |buffer_store, cx| buffer_store.save_buffer(buffer, cx))
-                .await?;
             Ok(resolution)
         })
     }
