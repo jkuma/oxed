@@ -255,6 +255,24 @@ struct DocumentSelectorContext {
     /// `None` for documents without a language, which no `language` filter matches.
     language_id: Option<String>,
     scheme: &'static str,
+    path: DocumentSelectorPath,
+}
+
+#[derive(Clone, Debug)]
+enum DocumentSelectorPath {
+    /// The context stands for every document of a language (e.g. for per-language caches),
+    /// so `pattern` filters cannot be evaluated and are not considered.
+    Unknown,
+    /// The document has no file system path, so no `pattern` filter matches it.
+    Absent,
+    /// The absolute path of the document.
+    Present(String),
+}
+
+impl DocumentSelectorPath {
+    fn for_file(file: &File, cx: &App) -> Self {
+        Self::Present(file.abs_path(cx).to_string_lossy().into_owned())
+    }
 }
 
 pub struct LocalLspStore {
@@ -1031,20 +1049,11 @@ impl LocalLspStore {
                     let lsp_store = lsp_store.clone();
                     let mut cx = cx.clone();
                     async move {
-                        lsp_store
-                            .update(&mut cx, |lsp_store, cx| {
-                                match lsp_store.register_server_capabilities(server_id, params, cx)
-                                {
-                                    Ok(()) => {}
-                                    Err(e) => {
-                                        log::error!(
-                                            "Failed to register server capabilities: {e:#}"
-                                        );
-                                    }
-                                };
-                            })
-                            .ok();
-                        Ok(())
+                        lsp_store.update(&mut cx, |lsp_store, cx| {
+                            lsp_store
+                                .register_server_capabilities(server_id, params, cx)
+                                .inspect_err(|error| log::error!("{error:#}"))
+                        })?
                     }
                 }
             })
@@ -1431,9 +1440,9 @@ impl LocalLspStore {
 
     fn language_servers_for_buffer<'a>(
         &'a self,
-        buffer: &'a Buffer,
-        cx: &'a mut App,
-    ) -> impl Iterator<Item = (&'a Arc<CachedLspAdapter>, &'a Arc<LanguageServer>)> {
+        buffer: &Buffer,
+        cx: &mut App,
+    ) -> impl Iterator<Item = (&'a Arc<CachedLspAdapter>, &'a Arc<LanguageServer>)> + use<'a> {
         self.language_server_ids_for_buffer(buffer, cx)
             .into_iter()
             .filter_map(|server_id| match self.language_servers.get(&server_id)? {
@@ -1955,6 +1964,7 @@ impl LocalLspStore {
                                             buffer_snapshot,
                                             adapter,
                                             server,
+                                            cx,
                                         )
                                     });
                                 if range_formatter.is_some() {
@@ -1969,6 +1979,7 @@ impl LocalLspStore {
                                             buffer_snapshot,
                                             adapter,
                                             server,
+                                            cx,
                                         )
                                     })
                                 } else {
@@ -1981,11 +1992,13 @@ impl LocalLspStore {
                                         buffer_snapshot,
                                         adapter,
                                         server,
+                                        cx,
                                     ) || buffer_supports_lsp_range_formatting(
                                         local,
                                         buffer_snapshot,
                                         adapter,
                                         server,
+                                        cx,
                                     )
                                 })
                             };
@@ -2473,6 +2486,7 @@ impl LocalLspStore {
                 buffer_handle.read(cx),
                 adapter,
                 language_server,
+                cx,
             )
         })?;
         if !range_formatting_supported {
@@ -2619,8 +2633,14 @@ impl LocalLspStore {
                 let local = this.as_local();
                 let buffer = buffer.read(cx);
                 (
-                    buffer_supports_lsp_formatting(local, buffer, adapter, language_server),
-                    buffer_supports_lsp_range_formatting(local, buffer, adapter, language_server),
+                    buffer_supports_lsp_formatting(local, buffer, adapter, language_server, cx),
+                    buffer_supports_lsp_range_formatting(
+                        local,
+                        buffer,
+                        adapter,
+                        language_server,
+                        cx,
+                    ),
                 )
             })?;
 
@@ -2905,6 +2925,7 @@ impl LocalLspStore {
                         server.server_id(),
                         &adapter,
                         buffer,
+                        cx,
                     ),
                     cx,
                 );
@@ -3207,6 +3228,7 @@ impl LocalLspStore {
                         server.server_id(),
                         &adapter,
                         buffer,
+                        cx,
                     ),
                     cx,
                 );
@@ -5565,6 +5587,7 @@ impl LspStore {
         &self,
         server_id: LanguageServerId,
         language: Option<&LanguageName>,
+        path: DocumentSelectorPath,
     ) -> Option<DocumentSelectorContext> {
         let language = language?;
         let server_name = &self.language_server_statuses.get(&server_id)?.name;
@@ -5579,6 +5602,7 @@ impl LspStore {
         Some(DocumentSelectorContext {
             language_id: Some(language_id),
             scheme: "file",
+            path,
         })
     }
 
@@ -5598,7 +5622,7 @@ impl LspStore {
             else {
                 return false;
             };
-            text_document_capabilities_for_buffer(local, method, buffer, adapter, server)
+            text_document_capabilities_for_buffer(local, method, buffer, adapter, server, cx)
                 .any(&mut check)
         })
     }
@@ -5629,7 +5653,7 @@ impl LspStore {
             })
             .any(|(adapter, server)| {
                 let server_name = server.name();
-                text_document_capabilities_for_buffer(local, method, buffer, adapter, server)
+                text_document_capabilities_for_buffer(local, method, buffer, adapter, server, cx)
                     .any(|capabilities| check(&server_name, capabilities))
             })
     }
@@ -5717,6 +5741,7 @@ impl LspStore {
                             buffer,
                             adapter,
                             language_server,
+                            cx,
                         )
                         .peekable();
                     if applicable_capabilities.peek().is_some() {
@@ -6658,7 +6683,7 @@ impl LspStore {
                 local
                     .language_servers_for_buffer(buffer, cx)
                     .filter(|(adapter, server)| {
-                        lsp_command_allowed_for_buffer(local, &request, buffer, adapter, server)
+                        lsp_command_allowed_for_buffer(local, &request, buffer, adapter, server, cx)
                     })
                     .filter(|(adapter, _)| {
                         scope
@@ -7146,6 +7171,7 @@ impl LspStore {
                                 registration,
                                 buffer.read(cx),
                                 &adapter,
+                                cx,
                             ) {
                                 continue;
                             }
@@ -7897,7 +7923,7 @@ impl LspStore {
                     .language_servers_for_buffer(buffer, cx)
                     .map(|(adapter, server)| {
                         let sync_kind =
-                            text_document_sync_kind_for_buffer(local, buffer, adapter, server);
+                            text_document_sync_kind_for_buffer(local, buffer, adapter, server, cx);
                         (server.clone(), sync_kind)
                     })
                     .collect(),
@@ -8029,7 +8055,7 @@ impl LspStore {
                     return None;
                 };
                 let include_text =
-                    did_save_include_text_for_buffer(local, buffer.read(cx), adapter, server)?;
+                    did_save_include_text_for_buffer(local, buffer.read(cx), adapter, server, cx)?;
                 Some((server.clone(), include_text))
             })
             .collect::<Vec<_>>();
@@ -8681,7 +8707,7 @@ impl LspStore {
             local
                 .language_servers_for_buffer(buffer, cx)
                 .filter(|(adapter, server)| {
-                    lsp_command_allowed_for_buffer(local, request, buffer, adapter, server)
+                    lsp_command_allowed_for_buffer(local, request, buffer, adapter, server, cx)
                 })
                 .map(|(_, server)| server.server_id())
                 .filter(|server_id| {
@@ -8733,7 +8759,7 @@ impl LspStore {
             local
                 .language_servers_for_buffer(buffer, cx)
                 .filter(|(adapter, server)| {
-                    lsp_command_allowed_for_buffer(local, &request, buffer, adapter, server)
+                    lsp_command_allowed_for_buffer(local, &request, buffer, adapter, server, cx)
                 })
                 .filter(|(adapter, _)| {
                     scope
@@ -10828,13 +10854,17 @@ let local_lsp_store = self.as_local_mut();
 fn document_selector_context_for_buffer(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
+    cx: &App,
 ) -> DocumentSelectorContext {
-    match buffer.language() {
-        Some(language) => document_selector_context_for_language(&language.name(), adapter),
-        None => DocumentSelectorContext {
-            language_id: None,
-            scheme: "file",
-        },
+    let path = File::from_dyn(buffer.file()).map_or(DocumentSelectorPath::Absent, |file| {
+        DocumentSelectorPath::for_file(file, cx)
+    });
+    DocumentSelectorContext {
+        language_id: buffer
+            .language()
+            .map(|language| adapter.language_id(&language.name())),
+        scheme: "file",
+        path,
     }
 }
 
@@ -10845,40 +10875,380 @@ fn document_selector_context_for_language(
     DocumentSelectorContext {
         language_id: Some(adapter.language_id(language)),
         scheme: "file",
+        path: DocumentSelectorPath::Unknown,
+    }
+}
+
+/// A document selector with the patterns of its filters compiled when it is registered, as
+/// documents are matched against it as often as on every edit.
+#[derive(Clone, Debug)]
+pub(super) struct CompiledDocumentSelector {
+    filters: Vec<CompiledDocumentFilter>,
+}
+
+#[derive(Clone, Debug)]
+struct CompiledDocumentFilter {
+    filter: lsp::DocumentFilter,
+    pattern: Option<DocumentFilterPattern>,
+}
+
+impl CompiledDocumentSelector {
+    /// Rejects unusable patterns up front, so that matching never has to decide what they mean.
+    pub(super) fn new(document_selector: lsp::DocumentSelector) -> Result<Self> {
+        let filters = document_selector
+            .into_iter()
+            .map(CompiledDocumentFilter::new)
+            .collect::<Result<_>>()?;
+        Ok(Self { filters })
+    }
+}
+
+impl CompiledDocumentFilter {
+    fn new(filter: lsp::DocumentFilter) -> Result<Self> {
+        let pattern = filter
+            .pattern
+            .as_ref()
+            .map(|pattern| {
+                DocumentFilterPattern::new(pattern)
+                    .with_context(|| format!("invalid document filter pattern {pattern:?}"))
+            })
+            .transpose()?;
+        Ok(Self { filter, pattern })
+    }
+}
+
+impl PartialEq for CompiledDocumentSelector {
+    fn eq(&self, other: &Self) -> bool {
+        self.filters
+            .iter()
+            .map(|filter| &filter.filter)
+            .eq(other.filters.iter().map(|filter| &filter.filter))
     }
 }
 
 fn document_selector_matches(
-    document_selector: Option<&lsp::DocumentSelector>,
+    document_selector: Option<&CompiledDocumentSelector>,
     context: &DocumentSelectorContext,
 ) -> bool {
     let Some(document_selector) = document_selector else {
         return true;
     };
 
-    document_selector.iter().any(|filter| {
-        if let Some(language) = &filter.language
-            && context.language_id.as_ref() != Some(language)
-        {
-            return false;
+    document_selector
+        .filters
+        .iter()
+        .any(|CompiledDocumentFilter { filter, pattern }| {
+            if let Some(language) = &filter.language
+                && context.language_id.as_ref() != Some(language)
+            {
+                return false;
+            }
+
+            if let Some(scheme) = &filter.scheme
+                && !scheme.eq_ignore_ascii_case(context.scheme)
+            {
+                return false;
+            }
+
+            // Checked last, since it runs the glob.
+            if let Some(pattern) = pattern {
+                match &context.path {
+                    DocumentSelectorPath::Unknown => {}
+                    DocumentSelectorPath::Absent => return false,
+                    DocumentSelectorPath::Present(path) => {
+                        if !pattern.matches(path) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            true
+        })
+}
+
+fn document_filter_glob(pattern: &lsp::GlobPattern) -> (Option<&lsp::Uri>, &str) {
+    match pattern {
+        lsp::GlobPattern::String(pattern) => (None, pattern),
+        lsp::GlobPattern::Relative(relative_pattern) => {
+            let base_uri = match &relative_pattern.base_uri {
+                OneOf::Left(workspace_folder) => &workspace_folder.uri,
+                OneOf::Right(base_uri) => base_uri,
+            };
+            (Some(base_uri), &relative_pattern.pattern)
+        }
+    }
+}
+
+// Bound work on server-supplied patterns before the regex compiler's own limits apply.
+const DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES: usize = 256;
+const DOCUMENT_FILTER_GLOB_MAX_BYTES: usize = 1024 * 1024;
+
+/// Compiles an LSP glob pattern into a regular expression matching paths with `/` separators.
+///
+/// Uses LSP glob semantics: `*` and `?` match characters (not bytes) within a path segment,
+/// a `**` segment matches any number of segments, `{a,b}` matches either sub-pattern, and
+/// `[a-z]` or `[!a-z]` matches a character in or out of a range within a path segment.
+/// Consecutive `**` segments are equivalent to one, and character classes cannot consume `/`,
+/// even when a negation or range would otherwise include it.
+fn compile_document_filter_glob(glob: &str) -> Result<regex::Regex> {
+    let mut regex = String::from("^(?:");
+    // Expand complete paths so `**` inside an alternative can absorb adjacent separators.
+    for (index, alternative) in expand_glob_braces(glob)?.iter().enumerate() {
+        let branch = glob_regex(alternative)?;
+        anyhow::ensure!(
+            regex.len() + branch.len() + 3 <= DOCUMENT_FILTER_GLOB_MAX_BYTES,
+            "document filter glob exceeds the compiled pattern size limit"
+        );
+        if index > 0 {
+            regex.push('|');
+        }
+        regex.push_str(&branch);
+    }
+    regex.push_str(")$");
+    Ok(regex::Regex::new(&regex)?)
+}
+
+fn expand_glob_braces(glob: &str) -> Result<Vec<String>> {
+    let mut remaining_bytes = DOCUMENT_FILTER_GLOB_MAX_BYTES
+        .checked_sub(glob.len())
+        .context("document filter glob exceeds the expansion size limit")?;
+    let mut pending = vec![glob.to_string()];
+    let mut expanded = Vec::new();
+    while let Some(pattern) = pending.pop() {
+        let Some((group, alternatives)) = glob_brace_alternatives(&pattern)? else {
+            expanded.push(pattern);
+            continue;
+        };
+        anyhow::ensure!(
+            expanded.len() + pending.len() + alternatives.len()
+                <= DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES,
+            "document filter glob exceeds the alternative count limit"
+        );
+        let prefix = &pattern[..group.start];
+        let suffix = &pattern[group.end..];
+        for alternative in alternatives.into_iter().rev() {
+            // Charge intermediate expansions too, so deeply nested single-choice groups
+            // cannot cause unbounded rescanning and copying even with few final alternatives.
+            remaining_bytes = remaining_bytes
+                .checked_sub(prefix.len() + alternative.len() + suffix.len())
+                .context("document filter glob exceeds the expansion size limit")?;
+            pending.push(format!("{prefix}{alternative}{suffix}"));
+        }
+    }
+    Ok(expanded)
+}
+
+fn glob_brace_alternatives(glob: &str) -> Result<Option<(Range<usize>, Vec<&str>)>> {
+    let mut chars = glob.char_indices();
+    let mut depth = 0;
+    let mut group_start = 0;
+    let mut alternative_start = 0;
+    let mut alternatives = Vec::new();
+    while let Some((index, character)) = chars.next() {
+        match character {
+            '[' => {
+                glob_character_class_end(glob, &mut chars)?;
+            }
+            '{' => {
+                if depth == 0 {
+                    group_start = index;
+                    alternative_start = index + 1;
+                }
+                depth += 1;
+            }
+            ',' if depth == 1 => {
+                anyhow::ensure!(
+                    alternatives.len() + 1 < DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES,
+                    "document filter glob exceeds the alternative count limit"
+                );
+                alternatives.push(&glob[alternative_start..index]);
+                alternative_start = index + 1;
+            }
+            '}' if depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    alternatives.push(&glob[alternative_start..index]);
+                    return Ok(Some((group_start..index + 1, alternatives)));
+                }
+            }
+            _ => {}
+        }
+    }
+    anyhow::ensure!(depth == 0, "unclosed `{{` in glob pattern {glob:?}");
+    Ok(None)
+}
+
+fn glob_character_class_end(glob: &str, chars: &mut std::str::CharIndices<'_>) -> Result<usize> {
+    let mut first = true;
+    let mut has_member = false;
+    for (index, character) in chars.by_ref() {
+        if character == ']' && has_member {
+            return Ok(index + 1);
+        }
+        // A leading `]`, also after negation, is a literal member rather than the delimiter.
+        if !first || !matches!(character, '!' | '^') {
+            has_member = true;
+        }
+        first = false;
+    }
+    anyhow::bail!("unclosed `[` in glob pattern {glob:?}")
+}
+
+fn glob_regex(glob: &str) -> Result<String> {
+    const GLOBSTAR: &str = "**";
+    let mut segments = split_glob(glob, '/')?;
+    segments.dedup_by(|segment, previous| *segment == GLOBSTAR && *previous == GLOBSTAR);
+    if segments.is_empty() {
+        return Ok(String::new());
+    }
+    if segments.iter().all(|segment| *segment == GLOBSTAR) {
+        return Ok("(?s:.*)".to_string());
+    }
+    if segments.as_slice() == ["", GLOBSTAR] {
+        return Ok("/(?s:.*)".to_string());
+    }
+
+    let mut regex = String::new();
+    for (index, segment) in segments.iter().enumerate() {
+        let is_last_segment = index + 1 == segments.len();
+        if *segment == GLOBSTAR {
+            // A terminal globstar owns its separator, but cannot extend the preceding
+            // segment (e.g. `/root/**` must not match `/rooted/`).
+            regex.push_str(if is_last_segment {
+                "(?:/(?s:.*))?"
+            } else {
+                "(?:/|[^/]+/)*?"
+            });
+            continue;
         }
 
-        if let Some(scheme) = &filter.scheme
-            && !scheme.eq_ignore_ascii_case(context.scheme)
-        {
-            return false;
+        let mut chars = segment.char_indices();
+        while let Some((index, char)) = chars.next() {
+            match char {
+                '[' => {
+                    let end = glob_character_class_end(segment, &mut chars)?;
+                    regex.push_str(&glob_character_class_regex(&segment[index + 1..end - 1]));
+                }
+                '?' => regex.push_str("[^/]"),
+                '*' => regex.push_str("[^/]*?"),
+                char => regex.push_str(&regex::escape(char.encode_utf8(&mut [0; 4]))),
+            }
         }
 
-        true
-    })
+        // A following `**` that ends the pattern brings its own separator.
+        let next_segment_is_last_globstar = segments
+            .get(index + 1)
+            .is_some_and(|next| *next == GLOBSTAR)
+            && index + 2 == segments.len();
+        if !is_last_segment && !next_segment_is_last_globstar {
+            regex.push('/');
+        }
+    }
+    Ok(regex)
+}
+
+/// Members are escaped and only a `-` between two members forms a range, as in the JavaScript
+/// regular expressions VS Code compiles classes into, so a `-` endpoint (e.g. `[--0]`) keeps
+/// its meaning instead of being reinterpreted by the regex parser.
+fn glob_character_class_regex(members: &str) -> String {
+    let push_member = |class: &mut String, member: char| {
+        class.push_str(&regex::escape(member.encode_utf8(&mut [0; 4])));
+    };
+    let mut class = String::new();
+    let mut members = match members.strip_prefix(['!', '^']) {
+        Some(members) => {
+            class.push('^');
+            members.chars()
+        }
+        None => members.chars(),
+    };
+    while let Some(member) = members.next() {
+        push_member(&mut class, member);
+        let mut lookahead = members.clone();
+        if lookahead.next() == Some('-')
+            && let Some(range_end) = lookahead.next()
+        {
+            class.push('-');
+            push_member(&mut class, range_end);
+            members = lookahead;
+        }
+    }
+    format!("[[{class}]&&[^/]]")
+}
+
+/// Splits a brace-expanded glob without interpreting separators inside character classes.
+fn split_glob(glob: &str, separator: char) -> Result<Vec<&str>> {
+    let mut parts = Vec::new();
+    if glob.is_empty() {
+        return Ok(parts);
+    }
+    let mut start = 0;
+    let mut chars = glob.char_indices();
+    while let Some((index, character)) = chars.next() {
+        if character == '[' {
+            glob_character_class_end(glob, &mut chars)?;
+        } else if character == separator {
+            parts.push(&glob[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    parts.push(&glob[start..]);
+    Ok(parts)
+}
+
+#[derive(Clone, Debug)]
+struct DocumentFilterPattern {
+    /// The path of a relative pattern's base, without a trailing `/`.
+    base: Option<String>,
+    matcher: regex::Regex,
+}
+
+impl DocumentFilterPattern {
+    fn new(pattern: &lsp::GlobPattern) -> Result<Self> {
+        let (base_uri, glob) = document_filter_glob(pattern);
+        let base = base_uri
+            .map(|base_uri| {
+                anyhow::ensure!(
+                    base_uri.scheme() == "file",
+                    "relative pattern base URI {base_uri} is not a file URI"
+                );
+                let path = base_uri
+                    .to_file_path_ext()
+                    .map_err(|()| anyhow!("relative pattern base URI {base_uri} is not a path"))?;
+                Ok(path.to_string_lossy().trim_end_matches('/').to_string())
+            })
+            .transpose()?;
+        let matcher = compile_document_filter_glob(glob)?;
+        Ok(Self { base, matcher })
+    }
+
+    fn matches(&self, path: &str) -> bool {
+        let Some(base_path) = &self.base else {
+            return self.matcher.is_match(path);
+        };
+        let mut relative_path = path;
+        for base_component in base_path.split('/') {
+            // The base may be the document itself, leaving an empty path for the pattern, which
+            // `**` matches. A path running out before the base does fails to match its components.
+            let (component, remainder) =
+                relative_path.split_once('/').unwrap_or((relative_path, ""));
+            if component != base_component {
+                return false;
+            }
+            relative_path = remainder;
+        }
+        self.matcher.is_match(relative_path)
+    }
 }
 
 fn dynamic_text_document_registration_allows_buffer(
     registration: &dynamic_registration::DynamicTextDocumentRegistration,
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
+    cx: &App,
 ) -> bool {
-    let context = document_selector_context_for_buffer(buffer, adapter);
+    let context = document_selector_context_for_buffer(buffer, adapter, cx);
     document_selector_matches(registration.document_selector.as_ref(), &context)
 }
 
@@ -10896,10 +11266,11 @@ fn text_document_registration_method(method: &str) -> &str {
 fn text_document_capabilities_for_buffer<'a>(
     local: &'a LocalLspStore,
     method: &str,
-    buffer: &'a Buffer,
-    adapter: &'a CachedLspAdapter,
+    buffer: &Buffer,
+    adapter: &CachedLspAdapter,
     server: &'a LanguageServer,
-) -> impl Iterator<Item = AdapterServerCapabilities<'a>> {
+    cx: &App,
+) -> impl DoubleEndedIterator<Item = AdapterServerCapabilities<'a>> + use<'a> {
     let code_action_kinds = server.code_action_kinds();
     let static_capabilities = local
         .initial_server_capabilities
@@ -10910,6 +11281,7 @@ fn text_document_capabilities_for_buffer<'a>(
         });
 
     let registration_method = text_document_registration_method(method);
+    let context = document_selector_context_for_buffer(buffer, adapter, cx);
     let dynamic_capabilities = local
         .language_server_dynamic_registrations
         .get(&server.server_id())
@@ -10917,7 +11289,7 @@ fn text_document_capabilities_for_buffer<'a>(
         .into_iter()
         .flat_map(|registrations| registrations.values())
         .filter(move |registration| {
-            dynamic_text_document_registration_allows_buffer(registration, buffer, adapter)
+            document_selector_matches(registration.document_selector.as_ref(), &context)
         })
         .map(move |registration| AdapterServerCapabilities {
             server_capabilities: &registration.server_capabilities,
@@ -10930,10 +11302,11 @@ fn text_document_capabilities_for_buffer<'a>(
 fn applicable_lsp_command_capabilities_for_buffer<'a, R>(
     local: &'a LocalLspStore,
     request: &'a R,
-    buffer: &'a Buffer,
-    adapter: &'a CachedLspAdapter,
+    buffer: &Buffer,
+    adapter: &CachedLspAdapter,
     server: &'a LanguageServer,
-) -> impl Iterator<Item = AdapterServerCapabilities<'a>>
+    cx: &App,
+) -> impl Iterator<Item = AdapterServerCapabilities<'a>> + use<'a, R>
 where
     R: LspCommand,
 {
@@ -10943,6 +11316,7 @@ where
         buffer,
         adapter,
         server,
+        cx,
     )
     .filter(move |capabilities| request.check_capabilities(*capabilities))
 }
@@ -10953,11 +11327,12 @@ fn lsp_command_allowed_for_buffer<R>(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
     server: &LanguageServer,
+    cx: &App,
 ) -> bool
 where
     R: LspCommand,
 {
-    applicable_lsp_command_capabilities_for_buffer(local, request, buffer, adapter, server)
+    applicable_lsp_command_capabilities_for_buffer(local, request, buffer, adapter, server, cx)
         .next()
         .is_some()
 }
@@ -10967,11 +11342,17 @@ fn buffer_supports_lsp_formatting(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
     server: &LanguageServer,
+    cx: &App,
 ) -> bool {
-    text_document_capabilities_for_buffer(local, "textDocument/formatting", buffer, adapter, server)
-        .any(|capabilities| {
-            server_capabilities_support_formatting(capabilities.server_capabilities)
-        })
+    text_document_capabilities_for_buffer(
+        local,
+        "textDocument/formatting",
+        buffer,
+        adapter,
+        server,
+        cx,
+    )
+    .any(|capabilities| server_capabilities_support_formatting(capabilities.server_capabilities))
 }
 
 fn buffer_supports_lsp_range_formatting(
@@ -10979,6 +11360,7 @@ fn buffer_supports_lsp_range_formatting(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
     server: &LanguageServer,
+    cx: &App,
 ) -> bool {
     text_document_capabilities_for_buffer(
         local,
@@ -10986,6 +11368,7 @@ fn buffer_supports_lsp_range_formatting(
         buffer,
         adapter,
         server,
+        cx,
     )
     .any(|capabilities| {
         server_capabilities_support_range_formatting(capabilities.server_capabilities)
@@ -10997,6 +11380,7 @@ fn completion_trigger_characters_for_buffer(
     server_id: LanguageServerId,
     adapter: &CachedLspAdapter,
     buffer: &Buffer,
+    cx: &App,
 ) -> BTreeSet<String> {
     fn extend_triggers(triggers: &mut BTreeSet<String>, options: &lsp::CompletionOptions) {
         if let Some(characters) = &options.trigger_characters {
@@ -11018,7 +11402,7 @@ fn completion_trigger_characters_for_buffer(
         .and_then(|registrations| registrations.text_documents.get("textDocument/completion"))
     {
         for registration in registrations.values() {
-            if dynamic_text_document_registration_allows_buffer(registration, buffer, adapter)
+            if dynamic_text_document_registration_allows_buffer(registration, buffer, adapter, cx)
                 && let Some(options) = registration
                     .server_capabilities
                     .completion_provider
@@ -12561,6 +12945,7 @@ fn did_save_include_text_for_buffer(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
     server: &LanguageServer,
+    cx: &App,
 ) -> Option<bool> {
     fn save_options(
         capabilities: &lsp::ServerCapabilities,
@@ -12577,7 +12962,7 @@ fn did_save_include_text_for_buffer(
         .buffers_opened_in_servers
         .get(&buffer.remote_id())
         .is_some_and(|servers| servers.contains(&server_id));
-    let context = document_selector_context_for_buffer(buffer, adapter);
+    let context = document_selector_context_for_buffer(buffer, adapter, cx);
     // Later registrations take precedence over earlier ones. Registrations without a selector
     // stand for the documents the client selects for the server, like the static options.
     let registered_save_options = local
@@ -12618,20 +13003,29 @@ fn text_document_sync_kind_for_buffer(
     buffer: &Buffer,
     adapter: &CachedLspAdapter,
     server: &LanguageServer,
+    cx: &App,
 ) -> Option<lsp::TextDocumentSyncKind> {
-    // Later registrations take precedence over earlier ones and the static options.
-    text_document_capabilities_for_buffer(local, "textDocument/didChange", buffer, adapter, server)
-        .filter_map(|capabilities| {
-            match capabilities
-                .server_capabilities
-                .text_document_sync
-                .as_ref()?
-            {
-                lsp::TextDocumentSyncCapability::Kind(kind) => Some(*kind),
-                lsp::TextDocumentSyncCapability::Options(options) => options.change,
-            }
-        })
-        .last()
+    // Later registrations take precedence over earlier ones and the static options, so
+    // searching from the latest one stops at the first registration selecting the buffer.
+    text_document_capabilities_for_buffer(
+        local,
+        "textDocument/didChange",
+        buffer,
+        adapter,
+        server,
+        cx,
+    )
+    .rev()
+    .find_map(|capabilities| {
+        match capabilities
+            .server_capabilities
+            .text_document_sync
+            .as_ref()?
+        {
+            lsp::TextDocumentSyncCapability::Kind(kind) => Some(*kind),
+            lsp::TextDocumentSyncCapability::Options(options) => options.change,
+        }
+    })
 }
 
 /// Completion items are displayed in a `UniformList`.
@@ -13123,6 +13517,409 @@ mod tests {
             "Get diagnostics via rust-analyzer failed: Server reset the connection"
         ));
         assert!(should_log_lsp_request_failure("something else entirely"));
+    }
+
+    fn toml_file_context(path: DocumentSelectorPath) -> DocumentSelectorContext {
+        DocumentSelectorContext {
+            language_id: Some("toml".to_string()),
+            scheme: "file",
+            path,
+        }
+    }
+
+    fn present(path: &str) -> DocumentSelectorPath {
+        DocumentSelectorPath::Present(path.to_string())
+    }
+
+    fn compiled_selector(document_selector: lsp::DocumentSelector) -> CompiledDocumentSelector {
+        CompiledDocumentSelector::new(document_selector).expect("valid document selector")
+    }
+
+    fn pattern_selector(
+        language: Option<&str>,
+        pattern: lsp::GlobPattern,
+    ) -> Option<CompiledDocumentSelector> {
+        Some(compiled_selector(vec![lsp::DocumentFilter {
+            language: language.map(str::to_string),
+            scheme: None,
+            pattern: Some(pattern),
+        }]))
+    }
+
+    #[test]
+    fn document_selector_pattern_matches_document_path() {
+        let selector = pattern_selector(
+            Some("toml"),
+            lsp::GlobPattern::String("**/Project.toml".to_string()),
+        );
+
+        assert!(document_selector_matches(
+            selector.as_ref(),
+            &toml_file_context(present("/root/Project.toml")),
+        ));
+        assert!(!document_selector_matches(
+            selector.as_ref(),
+            &toml_file_context(present("/root/Manifest.toml")),
+        ));
+        assert!(
+            !document_selector_matches(
+                selector.as_ref(),
+                &toml_file_context(DocumentSelectorPath::Absent),
+            ),
+            "a document without a path cannot match a pattern filter",
+        );
+        assert!(
+            document_selector_matches(
+                selector.as_ref(),
+                &toml_file_context(DocumentSelectorPath::Unknown),
+            ),
+            "per-language contexts do not evaluate pattern filters",
+        );
+
+        let mut context = toml_file_context(present("/root/Project.toml"));
+        context.language_id = Some("julia".to_string());
+        assert!(
+            !document_selector_matches(selector.as_ref(), &context),
+            "the pattern must not override a mismatching language",
+        );
+    }
+
+    #[test]
+    fn document_selector_pattern_wildcard_does_not_cross_separators() {
+        let selector =
+            pattern_selector(None, lsp::GlobPattern::String("**/root/*.toml".to_string()));
+        let context = |path: &str| toml_file_context(present(path));
+
+        assert!(document_selector_matches(
+            selector.as_ref(),
+            &context("/root/Project.toml"),
+        ));
+        assert!(!document_selector_matches(
+            selector.as_ref(),
+            &context("/root/sub/Project.toml"),
+        ));
+    }
+
+    #[test]
+    fn document_selector_relative_pattern_matches_below_base() {
+        let selector = pattern_selector(
+            None,
+            lsp::GlobPattern::Relative(lsp::RelativePattern {
+                base_uri: OneOf::Right(lsp::Uri::from_file_path("/root").unwrap()),
+                pattern: "sub/*.toml".to_string(),
+            }),
+        );
+        let context = |path: &str| toml_file_context(present(path));
+
+        assert!(document_selector_matches(
+            selector.as_ref(),
+            &context("/root/sub/Project.toml"),
+        ));
+        assert!(!document_selector_matches(
+            selector.as_ref(),
+            &context("/other/sub/Project.toml"),
+        ));
+        assert!(!document_selector_matches(
+            selector.as_ref(),
+            &context("/root/Project.toml"),
+        ));
+    }
+
+    #[test]
+    fn document_selector_relative_pattern_matches_base_document() -> Result<()> {
+        for (base_uri, pattern, path, expected) in [
+            ("file:///root/a.rs", "**", "/root/a.rs", true),
+            ("file:///root/a.rs", "**", "/root/a.rsx", false),
+            ("file:///root/a.rs", "**", "/root", false),
+            ("file:///root/a.rs", "*.rs", "/root/a.rs", false),
+        ] {
+            let selector = pattern_selector(
+                None,
+                lsp::GlobPattern::Relative(lsp::RelativePattern {
+                    base_uri: OneOf::Right(base_uri.parse()?),
+                    pattern: pattern.to_string(),
+                }),
+            );
+            let context = toml_file_context(present(path));
+            assert_eq!(
+                document_selector_matches(selector.as_ref(), &context),
+                expected,
+                "base {base_uri:?}, pattern {pattern:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_selector_relative_pattern_rejects_a_remote_base() -> Result<()> {
+        let pattern = lsp::GlobPattern::Relative(lsp::RelativePattern {
+            base_uri: OneOf::Right("file://server/root".parse()?),
+            pattern: "**".to_string(),
+        });
+        assert!(DocumentFilterPattern::new(&pattern).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn document_selector_patterns_are_case_sensitive() -> Result<()> {
+        for pattern in ["/C:/repo/a.rs", "/Équipe/a.rs"] {
+            let selector = pattern_selector(None, lsp::GlobPattern::String(pattern.to_string()));
+            let context = toml_file_context(present(&pattern.to_lowercase()));
+            assert!(!document_selector_matches(selector.as_ref(), &context));
+        }
+
+        for (base_uri, path, expected) in [
+            ("file:///%C3%89quipe", "/équipe/a.rs", false),
+            ("file:///%E2%84%AA", "/k/a.rs", false),
+            ("file:///%C3%89quipe", "/Équipe/a.rs", true),
+            ("file:///", "/a.rs", true),
+        ] {
+            let selector = pattern_selector(
+                None,
+                lsp::GlobPattern::Relative(lsp::RelativePattern {
+                    base_uri: OneOf::Right(base_uri.parse()?),
+                    pattern: "a.rs".to_string(),
+                }),
+            );
+            let context = toml_file_context(present(path));
+            assert_eq!(
+                document_selector_matches(selector.as_ref(), &context),
+                expected,
+                "base {base_uri:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_brace_alternatives_preserve_path_segments() -> Result<()> {
+        for (pattern, path, expected) in [
+            ("/root/{**,src}/a.rs", "/root/a.rs", true),
+            ("/root/{**,src}/a.rs", "/root/sub/a.rs", true),
+            ("/root/{**,src}/a.rs", "/root/src/a.rs", true),
+            ("/root/{**,src}/a.rs", "/root/b.rs", false),
+            ("/root/{**,src}/a.rs", "/rooted/a.rs", false),
+            ("/root/{**,src}", "/root", true),
+            ("/root/{**,src}/**", "/root", true),
+            ("/root/{*,src}*/a.rs", "/root/a.rs", true),
+            ("/{root/**,other}/a.rs", "/root/a.rs", true),
+            ("/root/{src/,}a.rs", "/root/a.rs", true),
+            ("/root/{,src/}a.rs", "/root/src/a.rs", true),
+            ("/root/{,src}/a.rs", "/root/a.rs", false),
+            ("/root/{,src}/a.rs", "/root//a.rs", true),
+            ("/root/{src,{lib,tests}}/a.rs", "/root/lib/a.rs", true),
+            ("/root/{src,lib}/{a,b}.rs", "/root/lib/b.rs", true),
+            ("/root/{}a.rs", "/root/a.rs", true),
+        ] {
+            let matcher = compile_document_filter_glob(pattern)?;
+            assert_eq!(
+                matcher.is_match(path),
+                expected,
+                "pattern {pattern:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_braces_in_character_classes_are_literal() -> Result<()> {
+        for (pattern, path, expected) in [
+            ("**/{[}],a}.rs", "/root/}.rs", true),
+            ("**/{[}],a}.rs", "/root/a.rs", true),
+            ("**/{[}],a}.rs", "/root/b.rs", false),
+            ("**/[{]/**/a.rs", "/root/{/a.rs", true),
+            ("**/[{]/**/a.rs", "/root/{/sub/a.rs", true),
+            ("**/[{]/**/a.rs", "/root/other/a.rs", false),
+            ("**/{[{],[}]}.rs", "/root/{.rs", true),
+            ("**/{[{],[}]}.rs", "/root/}.rs", true),
+            ("**/{[]}],a}.rs", "/root/].rs", true),
+            ("**/{[]}],a}.rs", "/root/}.rs", true),
+            ("**/{[,],a}.rs", "/root/,.rs", true),
+            ("**/{[!]],a}.rs", "/root/b.rs", true),
+            ("**/{[!]],a}.rs", "/root/].rs", false),
+        ] {
+            let matcher = compile_document_filter_glob(pattern)?;
+            assert_eq!(
+                matcher.is_match(path),
+                expected,
+                "pattern {pattern:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_brace_expansion_is_bounded() -> Result<()> {
+        assert_eq!(
+            expand_glob_braces(&"{a,b}".repeat(8))?.len(),
+            DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES,
+        );
+        assert!(expand_glob_braces(&"{a,b}".repeat(9)).is_err());
+
+        let empty_alternatives = format!(
+            "{{{}}}",
+            ",".repeat(DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES - 1)
+        );
+        assert_eq!(
+            expand_glob_braces(&empty_alternatives)?.len(),
+            DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES,
+        );
+        let too_many_empty_alternatives =
+            format!("{{{}}}", ",".repeat(DOCUMENT_FILTER_GLOB_MAX_ALTERNATIVES));
+        assert!(expand_glob_braces(&too_many_empty_alternatives).is_err());
+
+        let at_size_limit = "a".repeat(DOCUMENT_FILTER_GLOB_MAX_BYTES);
+        assert_eq!(expand_glob_braces(&at_size_limit)?, vec![at_size_limit]);
+        assert!(expand_glob_braces(&"a".repeat(DOCUMENT_FILTER_GLOB_MAX_BYTES + 1)).is_err());
+        let deeply_nested = format!("{}a{}", "{".repeat(2048), "}".repeat(2048));
+        assert!(expand_glob_braces(&deeply_nested).is_err());
+        let large_regex = "*a".repeat(DOCUMENT_FILTER_GLOB_MAX_BYTES / 4);
+        assert!(
+            compile_document_filter_glob(&large_regex)
+                .expect_err("the generated regex must also have a bounded size")
+                .to_string()
+                .contains("compiled pattern size limit")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_globstar_runs_match_path_segments() -> Result<()> {
+        for (pattern, path, expected) in [
+            ("/root/**/**", "/root/a.rs", true),
+            ("/root/**/**", "/root/sub/a.rs", true),
+            ("/root/**/**", "/root", true),
+            ("/root/**/**", "/root/", true),
+            ("/root/**/**", "/rooted/a.rs", false),
+            ("/root/**", "/rooted/", false),
+            ("/root/**/**", "/rooted//a.rs", false),
+            ("/root/**", "/root//a.rs", true),
+            ("/root/**", "/root/a\nb.rs", true),
+            ("/root/**/a.rs", "/root/sub\ndir/a.rs", true),
+            ("**", "/root/a\nb.rs", true),
+            ("**/**", "/root/a\nb.rs", true),
+            ("/**", "", false),
+            ("/**", "a.rs", false),
+            ("/**", "/", true),
+            ("/**", "/a.rs", true),
+            ("/", "/", true),
+            ("a/", "a", false),
+            ("a/", "a/", true),
+            ("/root/**/", "/root/sub", false),
+            ("/root/**/", "/root/sub/", true),
+            ("/root/**/**/**", "/root/a.rs", true),
+            ("/root/**/**/a.rs", "/root/a.rs", true),
+            ("/root/**/**/a.rs", "/root/sub/a.rs", true),
+            ("/root/**/**/a.rs", "/root/sub/b.rs", false),
+            ("**/**/a.rs", "a.rs", true),
+            ("**/**/a.rs", "/root/sub/a.rs", true),
+            ("**/**", "", true),
+            ("**/**", "a.rs", true),
+            ("**/**", "/root/a.rs", true),
+            ("/root/root/**/**", "/root/a.rs", false),
+            ("/root/root/**/**", "/root/root/a.rs", true),
+            ("/root/**/**/{a.rs,b.rs}", "/root/b.rs", true),
+        ] {
+            let matcher = compile_document_filter_glob(pattern)?;
+            assert_eq!(
+                matcher.is_match(path),
+                expected,
+                "pattern {pattern:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_character_classes_do_not_match_separators() -> Result<()> {
+        for (pattern, path, expected) in [
+            ("**/a[!x]b.rs", "/root/a/b.rs", false),
+            ("**/a[!x]b.rs", "/root/axb.rs", false),
+            ("**/a[!x]b.rs", "/root/a0b.rs", true),
+            ("**/a[!x]b.rs", "/root/aéb.rs", true),
+            ("**/a[.-0]b.rs", "/root/a/b.rs", false),
+            ("**/a[.-0]b.rs", "/root/a.b.rs", true),
+            ("**/a[.-0]b.rs", "/root/a0b.rs", true),
+            ("**/a[.-0]b.rs", "/root/a-b.rs", false),
+            ("**/a[/]b.rs", "/root/a/b.rs", false),
+            ("**/a[!/]b.rs", "/root/a/b.rs", false),
+            ("**/a[!/]b.rs", "/root/aéb.rs", true),
+            ("**/a[.-/]b.rs", "/root/a/b.rs", false),
+            ("**/a[.-/]b.rs", "/root/a.b.rs", true),
+            ("**/a[.-/]b.rs", "/root/a-b.rs", false),
+            ("**/a[/-0]b.rs", "/root/a/b.rs", false),
+            ("**/a[/-0]b.rs", "/root/a0b.rs", true),
+            ("**/a[/-0]b.rs", "/root/a-b.rs", false),
+            ("**/a[é]b.rs", "/root/aéb.rs", true),
+            ("**/a[!é]b.rs", "/root/aéb.rs", false),
+            ("**/a[!é]b.rs", "/root/a/b.rs", false),
+            ("**/a[[]b.rs", "/root/a[b.rs", true),
+            ("**/a[]]b.rs", "/root/a]b.rs", true),
+            ("**/a[x-]b.rs", "/root/a-b.rs", true),
+        ] {
+            let matcher = compile_document_filter_glob(pattern)?;
+            assert_eq!(
+                matcher.is_match(path),
+                expected,
+                "pattern {pattern:?}, path {path:?}",
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn document_filter_pattern_matches_characters() {
+        let matches = |pattern: &str, path: &str| {
+            DocumentFilterPattern::new(&lsp::GlobPattern::String(pattern.to_string()))
+                .expect("valid pattern")
+                .matches(path)
+        };
+
+        // `?` and character classes match characters, not bytes.
+        assert!(matches("**/?.rs", "/root/a.rs"));
+        assert!(matches("**/?.rs", "/root/é.rs"));
+        assert!(matches("**/[é].rs", "/root/é.rs"));
+        assert!(!matches("**/?.rs", "/root/ab.rs"));
+
+        assert!(matches("**/*.{rs,toml}", "/root/Project.toml"));
+        assert!(!matches("**/*.{rs,toml}", "/root/Project.json"));
+        assert!(matches("**/[!a].rs", "/root/b.rs"));
+        assert!(!matches("**/[!a].rs", "/root/a.rs"));
+        assert!(matches("**/[a-c].rs", "/root/b.rs"));
+        assert!(!matches("**/[a-c].rs", "/root/d.rs"));
+
+        // A `-` is a range operator only between two members; elsewhere it is literal.
+        assert!(matches("**/[--0].rs", "/root/..rs"));
+        assert!(!matches("**/[!--0].rs", "/root/..rs"));
+        assert!(matches("**/[!--0].rs", "/root/a.rs"));
+        assert!(matches("**/[-a].rs", "/root/-.rs"));
+        assert!(!matches("**/[-a].rs", "/root/b.rs"));
+        assert!(matches("**/[a-].rs", "/root/-.rs"));
+        assert!(matches("**/[!-a].rs", "/root/b.rs"));
+        assert!(!matches("**/[!-a].rs", "/root/-.rs"));
+        assert!(matches("**/[a-c-e].rs", "/root/-.rs"));
+        assert!(matches("**/[a-c-e].rs", "/root/e.rs"));
+        assert!(!matches("**/[a-c-e].rs", "/root/d.rs"));
+
+        assert!(matches("/root/**", "/root/sub/a.rs"));
+        assert!(matches("/root/**/a.rs", "/root/a.rs"));
+        assert!(matches("/root/**/a.rs", "/root/sub/a.rs"));
+        assert!(!matches("/root/**/a.rs", "/rooted/a.rs"));
+        assert!(!matches("/root/*.rs", "/root/sub/a.rs"));
+
+        for invalid_pattern in [
+            "**/[a.rs",
+            "**/{a,b.rs",
+            "**/{[}],a.rs",
+            "**/{a,{b,c}",
+            "**/[0--].rs",
+        ] {
+            assert!(
+                DocumentFilterPattern::new(&lsp::GlobPattern::String(invalid_pattern.to_string()))
+                    .is_err(),
+                "expected {invalid_pattern:?} to be rejected",
+            );
+        }
     }
 
     #[test]

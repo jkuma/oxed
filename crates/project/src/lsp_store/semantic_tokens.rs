@@ -22,8 +22,8 @@ use crate::{
         SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFull, SemanticTokensResponse,
     },
     lsp_store::{
-        LanguageServerState, document_selector_context_for_language, document_selector_matches,
-        missing_servers_to_query,
+        DocumentSelectorPath, LanguageServerState, document_selector_context_for_language,
+        document_selector_matches, missing_servers_to_query,
     },
     project_settings::ProjectSettings,
 };
@@ -484,7 +484,11 @@ impl LspStore {
         }
 
         if let Some(initial_capabilities) = self.lsp_server_initial_capabilities.get(&server_id) {
-            let context = self.remote_document_selector_context(server_id, language);
+            let context = self.remote_document_selector_context(
+                server_id,
+                language,
+                DocumentSelectorPath::Unknown,
+            );
             if let Some(registrations) = self
                 .lsp_server_text_document_registrations
                 .get(&server_id)

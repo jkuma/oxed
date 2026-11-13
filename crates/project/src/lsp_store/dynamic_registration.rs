@@ -15,7 +15,7 @@ use lsp::{
 };
 
 use crate::lsp_store::{
-    LanguageServerState, LspStore, RenamePathsWatchedForServer,
+    CompiledDocumentSelector, LanguageServerState, LspStore, RenamePathsWatchedForServer,
     completion_trigger_characters_for_buffer, lsp_workspace_diagnostics_refresh,
 };
 
@@ -53,9 +53,9 @@ impl CapabilityRegistrationChange {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct DynamicTextDocumentRegistration {
-    pub(super) document_selector: Option<lsp::DocumentSelector>,
+    pub(super) document_selector: Option<CompiledDocumentSelector>,
     pub(super) server_capabilities: lsp::ServerCapabilities,
 }
 
@@ -82,6 +82,9 @@ impl LspStore {
         document_selector: Option<lsp::DocumentSelector>,
         capability_of: impl Fn(&mut lsp::ServerCapabilities) -> &mut Option<T>,
     ) -> anyhow::Result<CapabilityRegistrationChange> {
+        let document_selector = document_selector
+            .map(CompiledDocumentSelector::new)
+            .transpose()?;
         let server_id = server.server_id();
         let local = self.as_local_mut();
         let mut server_capabilities = lsp::ServerCapabilities::default();
@@ -223,6 +226,9 @@ impl LspStore {
         document_selector: Option<lsp::DocumentSelector>,
         sync_options: lsp::TextDocumentSyncOptions,
     ) -> anyhow::Result<()> {
+        let document_selector = document_selector
+            .map(CompiledDocumentSelector::new)
+            .transpose()?;
         let local = self.as_local_mut();
         local
             .language_server_dynamic_registrations
@@ -450,7 +456,7 @@ impl LspStore {
         for handle in buffers_with_language_server {
             handle.update(cx, |buffer, cx| {
                 let triggers =
-                    completion_trigger_characters_for_buffer(local, server_id, adapter, buffer);
+                    completion_trigger_characters_for_buffer(local, server_id, adapter, buffer, cx);
                 buffer.set_completion_triggers(server_id, triggers, cx);
             });
         }
@@ -465,7 +471,7 @@ impl LspStore {
         let server = self
             .language_server_for_id(server_id)
             .with_context(|| format!("no server {server_id} found"))?;
-        for reg in params.registrations {
+        let mut register_capability = |reg: lsp::Registration| -> Result<()> {
             match reg.method.as_str() {
                 "workspace/didChangeWatchedFiles" => {
                     if let Some(options) = reg.register_options {
@@ -982,6 +988,26 @@ impl LspStore {
                 }
                 _ => log::warn!("unhandled capability registration: {reg:?}"),
             }
+            Ok(())
+        };
+
+        // Keep valid siblings even when a batch is partially invalid, but report its failures
+        // to the server rather than acknowledging the whole batch as successful.
+        let mut registration_errors = Vec::new();
+        for registration in params.registrations {
+            let method = registration.method.clone();
+            let registration_id = registration.id.clone();
+            if let Err(error) = register_capability(registration) {
+                registration_errors.push(format!(
+                    "server {server_id}, method {method}, registration {registration_id:?}: {error:#}"
+                ));
+            }
+        }
+        if !registration_errors.is_empty() {
+            anyhow::bail!(
+                "Failed to register server capabilities:\n{}",
+                registration_errors.join("\n")
+            );
         }
 
         Ok(())

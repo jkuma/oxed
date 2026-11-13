@@ -393,7 +393,7 @@ libsqlite3-sys = { version = "0.30.1", features = ["bundled"] }
 linkify = "0.10.0"
 log = { version = "0.4", default-features = false, features = ["std"] }
 lru = "0.16"
-lsp-types = { git = "https://github.com/zed-industries/lsp-types", rev = "f1783e63a7f4eb4397bf51d4148b4895a1f7ab16" }
+lsp-types = { git = "https://github.com/zed-industries/lsp-types", rev = "82d7fc66ebdfabcfeb26ba16bbed9f3d26211fc3" }
 markup5ever_rcdom = "0.39"
 merman = { version = "=0.8.0-alpha.5", default-features = false }
 moka = { version = "0.12.10", features = ["sync"] }
