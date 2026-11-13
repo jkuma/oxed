@@ -118,8 +118,8 @@ impl FileStatus {
             }
             .into(),
             [b'D', b'D'] => UnmergedStatus {
-                first_head: UnmergedStatusCode::Added,
-                second_head: UnmergedStatusCode::Added,
+                first_head: UnmergedStatusCode::Deleted,
+                second_head: UnmergedStatusCode::Deleted,
             }
             .into(),
             [x, b'U'] => UnmergedStatus {
@@ -623,11 +623,46 @@ mod tests {
         status::{FileStatus, GitStatus, TreeDiff, TreeDiffStatus},
     };
 
-    use super::{DiffStat, parse_numstat};
+    use super::{DiffStat, UnmergedStatus, UnmergedStatusCode, parse_numstat};
 
     fn lookup<'a>(entries: &'a [(RepoPath, DiffStat)], path: &str) -> Option<&'a DiffStat> {
         let path = RepoPath::new(path).unwrap();
         entries.iter().find(|(p, _)| p == &path).map(|(_, s)| s)
+    }
+
+    #[test]
+    fn test_parse_unmerged_statuses() {
+        for (bytes, first_head, second_head) in [
+            (
+                *b"DD",
+                UnmergedStatusCode::Deleted,
+                UnmergedStatusCode::Deleted,
+            ),
+            (*b"AA", UnmergedStatusCode::Added, UnmergedStatusCode::Added),
+            (
+                *b"UU",
+                UnmergedStatusCode::Updated,
+                UnmergedStatusCode::Updated,
+            ),
+            (
+                *b"DU",
+                UnmergedStatusCode::Deleted,
+                UnmergedStatusCode::Updated,
+            ),
+            (
+                *b"UD",
+                UnmergedStatusCode::Updated,
+                UnmergedStatusCode::Deleted,
+            ),
+        ] {
+            assert_eq!(
+                FileStatus::from_bytes(bytes).ok(),
+                Some(FileStatus::Unmerged(UnmergedStatus {
+                    first_head,
+                    second_head,
+                })),
+            );
+        }
     }
 
     #[test]
