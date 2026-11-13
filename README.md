@@ -9,6 +9,18 @@ Oxed is a minimal, LSP-first code editor written in Rust. It is a fork of [Zed](
 
 Oxed ships **without** AI features, account sign-in or collaboration, an integrated terminal, tasks, a debugger, telemetry, crash reporting, auto-update, or remote development.
 
+## What Oxed adds
+
+- **Code navigation in a popup.** Go to definition, implementation, type definition and references open a popup below the cursor line, with one row per result showing the code and its project path. `Ctrl+Alt+click` on a symbol shows its implementations.
+- **A JetBrains (GNOME) keymap**, offered at onboarding: the JetBrains keymap with the shortcuts JetBrains moves in its GNOME variant.
+- **Git blame annotations.** "Annotate with Git Blame", in the editor and gutter context menus, shows the commit date and author of each line, tinted with the commit's color.
+- **Merge conflict resolution.** Conflicted files in the git panel offer:
+  - "Accept Yours" and "Accept Theirs", which resolve a file with one side's version; during a rebase, "Yours" is the commit being replayed;
+  - "Resolve Automatically", which merges the file again from git's index and opens it with the conflicts it could resolve, for review before saving.
+
+  The three-way merge engine lives in `crates/merge`.
+- **A simpler layout.** The project, outline and git panels share the left dock, and a window shows a single project.
+
 ## Installing
 
 ```sh
@@ -41,7 +53,9 @@ Oxed does not sign in, send telemetry or check for updates. It still contacts:
 
 ## Relationship with Zed
 
-Oxed is a standalone fork: it does not follow Zed's releases. Code that Oxed does not need is removed rather than disabled.
+Oxed is a standalone fork: it does not merge Zed's releases. Code that Oxed does not need is removed rather than disabled.
+
+Fixes and improvements from stable Zed releases are reviewed and ported one by one, adapted to the fork, with the `zed-upstream` skill in `.claude/skills/`. Its ledger records the decision taken for every Zed commit; Zed v1.27.0 is reviewed.
 
 ## License
 
