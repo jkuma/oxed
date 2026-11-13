@@ -19,12 +19,24 @@
       "reason": "",
       "title": "ui: Keep project action shortcuts inside their buttons (#65531)"
     },
+    "04470cd9b5049eddbb1e5f389631074c8851638f": {
+      "decision": "skipped",
+      "pr": 65189,
+      "reason": "Remote projects only",
+      "title": "project: Don't send a project update when no worktree was removed (#65189)"
+    },
     "08104dc649e2e92e94eb38e23bda969a3a72cb3a": {
       "decision": "ported",
       "oxed_commit": "3d6ffab",
       "pr": 66016,
       "reason": "",
       "title": "git_ui: Add missing tooltips to Git Graph commit details (#66016)"
+    },
+    "087340e2d736737e66f6b8da9b3e3997e309bb09": {
+      "decision": "skipped",
+      "pr": 66158,
+      "reason": "macOS only",
+      "title": "Fix panic on cmd-q (#66158)"
     },
     "08cbb88a152c3751a43e853425a70e9f631a5918": {
       "decision": "ported",
@@ -45,6 +57,12 @@
       "reason": "only workspace manifests besides code absent from Oxed (gpui_macos)",
       "title": "gpui_macos: Migrate keyboard and event bindings to objc2 (#65715)"
     },
+    "0eb085876e71f9ef4c861d136e88aa50dd54f55e": {
+      "decision": "skipped",
+      "pr": 61528,
+      "reason": "AI commit messages, removed from Oxed",
+      "title": "Use recent commits to improve message generation (#61528)"
+    },
     "10cfb459449a65c8fee7d390794d6f3d5098e9f7": {
       "decision": "removed",
       "pr": 65933,
@@ -64,6 +82,18 @@
       "pr": 65253,
       "reason": "",
       "title": "project: Honor document selectors of didChange and didSave registrations (#65253)"
+    },
+    "1808df02c0ff7e12f2fa3bcd46b69fa8f5d485c7": {
+      "decision": "skipped",
+      "pr": 65942,
+      "reason": "macOS dependency",
+      "title": "Remove `block` dependency from the tree (#65942)"
+    },
+    "182d15a6291ace411cf9faaebce405d36d26fe3e": {
+      "decision": "skipped",
+      "pr": 66168,
+      "reason": "Unused icon",
+      "title": "icons: Add SquareR icon (#66168)"
     },
     "18512de483e4ed89633071c044ede7680098dfea": {
       "decision": "ported",
@@ -89,6 +119,12 @@
       "pr": 66110,
       "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
       "title": "agent: Number ACP tool call location lines from 1 (#66110)"
+    },
+    "24a2823456f16e36bf32df510fb5c43fee7a2565": {
+      "decision": "skipped",
+      "pr": 66190,
+      "reason": "Web platform only",
+      "title": "gpui_wgpu: Fix WebGL surface reconfiguration panics (#66190)"
     },
     "2a74c8dff6902b7d02038050f5672a0989b18f94": {
       "decision": "ported",
@@ -145,12 +181,24 @@
       "reason": "",
       "title": "project_panel: Preserve clipboard contents when duplicating entries (#60894)"
     },
+    "370591f3d178718e3a822cfbf2a5879cdcccfad1": {
+      "decision": "skipped",
+      "pr": 66181,
+      "reason": "Native window close on Windows and macOS; the Linux part was fixed separately",
+      "title": "gpui: Defer native window close cleanup to avoid reentrant app borrow (#66181)"
+    },
     "37faef81f74fc1bb08be9939c4cffc8ede6ced2f": {
       "decision": "ported",
       "oxed_commit": "bbfcb7e",
       "pr": 66157,
       "reason": "",
       "title": "Protect against solargraph LSP violations (#66157)"
+    },
+    "389c22e1c747d1a433c3b51c176936166c9cc1cf": {
+      "decision": "skipped",
+      "pr": 65970,
+      "reason": "Web platform only",
+      "title": "gpui: Make `Modifiers::secondary` web platform aware (#65970)"
     },
     "3c2f782514632c9f95d6d88911367d2336e116f1": {
       "decision": "ported",
@@ -171,6 +219,12 @@
       "pr": 64744,
       "reason": "only workspace manifests besides code absent from Oxed (remote)",
       "title": "remote: Stop URL-encoding SSH usernames (#64744)"
+    },
+    "484bcbfea6ec20b8a973404d2899879deec2bf20": {
+      "decision": "skipped",
+      "pr": 64579,
+      "reason": "OpenHarmony platform only",
+      "title": "feat(gpui): Allow building gpui against ohos (#64579)"
     },
     "4d7b2d05ea693e4a5d406fc3d41573f8000b7004": {
       "decision": "ported",
@@ -216,12 +270,24 @@
       "reason": "",
       "title": "git_ui: Avoid cloning repository snapshot when rendering Git graph (#66180)"
     },
+    "59dd60d4dd3bd85cbdcf00328e689fa519b55f78": {
+      "decision": "skipped",
+      "pr": 65381,
+      "reason": "Internal refactoring with no effect in Oxed",
+      "title": "Refactor `ExtensionLanguageProxy` to provide only `ExtensionLanguageProxy::update_languages` (#65381)"
+    },
     "5d47f835421d695f29187a379743894619b41f36": {
       "decision": "ported",
       "oxed_commit": "9c89528",
       "pr": 65389,
       "reason": "",
       "title": "Allow opening README files by default (#65389)"
+    },
+    "5e548b8ad99c0c3bb76a48bd71b7d25fb546eca2": {
+      "decision": "skipped",
+      "pr": 66119,
+      "reason": "No dock panel kept in Oxed can be zoomed",
+      "title": "workspace: Fix panel buttons not working while a dock panel is zoomed (#66119)"
     },
     "5e8998a2a704a16e56ea8540bdd77079a480ea09": {
       "decision": "removed",
@@ -273,6 +339,24 @@
       "pr": 66093,
       "reason": "touches only code absent from Oxed (agent_ui)",
       "title": "agent_ui: Keep inline review on the root thread when subagents appear (#66093)"
+    },
+    "79fe6a645f68f8c9230578f154bf99852d9f716f": {
+      "decision": "skipped",
+      "pr": 66062,
+      "reason": "Credential writes have no caller in Oxed",
+      "title": "gpui: Add a way to write credentials only if none exist (#66062)"
+    },
+    "876c1b0c5fb0ed7c15703a1955ef4b3580bd73fa": {
+      "decision": "skipped",
+      "pr": 66127,
+      "reason": "Project groups, removed from Oxed",
+      "title": "Fix removal of unloaded project groups (#66127)"
+    },
+    "87c92e8c092238df6b9fb04290792472c7214807": {
+      "decision": "skipped",
+      "pr": 57857,
+      "reason": "Agent files, removed from Oxed",
+      "title": "Add .agents folder to .gitignore (#57857)"
     },
     "96b617fa3798fa48f9aa6c33503d212a6bc97a8c": {
       "decision": "ported",
@@ -355,6 +439,12 @@
       "reason": "touches only code absent from Oxed (agent_servers)",
       "title": "agent_servers: Order ACP v1 load responses and treat replayed subagent state as history (#66064)"
     },
+    "b36b283021c48f1712714b8a0e2ad6ffb578920b": {
+      "decision": "skipped",
+      "pr": 66029,
+      "reason": "AI credentials, removed from Oxed",
+      "title": "Do not read LLM credentials when disable_ai is true (#66029)"
+    },
     "b488c4e81451f2042d5f47d93f6158732ac28212": {
       "decision": "ported",
       "oxed_commit": "d92318e",
@@ -369,6 +459,12 @@
       "reason": "",
       "title": "Warn only for explicitly requested fonts (#65968)"
     },
+    "bd9aa0ac058ab6a5b56eefb84a632a3700b01323": {
+      "decision": "skipped",
+      "pr": 66142,
+      "reason": "Windows remote projects only",
+      "title": "title_bar: Fix missing Git information for repository subfolders on Windows remotes (#66142)"
+    },
     "bed9563afc7af5363821f5547f7766c77c57e497": {
       "decision": "removed",
       "pr": 66166,
@@ -380,6 +476,12 @@
       "pr": 66057,
       "reason": "touches only code absent from Oxed (acp_thread)",
       "title": "acp_thread: Follow the subagents RFD when ACP subagents are cancelled (#66057)"
+    },
+    "c18e71c78281c01e08f5a2b82b28f6260f138fe1": {
+      "decision": "skipped",
+      "pr": 65722,
+      "reason": "Windows only",
+      "title": "languages: Fix Go test task cwd on Windows (#65722)"
     },
     "c5efa10dddf57e31f1f501da9d53cd1eda07030a": {
       "decision": "removed",
@@ -418,6 +520,12 @@
       "pr": 65930,
       "reason": "touches only code absent from Oxed (.config, .github, script)",
       "title": "Automate cleanup of non-responsive  PRs (#65930)"
+    },
+    "cfb894a5dde8ccf3fba1659164f47fdd1c024e2e": {
+      "decision": "skipped",
+      "pr": 65995,
+      "reason": "Case-insensitive file systems only",
+      "title": "fs: Normalize folded watcher path identity (#65995)"
     },
     "d27ad54dd6173760121f9b2ca8f435f82159e072": {
       "decision": "ported",
@@ -469,6 +577,12 @@
       "pr": 66066,
       "reason": "",
       "title": "ui: Make submenus steadier and more reliable (#66066)"
+    },
+    "e30095febcfd25ae81d52e59d7d80c2bd21830c6": {
+      "decision": "skipped",
+      "pr": 66185,
+      "reason": "Tree-sitter 0.28 for the web build",
+      "title": "Update Tree-sitter and extension grammar memory imports (#66185)"
     },
     "e4a3732b94eb0881e1d954201ed41ffd2abf18f6": {
       "decision": "ported",
@@ -522,11 +636,29 @@
       "reason": "Not wanted: the agent checkpoints code is left as is",
       "title": "agent: Remove checkpoints (#65989)"
     },
+    "f14592c4a5bd1dcd3545041a620055c5d4be0622": {
+      "decision": "skipped",
+      "pr": 65994,
+      "reason": "macOS only",
+      "title": "Require macOS 12 and SDK 26 (#65994)"
+    },
     "f1ccf949d59bc0cc8ec05a4366be4dcb8262aaf8": {
       "decision": "removed",
       "pr": 65975,
       "reason": "touches only code absent from Oxed (gpui_apple, gpui_ios, gpui_macos)",
       "title": "gpui_ios: Reuse the cached main-thread marker (#65975)"
+    },
+    "f2a60bb8b6c162593f38c02601e41083270d0433": {
+      "decision": "skipped",
+      "pr": 66199,
+      "reason": "Windows remote projects only",
+      "title": "title_bar: Fix project name shown for `repo.git` bare clones on Windows remotes (#66199)"
+    },
+    "f41ac648126becc954455b925ea02176e379435e": {
+      "decision": "skipped",
+      "pr": 65470,
+      "reason": "Agent, removed from Oxed",
+      "title": "agent: Parse thread markdown lazily, on first render (#65470)"
     },
     "f95eddfb8796daeff2f66b3ae6db4ab76e6fdda1": {
       "decision": "removed",
@@ -561,6 +693,6 @@
     }
   },
   "fork_base": "v1.26.2",
-  "reviewed_up_to": "v1.26.2",
+  "reviewed_up_to": "v1.27.0",
   "upstream": "https://github.com/zed-industries/zed"
 }
