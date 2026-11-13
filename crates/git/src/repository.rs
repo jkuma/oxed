@@ -659,15 +659,6 @@ pub enum ConflictSide {
     Theirs,
 }
 
-impl ConflictSide {
-    pub fn stage(self) -> u8 {
-        match self {
-            Self::Ours => 2,
-            Self::Theirs => 3,
-        }
-    }
-}
-
 pub enum ResetMode {
     /// Reset the branch pointer, leave index and worktree unchanged (this will make it look like things that were
     /// committed are now staged).
@@ -1615,31 +1606,44 @@ impl GitRepository for RealGitRepository {
             if paths.is_empty() {
                 return Ok(());
             }
-            let stage = side.stage();
-            let side_versions = self
-                .load_revisions(
-                    paths
-                        .iter()
-                        .map(|path| format!(":{stage}:{}", path.as_unix_str()))
-                        .collect(),
-                )
-                .await?;
-            let (kept, deleted): (Vec<_>, Vec<_>) = paths
-                .iter()
-                .zip(side_versions)
-                .partition(|(_, version)| version.is_some());
-            let kept = kept
-                .into_iter()
-                .map(|(path, _)| path.as_unix_str())
-                .collect::<Vec<_>>();
-            let deleted = deleted
-                .into_iter()
-                .map(|(path, _)| path.as_unix_str())
-                .collect::<Vec<_>>();
-            let side_flag = match side {
-                ConflictSide::Ours => "--ours",
-                ConflictSide::Theirs => "--theirs",
+            let (side_flag, side_stage) = match side {
+                ConflictSide::Ours => ("--ours", "2"),
+                ConflictSide::Theirs => ("--theirs", "3"),
             };
+            let output = git
+                .build_command(&["ls-files", "--unmerged", "-z", "--"])
+                .env("GIT_LITERAL_PATHSPECS", "1")
+                .args(paths.iter().map(|path| path.as_unix_str()))
+                .output()
+                .await?;
+            anyhow::ensure!(
+                output.status.success(),
+                "Failed to list conflicts:\n{}",
+                String::from_utf8_lossy(&output.stderr),
+            );
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Each entry is "<mode> <object> <stage>\t<path>".
+            let mut stages_by_path = HashMap::<&str, Vec<&str>>::default();
+            for entry in stdout.split('\0') {
+                if let Some((info, path)) = entry.split_once('\t')
+                    && let Some(stage) = info.rsplit(' ').next()
+                {
+                    stages_by_path.entry(path).or_default().push(stage);
+                }
+            }
+            let mut kept = Vec::new();
+            let mut deleted = Vec::new();
+            for path in &paths {
+                let path = path.as_unix_str();
+                let stages = stages_by_path
+                    .get(path)
+                    .with_context(|| format!("{path} is not conflicted"))?;
+                if stages.contains(&side_stage) {
+                    kept.push(path);
+                } else {
+                    deleted.push(path);
+                }
+            }
             let mut commands = Vec::new();
             if !kept.is_empty() {
                 commands.push((vec!["checkout", side_flag, "--"], &kept));
@@ -1652,6 +1656,7 @@ impl GitRepository for RealGitRepository {
                 let output = git
                     .build_command(&args)
                     .envs(env.iter())
+                    .env("GIT_LITERAL_PATHSPECS", "1")
                     .args(paths.iter())
                     .output()
                     .await?;
@@ -5964,6 +5969,20 @@ mod tests {
         assert_eq!(
             git_command_output(path, ["status", "--porcelain"]),
             "D  deleted.txt"
+        );
+
+        let error = repo
+            .checkout_conflict_side(
+                vec![repo_path("modified.txt")],
+                ConflictSide::Theirs,
+                Arc::new(HashMap::default()),
+            )
+            .await
+            .expect_err("a resolved path is not conflicted");
+        assert!(error.to_string().contains("not conflicted"), "{error}");
+        assert_eq!(
+            fs::read_to_string(path.join("modified.txt")).unwrap(),
+            "a\nours\n"
         );
     }
 

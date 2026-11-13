@@ -579,7 +579,16 @@ impl GitRepository for FakeGitRepository {
                 let abs_path = workdir_path.join(path.as_std_path());
                 match content {
                     Some(content) => fs.write_file_internal(abs_path, content, false)?,
-                    None => fs.remove_file(&abs_path, RemoveOptions::default()).await?,
+                    None => {
+                        fs.remove_file(
+                            &abs_path,
+                            RemoveOptions {
+                                ignore_if_not_exists: true,
+                                ..RemoveOptions::default()
+                            },
+                        )
+                        .await?
+                    }
                 }
             }
             Ok(())

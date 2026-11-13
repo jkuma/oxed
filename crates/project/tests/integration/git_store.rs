@@ -2606,8 +2606,21 @@ mod conflict_resolution_tests {
         assert_eq!(
             resolution,
             AutomaticResolution {
-                conflicts: 2,
                 resolved: 1,
+                remaining: 1,
+            }
+        );
+        let resolution = repository
+            .update(cx, |repository, cx| {
+                repository.resolve_conflicts_automatically(repo_path("settings.txt"), cx)
+            })
+            .await
+            .expect("resolve conflicts again");
+        assert_eq!(
+            resolution,
+            AutomaticResolution {
+                resolved: 1,
+                remaining: 1,
             }
         );
         assert_eq!(
@@ -2627,6 +2640,26 @@ mod conflict_resolution_tests {
             .await
             .expect_err("a side deleted the file");
         assert!(error.to_string().contains("deleted on one side"), "{error}");
+
+        let buffer = project
+            .update(cx, |project, cx| {
+                project.open_local_buffer("/project/settings.txt", cx)
+            })
+            .await
+            .expect("open buffer");
+        buffer.update(cx, |buffer, cx| buffer.edit([(0..0, "edited ")], None, cx));
+        let error = repository
+            .update(cx, |repository, cx| {
+                repository.checkout_conflict_side(
+                    vec![repo_path("settings.txt")],
+                    ConflictSide::Theirs,
+                    cx,
+                )
+            })
+            .await
+            .expect_err("the buffer has unsaved edits");
+        assert!(error.to_string().contains("save or discard"), "{error}");
+        buffer.update(cx, |buffer, cx| buffer.undo(cx));
 
         repository
             .update(cx, |repository, cx| {

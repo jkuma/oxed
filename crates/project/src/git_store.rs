@@ -207,8 +207,8 @@ pub struct ConflictStages {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AutomaticResolution {
-    pub conflicts: usize,
     pub resolved: usize,
+    pub remaining: usize,
 }
 
 #[derive(Debug)]
@@ -4532,20 +4532,24 @@ impl Repository {
         side: ConflictSide,
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
+        if let Some(path) = paths.iter().find(|path| self.has_unsaved_edits(path, cx)) {
+            return Task::ready(Err(anyhow!(
+                "save or discard the changes to {} first",
+                path.as_unix_str()
+            )));
+        }
         let description = match side {
             ConflictSide::Ours => "git checkout --ours",
             ConflictSide::Theirs => "git checkout --theirs",
         };
-        let job_key = GitJobKey::WriteIndex(paths.clone());
         self.spawn_job_with_tracking(
             paths.clone(),
             pending_op::GitStatus::Staged,
             cx,
             async move |this, cx| {
                 this.update(cx, |this, _| {
-                    this.send_keyed_job(
+                    this.send_job(
                         "checkout_conflict_side",
-                        Some(job_key),
                         Some(description.into()),
                         move |git_repo, _| async move {
                             let LocalRepositoryState {
@@ -4562,6 +4566,15 @@ impl Repository {
                 .await?
             },
         )
+    }
+
+    fn has_unsaved_edits(&self, path: &RepoPath, cx: &App) -> bool {
+        self.repo_path_to_project_path(path, cx)
+            .zip(self.buffer_store(cx))
+            .and_then(|(project_path, buffer_store)| {
+                buffer_store.read(cx).get_by_path(&project_path)
+            })
+            .is_some_and(|buffer| buffer.read(cx).has_unsaved_edits())
     }
 
     /// Merges the base, ours and theirs versions of a conflicted path again, resolves what the
@@ -4620,9 +4633,10 @@ impl Repository {
                     let conflicts = document.conflict_count();
                     merge::resolve_whitespace(&mut document);
                     merge::resolve_words(&mut document);
+                    let remaining = document.conflict_count();
                     let resolution = AutomaticResolution {
-                        conflicts,
-                        resolved: conflicts - document.conflict_count(),
+                        resolved: conflicts - remaining,
+                        remaining,
                     };
                     let text = document.render(&merge::MarkerLabels {
                         ours: &ours_label,
@@ -4632,8 +4646,16 @@ impl Repository {
                     (text, resolution)
                 })
                 .await;
+            if resolution.resolved == 0 {
+                return Ok(resolution);
+            }
             let diff = buffer.update(cx, |buffer, cx| buffer.diff(text, cx)).await;
-            buffer.update(cx, |buffer, cx| buffer.apply_diff(diff, cx));
+            buffer.update(cx, |buffer, cx| {
+                // The index holds normalized line endings, the working file keeps its own.
+                let line_ending = buffer.line_ending();
+                buffer.apply_diff(diff, cx);
+                buffer.set_line_ending(line_ending, cx);
+            });
             buffer_store
                 .update(cx, |buffer_store, cx| buffer_store.save_buffer(buffer, cx))
                 .await?;

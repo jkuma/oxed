@@ -2951,6 +2951,9 @@ impl GitPanel {
         cx: &mut Context<Self>,
     ) {
         let paths = self.selected_conflicted_paths();
+        if paths.is_empty() {
+            return;
+        }
         let Some(repository) = self.active_repository.clone() else {
             return;
         };
@@ -2963,54 +2966,26 @@ impl GitPanel {
                 })
                 .collect::<Vec<_>>()
         });
-        if tasks.is_empty() {
-            return;
-        }
-        cx.spawn(async move |this, cx| {
-            let mut resolved_paths = Vec::new();
-            let mut conflicts = 0;
-            let mut resolved = 0;
+        let workspace = self.workspace.clone();
+        cx.spawn(async move |_, cx| {
+            let mut messages = Vec::new();
             for (path, task) in tasks {
-                match task.await {
-                    Ok(resolution) => {
-                        conflicts += resolution.conflicts;
-                        resolved += resolution.resolved;
-                        resolved_paths.push(path);
-                    }
-                    Err(error) => {
-                        this.update(cx, |this, cx| {
-                            this.show_error_toast("resolve conflicts", error, cx)
-                        })?;
-                    }
-                }
+                let path = path.as_unix_str();
+                messages.push(match task.await {
+                    Ok(resolution) => format!(
+                        "{path}: {} conflicts resolved, {} left",
+                        resolution.resolved, resolution.remaining
+                    ),
+                    Err(error) => format!("{path}: {error}"),
+                });
             }
-            let target = match resolved_paths.as_slice() {
-                [] => return anyhow::Ok(()),
-                [path] => path.as_unix_str().to_string(),
-                paths => format!("{} files", paths.len()),
-            };
-            let message = format!("Resolved {resolved} of {conflicts} conflicts in {target}");
-            this.update(cx, |this, cx| this.show_status_message(message, cx))?;
-            anyhow::Ok(())
+            workspace.update(cx, |workspace, cx| {
+                let toast =
+                    StatusToast::new(messages.join("\n"), cx, |this, _| this.dismiss_button(true));
+                workspace.toggle_status_toast(toast, cx);
+            })
         })
         .detach_and_log_err(cx);
-    }
-
-    fn show_status_message(&self, message: String, cx: &mut App) {
-        let Some(workspace) = self.workspace.upgrade() else {
-            return;
-        };
-        workspace.update(cx, |workspace, cx| {
-            let status_toast = StatusToast::new(message, cx, |this, _| {
-                this.icon(
-                    Icon::new(IconName::GitBranch)
-                        .size(IconSize::Small)
-                        .color(Color::Muted),
-                )
-                .dismiss_button(true)
-            });
-            workspace.toggle_status_toast(status_toast, cx);
-        });
     }
 
     fn revert_entries(
