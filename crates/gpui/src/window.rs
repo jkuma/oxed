@@ -1740,7 +1740,16 @@ impl Window {
         platform_window.on_close(Box::new({
             let mut cx = cx.to_async();
             move || {
-                let _ = handle.update(&mut cx, |_, window, _| window.remove_window());
+                // Platforms also report the close of a window the app already removed.
+                let window_is_open = cx.app.upgrade().is_some_and(|app| {
+                    app.try_borrow_mut()
+                        .is_ok_and(|app| app.windows.contains_key(handle.window_id()))
+                });
+                if window_is_open {
+                    handle
+                        .update(&mut cx, |_, window, _| window.remove_window())
+                        .log_err();
+                }
             }
         }));
         platform_window.on_request_frame(Box::new({
@@ -2594,7 +2603,12 @@ impl Window {
             entity_id,
             Box::new(move |entity, cx| {
                 let entity = entity.downcast_mut().expect("invalid entity type");
-                let _ = window_handle.update(cx, |_, window, cx| on_release(entity, window, cx));
+                // The window can close before the entities it observes are released.
+                if cx.windows.contains_key(window_handle.window_id()) {
+                    window_handle
+                        .update(cx, |_, window, cx| on_release(entity, window, cx))
+                        .log_err();
+                }
             }),
         );
         activate();
