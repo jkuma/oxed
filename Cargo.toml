@@ -67,6 +67,7 @@ members = [
     "crates/markdown",
     "crates/markdown_preview",
     "crates/menu",
+    "crates/merge",
     "crates/mermaid_render",
     "crates/miniprofiler_ui",
     "crates/multi_buffer",

@@ -5881,6 +5881,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "merge"
+version = "0.1.0"
+dependencies = [
+ "imara-diff",
+ "pretty_assertions",
+ "tempfile",
+]
+
+[[package]]
 name = "mermaid_render"
 version = "0.1.0"
 dependencies = [
