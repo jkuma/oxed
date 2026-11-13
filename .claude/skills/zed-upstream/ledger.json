@@ -216,6 +216,13 @@
       "reason": "",
       "title": "git_ui: Avoid cloning repository snapshot when rendering Git graph (#66180)"
     },
+    "5d47f835421d695f29187a379743894619b41f36": {
+      "decision": "ported",
+      "oxed_commit": "9c89528",
+      "pr": 65389,
+      "reason": "",
+      "title": "Allow opening README files by default (#65389)"
+    },
     "5e8998a2a704a16e56ea8540bdd77079a480ea09": {
       "decision": "removed",
       "pr": 66245,
@@ -291,6 +298,13 @@
       "pr": 65444,
       "reason": "touches only code absent from Oxed (acp_thread, agent, agent_ui)",
       "title": "agent: Materialize tool-call diffs lazily, on first view (#65444)"
+    },
+    "9e84b066b55bc3609a30dd965075c12255b38b45": {
+      "decision": "ported",
+      "oxed_commit": "7cb41ec",
+      "pr": 65998,
+      "reason": "",
+      "title": "fs: Preserve child watches when removing parent subscriptions (#65998)"
     },
     "9f305aaf88370e8ca39c702242186e3d8f97ecca": {
       "decision": "removed",
@@ -385,6 +399,13 @@
       "reason": "touches only code absent from Oxed (gpui_macos)",
       "title": "gpui_macos: Migrate display bindings to objc2 (#65714)"
     },
+    "cb593458e1d6ed998709ac5257cb48ab147a5b12": {
+      "decision": "ported",
+      "oxed_commit": "3aee324",
+      "pr": 65252,
+      "reason": "",
+      "title": "project: Match document filter patterns in dynamic registrations (#65252)"
+    },
     "cc23f35a7ded9d5ba62930629d96095b7bee7364": {
       "decision": "ported",
       "oxed_commit": "c8b6eb7",
@@ -428,6 +449,12 @@
       "pr": 66040,
       "reason": "touches only code absent from Oxed (acp_thread, agent_ui)",
       "title": "agent_ui: Show ACP subagents as inline cards (#66040)"
+    },
+    "dde76a1dca5305607a940309ada0568350d1aac6": {
+      "decision": "skipped",
+      "pr": 66156,
+      "reason": "Not wanted: low value for a high conflict risk",
+      "title": "gpui: Some gpui cleanups (#66156)"
     },
     "e0e784e40c7cd735f5a0b8b693b3eca939a7c129": {
       "decision": "ported",
@@ -488,6 +515,12 @@
       "pr": 55294,
       "reason": "",
       "title": "git: Reflect external stash renames (#55294)"
+    },
+    "eee7501970fabf711e1bec286ba4cf2a05586b3f": {
+      "decision": "skipped",
+      "pr": 65989,
+      "reason": "Not wanted: the agent checkpoints code is left as is",
+      "title": "agent: Remove checkpoints (#65989)"
     },
     "f1ccf949d59bc0cc8ec05a4366be4dcb8262aaf8": {
       "decision": "removed",
