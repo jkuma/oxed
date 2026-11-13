@@ -173,18 +173,23 @@ impl MergeDocument {
                 ChunkKind::TheirsOnly => output.push_str(self.theirs_text(chunk)),
                 ChunkKind::Conflict => match &chunk.resolution {
                     Some(resolution) => output.push_str(resolution),
-                    None => {
-                        push_marker(&mut output, "<<<<<<<", labels.ours, newline);
-                        push_section(&mut output, self.ours_text(chunk), newline);
-                        if let Some(base_label) = labels.base {
-                            push_marker(&mut output, "|||||||", base_label, newline);
-                            push_section(&mut output, self.base_text(chunk), newline);
-                        }
-                        output.push_str("=======");
-                        output.push_str(newline);
-                        push_section(&mut output, self.theirs_text(chunk), newline);
-                        push_marker(&mut output, ">>>>>>>", labels.theirs, newline);
-                    }
+                    None => match labels.base {
+                        Some(_) => push_conflict(
+                            &mut output,
+                            labels,
+                            self.ours_text(chunk),
+                            self.base_text(chunk),
+                            self.theirs_text(chunk),
+                            newline,
+                        ),
+                        None => push_refined_conflict(
+                            &mut output,
+                            labels,
+                            self.ours_text(chunk),
+                            self.theirs_text(chunk),
+                            newline,
+                        ),
+                    },
                 },
             }
             base_line = chunk.base.end;
@@ -192,6 +197,55 @@ impl MergeDocument {
         output.push_str(self.base.lines(base_line..self.base.line_count()));
         output
     }
+}
+
+fn push_conflict(
+    output: &mut String,
+    labels: &MarkerLabels,
+    ours: &str,
+    base: &str,
+    theirs: &str,
+    newline: &str,
+) {
+    push_marker(output, "<<<<<<<", labels.ours, newline);
+    push_section(output, ours, newline);
+    if let Some(base_label) = labels.base {
+        push_marker(output, "|||||||", base_label, newline);
+        push_section(output, base, newline);
+    }
+    output.push_str("=======");
+    output.push_str(newline);
+    push_section(output, theirs, newline);
+    push_marker(output, ">>>>>>>", labels.theirs, newline);
+}
+
+/// Without a base section, the lines both sides share stay out of the markers, as git writes
+/// them.
+fn push_refined_conflict(
+    output: &mut String,
+    labels: &MarkerLabels,
+    ours: &str,
+    theirs: &str,
+    newline: &str,
+) {
+    let ours_lines = sources::lines(ours).collect::<Vec<_>>();
+    let theirs_lines = sources::lines(theirs).collect::<Vec<_>>();
+    let lines = |lines: &[&str], range: Range<usize>| lines.get(range).unwrap_or_default().concat();
+    let input = InternedInput::new(ours, theirs);
+    let mut ours_line = 0;
+    for hunk in hunks(&input, Tokens::Lines) {
+        output.push_str(&lines(&ours_lines, ours_line..hunk.before.start as usize));
+        push_conflict(
+            output,
+            labels,
+            &lines(&ours_lines, indices(&hunk.before)),
+            "",
+            &lines(&theirs_lines, indices(&hunk.after)),
+            newline,
+        );
+        ours_line = hunk.before.end as usize;
+    }
+    output.push_str(&lines(&ours_lines, ours_line..ours_lines.len()));
 }
 
 fn line_ending(text: &str) -> &'static str {
@@ -480,7 +534,7 @@ mod tests {
     };
 
     #[allow(clippy::disallowed_methods)]
-    fn git_merge_file(base: &str, ours: &str, theirs: &str) -> String {
+    fn git_merge_file(base: &str, ours: &str, theirs: &str, style: &str) -> String {
         let directory = tempfile::tempdir().expect("temporary directory");
         for (name, content) in [("base", base), ("ours", ours), ("theirs", theirs)] {
             std::fs::write(directory.path().join(name), content).expect("write input");
@@ -489,7 +543,8 @@ mod tests {
             .current_dir(directory.path())
             .env("GIT_CONFIG_GLOBAL", "")
             .env("GIT_CONFIG_SYSTEM", "")
-            .args(["merge-file", "-p", "--diff3", "-L", "ours", "-L", "base"])
+            .args(["merge-file", "-p", style, "--diff-algorithm=histogram"])
+            .args(["-L", "ours", "-L", "base"])
             .args(["-L", "theirs", "ours", "base", "theirs"])
             .output()
             .expect("run git merge-file");
@@ -547,6 +602,12 @@ mod tests {
                 "use a;\nuse b;\nuse d;\n\nfn main() {}\n",
             ),
             (
+                "same import added before different ones",
+                "use a;\n\nfn main() {}\n",
+                "use a;\nuse b;\nuse c;\n\nfn main() {}\n",
+                "use a;\nuse b;\nuse d;\n\nfn main() {}\n",
+            ),
+            (
                 "several conflicts",
                 "1\n2\n3\n4\n5\n6\n7\n8\n9\n",
                 "1\n2a\n3\n4\n5a\n5b\n6\n7\n9\n",
@@ -556,9 +617,21 @@ mod tests {
             let document = merge_texts(Some(base), ours, theirs);
             assert_eq!(
                 document.render(&LABELS),
-                git_merge_file(base, ours, theirs),
+                git_merge_file(base, ours, theirs, "--diff3"),
                 "{name}"
             );
+            // Git also joins conflicts that are less than four lines apart.
+            if name != "several conflicts" {
+                let labels = MarkerLabels {
+                    base: None,
+                    ..LABELS
+                };
+                assert_eq!(
+                    document.render(&labels),
+                    git_merge_file(base, ours, theirs, "--no-diff3"),
+                    "{name} without the base"
+                );
+            }
         }
     }
 
@@ -601,15 +674,36 @@ mod tests {
 
     #[test]
     fn markers_without_base_section() {
-        let document = merge_texts(Some("a\nb\n"), "a\nx\n", "a\ny\n");
         let labels = MarkerLabels {
             ours: "HEAD",
             base: None,
             theirs: "feature",
         };
+        let document = merge_texts(Some("a\nb\n"), "a\nx\n", "a\ny\n");
         assert_eq!(
             document.render(&labels),
             "a\n<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> feature\n"
+        );
+
+        let document = merge_texts(
+            Some("1\n2\n3\n4\n5\n6\n7\n8\n9\n"),
+            "1\n2a\n3\n4\n5a\n5b\n6\n7\n9\n",
+            "1\n2b\n3\n4\n5\n6c\n7\n8\n9\nend\n",
+        );
+        assert_eq!(
+            document.render(&labels),
+            "1\n<<<<<<< HEAD\n2a\n=======\n2b\n>>>>>>> feature\n3\n4\n\
+             <<<<<<< HEAD\n5a\n5b\n6\n=======\n5\n6c\n>>>>>>> feature\n7\n9\nend\n",
+            "nearby conflicts stay apart"
+        );
+
+        let document = merge_texts(Some("a\nb\n"), "A\nm\nB\n", "C\nm\nD\n");
+        assert_eq!(document.conflict_count(), 1);
+        assert_eq!(
+            document.render(&labels),
+            "<<<<<<< HEAD\nA\n=======\nC\n>>>>>>> feature\nm\n\
+             <<<<<<< HEAD\nB\n=======\nD\n>>>>>>> feature\n",
+            "a line both sides share splits the conflict"
         );
     }
 
