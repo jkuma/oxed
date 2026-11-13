@@ -57,6 +57,7 @@ language.workspace = true
 log.workspace = true
 lsp.workspace = true
 markdown.workspace = true
+merge.workspace = true
 node_runtime.workspace = true
 parking_lot.workspace = true
 path.workspace = true

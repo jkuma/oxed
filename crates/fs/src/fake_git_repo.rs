@@ -13,9 +13,9 @@ use git::{
     blame::Blame,
     repository::{
         AskPassDelegate, Branch, CommitData, CommitDataReader, CommitDetails, CommitOptions,
-        CreateWorktreeTarget, FetchOptions, FileHistoryChangedFileSets, GRAPH_CHUNK_SIZE,
-        GitRepository, GitRepositoryCheckpoint, InitialGraphCommitData, LogOrder, LogSource,
-        PushOptions, RefEdit, Remote, RepoPath, ResetMode, SearchCommitArgs, Worktree,
+        ConflictSide, CreateWorktreeTarget, FetchOptions, FileHistoryChangedFileSets,
+        GRAPH_CHUNK_SIZE, GitRepository, GitRepositoryCheckpoint, InitialGraphCommitData, LogOrder,
+        LogSource, PushOptions, RefEdit, Remote, RepoPath, ResetMode, SearchCommitArgs, Worktree,
         commit_hash_search_query,
     },
     stash::GitStash,
@@ -56,11 +56,20 @@ pub enum FakeCommitDataEntry {
     Fail(CommitData),
 }
 
+/// The base, ours and theirs versions of a conflicted path: index stages 1, 2 and 3.
+#[derive(Debug, Clone, Default)]
+pub struct FakeConflictStages {
+    pub base: Option<Vec<u8>>,
+    pub ours: Option<Vec<u8>>,
+    pub theirs: Option<Vec<u8>>,
+}
+
 #[derive(Debug, Clone)]
 pub struct FakeGitRepositoryState {
     pub commit_history: Vec<FakeCommitSnapshot>,
     pub event_emitter: async_channel::Sender<PathBuf>,
     pub unmerged_paths: HashMap<RepoPath, UnmergedStatus>,
+    pub conflict_stages: HashMap<RepoPath, FakeConflictStages>,
     pub head_contents: HashMap<RepoPath, Vec<u8>>,
     pub index_contents: HashMap<RepoPath, Vec<u8>>,
     // everything in commit contents is in oids
@@ -93,6 +102,7 @@ impl FakeGitRepositoryState {
             head_contents: Default::default(),
             index_contents: Default::default(),
             unmerged_paths: Default::default(),
+            conflict_stages: Default::default(),
             blames: Default::default(),
             blames_at_revision: Default::default(),
             current_branch_name: Default::default(),
@@ -383,6 +393,17 @@ impl GitRepository for FakeGitRepository {
             Ok(revisions
                 .into_iter()
                 .map(|rev| {
+                    if let Some((stage, path)) =
+                        rev.strip_prefix(':').and_then(|rest| rest.split_once(':'))
+                        && matches!(stage, "1" | "2" | "3")
+                    {
+                        let stages = state.conflict_stages.get(&RepoPath::new(path).ok()?)?;
+                        return match stage {
+                            "1" => stages.base.clone(),
+                            "2" => stages.ours.clone(),
+                            _ => stages.theirs.clone(),
+                        };
+                    }
                     let (prefix, path) = rev.split_once(':')?;
                     let repo_path = RepoPath::new(path).ok()?;
                     match prefix {
@@ -518,6 +539,48 @@ impl GitRepository for FakeGitRepository {
         async move {
             for (path, content) in restored.await? {
                 fs.write_file_internal(workdir_path.join(path.as_std_path()), content, false)?;
+            }
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn checkout_conflict_side(
+        &self,
+        paths: Vec<RepoPath>,
+        side: ConflictSide,
+        _env: Arc<HashMap<String, String>>,
+    ) -> BoxFuture<'_, Result<()>> {
+        let fs = self.fs.clone();
+        let workdir_path = self.dot_git_path.parent().map(Path::to_path_buf);
+        let resolved = self.with_state_async(true, move |state| {
+            paths
+                .into_iter()
+                .map(|path| {
+                    let stages = state.conflict_stages.remove(&path).with_context(|| {
+                        format!("path '{}' is not conflicted", path.as_unix_str())
+                    })?;
+                    state.unmerged_paths.remove(&path);
+                    let content = match side {
+                        ConflictSide::Ours => stages.ours,
+                        ConflictSide::Theirs => stages.theirs,
+                    };
+                    match &content {
+                        Some(content) => state.index_contents.insert(path.clone(), content.clone()),
+                        None => state.index_contents.remove(&path),
+                    };
+                    Ok((path, content))
+                })
+                .collect::<Result<Vec<_>>>()
+        });
+        async move {
+            let workdir_path = workdir_path.context("repository has no working directory")?;
+            for (path, content) in resolved.await? {
+                let abs_path = workdir_path.join(path.as_std_path());
+                match content {
+                    Some(content) => fs.write_file_internal(abs_path, content, false)?,
+                    None => fs.remove_file(&abs_path, RemoveOptions::default()).await?,
+                }
             }
             Ok(())
         }
@@ -1187,6 +1250,8 @@ impl GitRepository for FakeGitRepository {
             let contents = join_all(contents).await;
             self.with_state_async(true, move |state| {
                 for (path, content) in contents {
+                    state.unmerged_paths.remove(&path);
+                    state.conflict_stages.remove(&path);
                     if let Some(content) = content {
                         state.index_contents.insert(path, content);
                     } else {

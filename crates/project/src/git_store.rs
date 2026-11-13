@@ -38,10 +38,11 @@ use git::{
     parse_git_remote_url,
     repository::{
         Branch, BranchesScanResult, CommitData, CommitDetails, CommitFileStatus, CommitOptions,
-        CreateWorktreeTarget, DiffStatType, DiffType, FetchOptions, FileHistoryChangedFileSets,
-        GitCommitTemplate, GitRepository, GitRepositoryCheckpoint, InitialGraphCommitData,
-        LogOrder, LogSource, PushOptions, Remote, RemoteCommandOutput, RepoPath, ResetMode,
-        SearchCommitArgs, Worktree as GitWorktree, delete_branch_flag, is_binary_content,
+        ConflictSide, CreateWorktreeTarget, DiffStatType, DiffType, FetchOptions,
+        FileHistoryChangedFileSets, GitCommitTemplate, GitRepository, GitRepositoryCheckpoint,
+        InitialGraphCommitData, LogOrder, LogSource, PushOptions, Remote, RemoteCommandOutput,
+        RepoPath, ResetMode, SearchCommitArgs, Worktree as GitWorktree, delete_branch_flag,
+        is_binary_content,
     },
     stash::GitStash,
     status::{self, DiffStat, DiffTreeType, FileStatus, GitSummary, TreeDiff},
@@ -193,6 +194,21 @@ fn decode_git_text(bytes: Vec<u8>) -> Result<String> {
         "Binary files are not supported"
     );
     Ok(text)
+}
+
+/// The versions of a conflicted path in the index stages. A side is missing when it deleted
+/// the path, and the base is missing when both sides added it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConflictStages {
+    pub base: Option<String>,
+    pub ours: Option<String>,
+    pub theirs: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AutomaticResolution {
+    pub conflicts: usize,
+    pub resolved: usize,
 }
 
 #[derive(Debug)]
@@ -4485,6 +4501,143 @@ impl Repository {
                 )
             })?
             .await?
+        })
+    }
+
+    pub fn load_conflict_stages(
+        &mut self,
+        path: RepoPath,
+        cx: &App,
+    ) -> Task<Result<ConflictStages>> {
+        let rx = self.send_job("load_conflict_stages", None, move |state, _| async move {
+            let LocalRepositoryState { backend, .. } = state;
+            let revisions = (1..=3)
+                .map(|stage| format!(":{stage}:{}", path.as_unix_str()))
+                .collect();
+            let mut versions = backend.load_revisions(revisions).await?.into_iter();
+            let mut next_version = || versions.next().flatten().map(decode_git_text).transpose();
+            anyhow::Ok(ConflictStages {
+                base: next_version()?,
+                ours: next_version()?,
+                theirs: next_version()?,
+            })
+        });
+        cx.spawn(|_: &mut AsyncApp| async move { rx.await? })
+    }
+
+    /// Resolves the conflicts in `paths` with one side's version and marks them resolved.
+    pub fn checkout_conflict_side(
+        &mut self,
+        paths: Vec<RepoPath>,
+        side: ConflictSide,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<()>> {
+        let description = match side {
+            ConflictSide::Ours => "git checkout --ours",
+            ConflictSide::Theirs => "git checkout --theirs",
+        };
+        let job_key = GitJobKey::WriteIndex(paths.clone());
+        self.spawn_job_with_tracking(
+            paths.clone(),
+            pending_op::GitStatus::Staged,
+            cx,
+            async move |this, cx| {
+                this.update(cx, |this, _| {
+                    this.send_keyed_job(
+                        "checkout_conflict_side",
+                        Some(job_key),
+                        Some(description.into()),
+                        move |git_repo, _| async move {
+                            let LocalRepositoryState {
+                                backend,
+                                environment,
+                                ..
+                            } = git_repo;
+                            backend
+                                .checkout_conflict_side(paths, side, environment.clone())
+                                .await
+                        },
+                    )
+                })?
+                .await?
+            },
+        )
+    }
+
+    /// Merges the base, ours and theirs versions of a conflicted path again, resolves what the
+    /// merge strategies can, and saves the result. The path stays conflicted until it is staged.
+    pub fn resolve_conflicts_automatically(
+        &mut self,
+        path: RepoPath,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<AutomaticResolution>> {
+        let Some(buffer_store) = self.buffer_store(cx) else {
+            return Task::ready(Err(anyhow!("the project is no longer available")));
+        };
+        let Some(project_path) = self.repo_path_to_project_path(&path, cx) else {
+            return Task::ready(Err(anyhow!(
+                "{} is outside of the project",
+                path.as_unix_str()
+            )));
+        };
+        let stages = self.load_conflict_stages(path.clone(), cx);
+        let buffer = buffer_store.update(cx, |buffer_store, cx| {
+            buffer_store.open_buffer(project_path, cx)
+        });
+        cx.spawn(async move |_, cx| {
+            let stages = stages.await?;
+            let buffer = buffer.await?;
+            let (ours, theirs) = match (stages.ours, stages.theirs) {
+                (Some(ours), Some(theirs)) => (ours, theirs),
+                (None, None) => anyhow::bail!("{} is not conflicted", path.as_unix_str()),
+                _ => anyhow::bail!(
+                    "{} was deleted on one side, accept a side instead",
+                    path.as_unix_str()
+                ),
+            };
+            let (labels, has_unsaved_edits) = buffer.read_with(cx, |buffer, _| {
+                let conflicts = ConflictSet::parse(&buffer.text_snapshot()).conflicts;
+                let labels = conflicts.first().map(|conflict| {
+                    (
+                        conflict.ours_branch_name.to_string(),
+                        conflict.base.is_some(),
+                        conflict.theirs_branch_name.to_string(),
+                    )
+                });
+                (labels, buffer.has_unsaved_edits())
+            });
+            anyhow::ensure!(
+                !has_unsaved_edits,
+                "save or discard the changes to {} first",
+                path.as_unix_str()
+            );
+            let (ours_label, has_base_section, theirs_label) = labels
+                .with_context(|| format!("{} has no conflict markers left", path.as_unix_str()))?;
+            let base = stages.base;
+            let (text, resolution) = cx
+                .background_spawn(async move {
+                    let mut document = merge::merge_texts(base.as_deref(), &ours, &theirs);
+                    let conflicts = document.conflict_count();
+                    merge::resolve_whitespace(&mut document);
+                    merge::resolve_words(&mut document);
+                    let resolution = AutomaticResolution {
+                        conflicts,
+                        resolved: conflicts - document.conflict_count(),
+                    };
+                    let text = document.render(&merge::MarkerLabels {
+                        ours: &ours_label,
+                        base: has_base_section.then_some("base"),
+                        theirs: &theirs_label,
+                    });
+                    (text, resolution)
+                })
+                .await;
+            let diff = buffer.update(cx, |buffer, cx| buffer.diff(text, cx)).await;
+            buffer.update(cx, |buffer, cx| buffer.apply_diff(diff, cx));
+            buffer_store
+                .update(cx, |buffer_store, cx| buffer_store.save_buffer(buffer, cx))
+                .await?;
+            Ok(resolution)
         })
     }
 

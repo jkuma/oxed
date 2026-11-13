@@ -46,13 +46,13 @@ mod fake_git_repo;
 #[cfg(feature = "test-support")]
 use collections::{BTreeMap, btree_map};
 #[cfg(feature = "test-support")]
-pub use fake_git_repo::FakeBlobReadGate;
+pub use fake_git_repo::{FakeBlobReadGate, FakeConflictStages};
 #[cfg(feature = "test-support")]
 use fake_git_repo::{FakeCommitDataEntry, FakeGitRepositoryState};
 #[cfg(feature = "test-support")]
 use git::{
     repository::{CommitData, InitialGraphCommitData, RepoPath, Worktree, repo_path},
-    status::{FileStatus, StatusCode, TrackedStatus, UnmergedStatus},
+    status::{FileStatus, StatusCode, TrackedStatus, UnmergedStatus, UnmergedStatusCode},
 };
 #[cfg(feature = "test-support")]
 use util::paths::normalize_path;
@@ -2152,6 +2152,34 @@ impl FakeFs {
                     .iter()
                     .map(|(path, content)| (path.clone(), *content)),
             );
+        })
+        .unwrap();
+    }
+
+    /// Leaves each path conflicted, with its base, ours and theirs versions in the index stages.
+    pub fn set_merge_conflicts_for_repo(
+        &self,
+        dot_git: &Path,
+        conflicts: &[(&str, FakeConflictStages)],
+    ) {
+        self.with_git_state(dot_git, true, |state| {
+            for (path, stages) in conflicts {
+                let path = repo_path(path);
+                let head_status = |version: &Option<Vec<u8>>| match (version, &stages.base) {
+                    (None, _) => UnmergedStatusCode::Deleted,
+                    (Some(_), None) => UnmergedStatusCode::Added,
+                    (Some(_), Some(_)) => UnmergedStatusCode::Updated,
+                };
+                state.unmerged_paths.insert(
+                    path.clone(),
+                    UnmergedStatus {
+                        first_head: head_status(&stages.ours),
+                        second_head: head_status(&stages.theirs),
+                    },
+                );
+                state.index_contents.remove(&path);
+                state.conflict_stages.insert(path, stages.clone());
+            }
         })
         .unwrap();
     }

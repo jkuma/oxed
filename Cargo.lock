@@ -7866,6 +7866,7 @@ dependencies = [
  "log",
  "lsp",
  "markdown",
+ "merge",
  "node_runtime",
  "parking_lot",
  "path",

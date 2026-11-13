@@ -652,6 +652,22 @@ pub struct Remote {
     pub name: SharedString,
 }
 
+/// One side of a merge conflict: ours is stage 2 of the index, theirs is stage 3.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConflictSide {
+    Ours,
+    Theirs,
+}
+
+impl ConflictSide {
+    pub fn stage(self) -> u8 {
+        match self {
+            Self::Ours => 2,
+            Self::Theirs => 3,
+        }
+    }
+}
+
 pub enum ResetMode {
     /// Reset the branch pointer, leave index and worktree unchanged (this will make it look like things that were
     /// committed are now staged).
@@ -899,6 +915,15 @@ pub trait GitRepository: Send + Sync {
         &self,
         commit: Option<String>,
         paths: Vec<RepoPath>,
+        env: Arc<HashMap<String, String>>,
+    ) -> BoxFuture<'_, Result<()>>;
+
+    /// Resolves the conflicts in `paths` with one side's version and marks them resolved. A path
+    /// that side deleted is removed.
+    fn checkout_conflict_side(
+        &self,
+        paths: Vec<RepoPath>,
+        side: ConflictSide,
         env: Arc<HashMap<String, String>>,
     ) -> BoxFuture<'_, Result<()>>;
 
@@ -1573,6 +1598,69 @@ impl GitRepository for RealGitRepository {
                 "Failed to checkout files:\n{}",
                 String::from_utf8_lossy(&output.stderr),
             );
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn checkout_conflict_side(
+        &self,
+        paths: Vec<RepoPath>,
+        side: ConflictSide,
+        env: Arc<HashMap<String, String>>,
+    ) -> BoxFuture<'_, Result<()>> {
+        let git = self.git_binary_in_worktree();
+        async move {
+            let git = git?;
+            if paths.is_empty() {
+                return Ok(());
+            }
+            let stage = side.stage();
+            let side_versions = self
+                .load_revisions(
+                    paths
+                        .iter()
+                        .map(|path| format!(":{stage}:{}", path.as_unix_str()))
+                        .collect(),
+                )
+                .await?;
+            let (kept, deleted): (Vec<_>, Vec<_>) = paths
+                .iter()
+                .zip(side_versions)
+                .partition(|(_, version)| version.is_some());
+            let kept = kept
+                .into_iter()
+                .map(|(path, _)| path.as_unix_str())
+                .collect::<Vec<_>>();
+            let deleted = deleted
+                .into_iter()
+                .map(|(path, _)| path.as_unix_str())
+                .collect::<Vec<_>>();
+            let side_flag = match side {
+                ConflictSide::Ours => "--ours",
+                ConflictSide::Theirs => "--theirs",
+            };
+            let mut commands = Vec::new();
+            if !kept.is_empty() {
+                commands.push((vec!["checkout", side_flag, "--"], &kept));
+                commands.push((vec!["update-index", "--add", "--remove", "--"], &kept));
+            }
+            if !deleted.is_empty() {
+                commands.push((vec!["rm", "--quiet", "--"], &deleted));
+            }
+            for (args, paths) in commands {
+                let output = git
+                    .build_command(&args)
+                    .envs(env.iter())
+                    .args(paths.iter())
+                    .output()
+                    .await?;
+                anyhow::ensure!(
+                    output.status.success(),
+                    "Failed to resolve conflicts:\n{}",
+                    String::from_utf8_lossy(&output.stderr),
+                );
+            }
             Ok(())
         }
         .boxed()
@@ -5800,6 +5888,83 @@ mod tests {
 
         let message = git_command_output(repo_dir.path(), ["log", "-1", "--pretty=%B"]);
         assert_eq!(message, "Commit without verification");
+    }
+
+    #[gpui::test]
+    #[allow(clippy::disallowed_methods)]
+    async fn test_conflict_stages_and_checkout_conflict_side(cx: &mut TestAppContext) {
+        disable_git_global_config();
+        cx.executor().allow_parking();
+
+        let repo_dir = tempfile::tempdir().unwrap();
+        let path = repo_dir.path();
+        git_init_repo(path);
+        fs::write(path.join("modified.txt"), "a\nbase\n").unwrap();
+        fs::write(path.join("deleted.txt"), "x\n").unwrap();
+        git_command(path, ["add", "."]);
+        git_command(path, ["commit", "-m", "base"]);
+        git_command(path, ["checkout", "-b", "feature"]);
+        fs::write(path.join("modified.txt"), "a\ntheirs\n").unwrap();
+        git_command(path, ["rm", "--quiet", "deleted.txt"]);
+        git_command(path, ["commit", "-am", "feature"]);
+        git_command(path, ["checkout", "main"]);
+        fs::write(path.join("modified.txt"), "a\nours\n").unwrap();
+        fs::write(path.join("deleted.txt"), "X\n").unwrap();
+        git_command(path, ["commit", "-am", "main"]);
+        let merge = std::process::Command::new("git")
+            .args(["merge", "--no-edit", "feature"])
+            .current_dir(path)
+            .envs(test_commit_envs())
+            .output()
+            .unwrap();
+        assert!(!merge.status.success(), "the merge should conflict");
+
+        let repo =
+            RealGitRepository::new(&path.join(".git"), Some("git".into()), cx.executor()).unwrap();
+        let revisions = [
+            ":1:modified.txt",
+            ":2:modified.txt",
+            ":3:modified.txt",
+            ":3:deleted.txt",
+            ":modified.txt",
+        ];
+        assert_eq!(
+            repo.load_revisions(revisions.map(String::from).to_vec())
+                .await
+                .unwrap(),
+            vec![
+                Some(b"a\nbase\n".to_vec()),
+                Some(b"a\nours\n".to_vec()),
+                Some(b"a\ntheirs\n".to_vec()),
+                None,
+                None,
+            ]
+        );
+
+        repo.checkout_conflict_side(
+            vec![repo_path("modified.txt")],
+            ConflictSide::Ours,
+            Arc::new(HashMap::default()),
+        )
+        .await
+        .unwrap();
+        repo.checkout_conflict_side(
+            vec![repo_path("deleted.txt")],
+            ConflictSide::Theirs,
+            Arc::new(HashMap::default()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(path.join("modified.txt")).unwrap(),
+            "a\nours\n"
+        );
+        assert!(!path.join("deleted.txt").exists());
+        assert_eq!(git_command_output(path, ["ls-files", "--unmerged"]), "");
+        assert_eq!(
+            git_command_output(path, ["status", "--porcelain"]),
+            "D  deleted.txt"
+        );
     }
 
     #[gpui::test]

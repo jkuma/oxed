@@ -2516,3 +2516,135 @@ mod repository_activation_tests {
         });
     }
 }
+
+mod conflict_resolution_tests {
+    use crate::Project;
+    use fs::{FakeConflictStages, FakeFs, Fs as _};
+    use git::repository::{ConflictSide, repo_path};
+    use gpui::{BackgroundExecutor, TestAppContext};
+    use project::git_store::{AutomaticResolution, ConflictStages};
+    use serde_json::json;
+    use std::path::Path;
+
+    #[gpui::test]
+    async fn test_resolve_conflicts_from_index_stages(
+        executor: BackgroundExecutor,
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| settings::init(cx));
+        let base = "x = 1\ny = 2\n\nvalue = 1\n";
+        let ours = "x = 10\ny = 2\n\nvalue = 2\n";
+        let theirs = "x = 1\ny = 20\n\nvalue = 3\n";
+        let conflicted = "<<<<<<< HEAD\nx = 10\ny = 2\n=======\nx = 1\ny = 20\n>>>>>>> feature\n\n\
+                          <<<<<<< HEAD\nvalue = 2\n=======\nvalue = 3\n>>>>>>> feature\n";
+        let fs = FakeFs::new(executor);
+        fs.insert_tree(
+            "/project",
+            json!({
+                ".git": {},
+                "settings.txt": conflicted,
+                "deleted.txt": "kept!\n",
+            }),
+        )
+        .await;
+        fs.set_merge_conflicts_for_repo(
+            Path::new("/project/.git"),
+            &[
+                (
+                    "settings.txt",
+                    FakeConflictStages {
+                        base: Some(base.into()),
+                        ours: Some(ours.into()),
+                        theirs: Some(theirs.into()),
+                    },
+                ),
+                (
+                    "deleted.txt",
+                    FakeConflictStages {
+                        base: Some(b"kept\n".to_vec()),
+                        ours: Some(b"kept!\n".to_vec()),
+                        theirs: None,
+                    },
+                ),
+            ],
+        );
+        let project = Project::test(fs.clone(), ["/project".as_ref()], cx).await;
+        cx.run_until_parked();
+        let repository = project
+            .read_with(cx, |project, cx| project.active_repository(cx))
+            .expect("repository");
+        let is_conflicted = |path: &str, cx: &mut TestAppContext| {
+            repository.read_with(cx, |repository, _| {
+                repository
+                    .status_for_path(&repo_path(path))
+                    .is_some_and(|entry| entry.status.is_conflicted())
+            })
+        };
+        assert!(is_conflicted("settings.txt", cx));
+
+        let stages = repository
+            .update(cx, |repository, cx| {
+                repository.load_conflict_stages(repo_path("settings.txt"), cx)
+            })
+            .await
+            .expect("load stages");
+        assert_eq!(
+            stages,
+            ConflictStages {
+                base: Some(base.to_string()),
+                ours: Some(ours.to_string()),
+                theirs: Some(theirs.to_string()),
+            }
+        );
+
+        let resolution = repository
+            .update(cx, |repository, cx| {
+                repository.resolve_conflicts_automatically(repo_path("settings.txt"), cx)
+            })
+            .await
+            .expect("resolve conflicts");
+        assert_eq!(
+            resolution,
+            AutomaticResolution {
+                conflicts: 2,
+                resolved: 1,
+            }
+        );
+        assert_eq!(
+            fs.load(Path::new("/project/settings.txt")).await.unwrap(),
+            "x = 10\ny = 20\n\n<<<<<<< HEAD\nvalue = 2\n=======\nvalue = 3\n>>>>>>> feature\n"
+        );
+        cx.run_until_parked();
+        assert!(
+            is_conflicted("settings.txt", cx),
+            "resolving automatically does not stage the file"
+        );
+
+        let error = repository
+            .update(cx, |repository, cx| {
+                repository.resolve_conflicts_automatically(repo_path("deleted.txt"), cx)
+            })
+            .await
+            .expect_err("a side deleted the file");
+        assert!(error.to_string().contains("deleted on one side"), "{error}");
+
+        repository
+            .update(cx, |repository, cx| {
+                repository.checkout_conflict_side(
+                    vec![repo_path("settings.txt"), repo_path("deleted.txt")],
+                    ConflictSide::Theirs,
+                    cx,
+                )
+            })
+            .await
+            .expect("accept theirs");
+        cx.run_until_parked();
+        assert_eq!(
+            fs.load(Path::new("/project/settings.txt")).await.unwrap(),
+            theirs
+        );
+        assert!(!fs.is_file(Path::new("/project/deleted.txt")).await);
+        assert!(!is_conflicted("settings.txt", cx));
+        assert!(!is_conflicted("deleted.txt", cx));
+    }
+}

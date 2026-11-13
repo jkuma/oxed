@@ -226,6 +226,7 @@ lsp_locations = { path = "crates/lsp_locations" }
 markdown = { path = "crates/markdown" }
 markdown_preview = { path = "crates/markdown_preview" }
 menu = { path = "crates/menu" }
+merge = { path = "crates/merge" }
 mermaid_render = { path = "crates/mermaid_render" }
 miniprofiler_ui = { path = "crates/miniprofiler_ui" }
 multi_buffer = { path = "crates/multi_buffer" }
